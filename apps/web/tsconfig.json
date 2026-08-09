@@ -1,0 +1,27 @@
+{
+  "extends": "@harolds/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "ES2022"],
+    "allowJs": true,
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "noUncheckedIndexedAccess": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@harolds/config": ["../../packages/config/src/index.ts"],
+      "@harolds/config/*": ["../../packages/config/src/*"],
+      "@harolds/db": ["../../packages/db/src/index.ts"],
+      "@harolds/db/*": ["../../packages/db/src/*"],
+      "@harolds/types": ["../../packages/types/src/index.ts"]
+    },
+    "types": ["node"]
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

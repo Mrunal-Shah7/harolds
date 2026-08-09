@@ -1,0 +1,36 @@
+{
+  "name": "@harolds/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./store-config": "./src/store-config.ts"
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "seed": "tsx src/seed/index.ts",
+    "verify": "tsx src/verify.ts",
+    "studio": "prisma studio",
+    "test:currency": "tsx --test src/seed/currency.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@harolds/config": "workspace:*",
+    "@harolds/types": "workspace:*",
+    "@prisma/client": "^6.1.0",
+    "dotenv": "^16.4.7",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "prisma": "^6.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,5 @@
+# SPRINT-1: Next.js app ignore rules (extends root gitignore concerns)
+node_modules
+.next
+out
+.env*.local

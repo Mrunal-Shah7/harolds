@@ -1,0 +1,12 @@
+# SPRINT-1: normalize line endings so Windows and other checkouts avoid whole-file diffs
+* text=auto eol=lf
+
+*.{cmd,bat} text eol=crlf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.xlsx binary
+*.pdf binary

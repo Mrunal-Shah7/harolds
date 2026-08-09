@@ -1,0 +1,39 @@
+# SPRINT-1: repository ignore rules
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build / output
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Environment — real secrets must never be committed
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Prisma
+packages/db/src/generated/
+
+# Logs and caches
+*.log
+npm-debug.log*
+.pnpm-debug.log*
+.turbo/
+.cache/
+.eslintcache
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Test / coverage
+coverage/

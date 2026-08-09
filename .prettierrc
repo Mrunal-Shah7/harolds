@@ -1,0 +1,7 @@
+# SPRINT-1: shared Prettier configuration for consistent formatting across Windows checkouts
+semi: true
+singleQuote: false
+trailingComma: "all"
+printWidth: 100
+tabWidth: 2
+endOfLine: "lf"

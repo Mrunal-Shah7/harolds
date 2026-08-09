@@ -1,0 +1,9 @@
+# SPRINT-1: paths Prettier should skip
+node_modules
+.next
+dist
+build
+coverage
+packages/db/src/generated
+pnpm-lock.yaml
+*.xlsx

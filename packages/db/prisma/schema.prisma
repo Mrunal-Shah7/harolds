@@ -1,0 +1,446 @@
+// SPRINT-1: Prisma schema — complete data model for menu, ordering, fulfilment, and operations.
+// Later sprints add rows, not tables. All money is integer US cents (*Cents suffix). No soft deletes.
+
+generator client {
+  provider = "prisma-client-js"
+  // Generated into the package so @harolds/db can re-export a single shared client.
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enumerations
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Kitchen-display–driven order lifecycle (Sprint 6).
+enum OrderStatus {
+  AWAITING_PAYMENT
+  PAID
+  PRINTED
+  IN_PROGRESS
+  READY
+  PICKED_UP
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORISED
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+/// v1 is pickup only. Declared as a single-value enum so delivery can be added later without a column change.
+enum FulfilmentType {
+  PICKUP
+}
+
+enum PrintTarget {
+  KITCHEN_TICKET
+  COUNTER_RECEIPT
+}
+
+enum PrintJobStatus {
+  QUEUED
+  SENT
+  PRINTED
+  FAILED
+  CANCELLED
+}
+
+/// Job types for the in-process worker (Sprint 7).
+enum JobType {
+  SMS_ORDER_READY
+  SMS_ORDER_CONFIRMATION
+  EMAIL_ORDER_RECEIPT
+  EMAIL_ORDER_READY
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  /// Attempt failed; job will be retried (runAfter pushed forward).
+  FAILED
+  /// Attempt ceiling reached; human intervention required. Distinct from FAILED.
+  DEAD
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Menu domain
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Menu section (e.g. Chicken Dinners). Slug is stored (not computed at render) for storefront anchors.
+model Category {
+  id          String   @id @default(cuid())
+  /// Stable natural key from the reconciliation workbook (e.g. cat_whole_dinners). Used for idempotent seeding.
+  workbookId  String   @unique
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items MenuItem[]
+
+  @@index([sortOrder])
+}
+
+/// Purchasable product. Board label preserves terse menu-board text; display name is storefront-unambiguous.
+model MenuItem {
+  id                   String   @id @default(cuid())
+  /// Stable natural key from the workbook (e.g. itm_whole_2pc). Used for idempotent seeding.
+  workbookId           String   @unique
+  categoryId           String
+  name                 String
+  /// Original menu-board text, preserved verbatim including capitalisation. Kitchen may prefer this.
+  boardLabel           String?
+  description          String?
+  /// Base price in US cents. Never float/decimal.
+  basePriceCents       Int
+  imageUrl             String?
+  isActive             Boolean  @default(true)
+  /// Temporary same-day condition; distinct from isActive (removed from menu).
+  isSoldOut            Boolean  @default(false)
+  sortOrder            Int
+  isFeatured           Boolean  @default(false)
+  featuredSortOrder    Int?
+  isMostOrdered        Boolean  @default(false)
+  mostOrderedSortOrder Int?
+  /// True when workbook flag is PLACEHOLDER — invented price, needs admin correction.
+  isUnverifiedPrice    Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Cascade: Restrict — deleting a category must not silently orphan/delete items.
+  // Admin must reassign or deactivate items first.
+  category       Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  modifierGroups ItemModifierGroup[]
+  orderLines     OrderLine[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+  @@index([sortOrder])
+  @@index([isFeatured, featuredSortOrder])
+  @@index([isMostOrdered, mostOrderedSortOrder])
+}
+
+/// Set of choices offered against one or more items (toppings, prep, add-ons).
+model ModifierGroup {
+  id            String   @id @default(cuid())
+  /// Stable natural key from the workbook (e.g. mg_toppings).
+  workbookId    String   @unique
+  /// Internal name used by admin / kitchen ticket.
+  name          String
+  /// Customer-facing prompt rendered by the storefront.
+  prompt        String
+  /// Derived from but not equal to minSelect > 0 — store both for unambiguous validation.
+  isRequired    Boolean  @default(false)
+  minSelect     Int      @default(0)
+  maxSelect     Int      @default(1)
+  sortOrder     Int
+  isActive      Boolean  @default(true)
+  /// True when workbook flag is PROVISIONAL — reconstructed from screenshots, needs replacement.
+  isProvisional Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  options ModifierOption[]
+  items   ItemModifierGroup[]
+
+  @@index([sortOrder])
+}
+
+/// Selectable choice within a modifier group. priceDeltaCents may be zero or positive.
+model ModifierOption {
+  id                String   @id @default(cuid())
+  /// Stable natural key from the workbook (e.g. mo_add_fries).
+  workbookId        String   @unique
+  groupId           String
+  name              String
+  /// Price delta in US cents relative to the item base. Zero or positive; never float.
+  priceDeltaCents   Int      @default(0)
+  sortOrder         Int
+  isActive          Boolean  @default(true)
+  /// Independent of item sold-out — running out of one sauce must not remove the item.
+  isSoldOut         Boolean  @default(false)
+  isDefaultSelected Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Cascade: Cascade — options belong exclusively to their group; deleting the group removes its options.
+  group ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([groupId, name])
+  @@index([groupId])
+  @@index([sortOrder])
+}
+
+/// Join binding modifier groups to items.
+/// WHY A JOIN TABLE: a single group (e.g. sauce selection) attaches to many items.
+/// Duplicating groups per item would mean changing one option requires editing every item —
+/// and one of those edits will eventually be missed.
+model ItemModifierGroup {
+  id        String   @id @default(cuid())
+  itemId    String
+  groupId   String
+  /// Order in which groups appear within this specific item.
+  sortOrder Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Cascade: Cascade — removing an item or group cleans up the binding.
+  item  MenuItem      @relation(fields: [itemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  group ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([itemId, groupId])
+  @@index([itemId])
+  @@index([groupId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ordering domain
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Order {
+  id String @id @default(cuid())
+
+  /// Human-readable order number including prefix (e.g. "HC-1042"). Unique; shown on ticket.
+  orderNumber   String @unique
+  /// Raw integer allocated from OrderNumberCounter — sorts correctly; prefix is applied when composing orderNumber.
+  orderSequence Int
+
+  // Customer (guest checkout — no account relation)
+  customerFirstName String
+  customerLastName  String
+  /// Normalised international format (E.164).
+  customerPhone     String
+  customerEmail     String
+  smsConsent        Boolean   @default(false)
+  /// Compliance: consent captured at checkout with timestamp (Sprint 7 messaging).
+  smsConsentAt      DateTime?
+
+  // Money — all integers in US cents. Never float/decimal.
+  subtotalCents         Int
+  taxCents              Int
+  tipCents              Int     @default(0)
+  totalCents            Int
+  refundedCents         Int     @default(0)
+  /// Tax rate that was actually charged, in basis points (1010 = 10.10%). Snapshotted so historical orders stay reconcilable.
+  taxRateBps            Int
+  /// Whether tax was applied to the pre-discount subtotal for this order.
+  taxAppliedPreDiscount Boolean
+
+  // Payment (nullable until Sprint 4)
+  paymentStatus      PaymentStatus @default(PENDING)
+  processorPaymentId String?
+  processorOrderId   String?
+  paymentCapturedAt  DateTime?
+
+  // Fulfilment
+  fulfilmentType   FulfilmentType @default(PICKUP)
+  status           OrderStatus    @default(AWAITING_PAYMENT)
+  estimatedReadyAt DateTime?
+  paidAt           DateTime?
+  printedAt        DateTime?
+  readyAt          DateTime?
+  pickedUpAt       DateTime?
+  cancelledAt      DateTime?
+
+  customerNote String?
+  staffNote    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines     OrderLine[]
+  printJobs PrintJob[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerPhone])
+}
+
+/// Line item with a COMPLETE purchase snapshot.
+/// WHY THE REDUNDANCY IS DELIBERATE: joining a historical order to the live menu means that
+/// raising a price silently rewrites every past receipt, which makes reconciliation impossible
+/// and is the single most common failure in systems of this kind. An order line must be fully
+/// renderable, reprintable, and reconcilable years later without reading the menu tables.
+model OrderLine {
+  id         String  @id @default(cuid())
+  orderId    String
+  /// Nullable analytics-only link. Must not cascade-delete — historical lines survive menu deletions.
+  menuItemId String?
+  quantity   Int
+
+  // Snapshot fields
+  itemName                String
+  boardLabel              String?
+  unitPriceCents          Int
+  /// Sum of selected modifier price deltas at purchase.
+  modifierTotalCents      Int     @default(0)
+  /// unitPriceCents + modifierTotalCents
+  effectiveUnitPriceCents Int
+  /// effectiveUnitPriceCents * quantity
+  lineTotalCents          Int
+  /// JSON array of { groupName, groupPrompt, optionName, priceDeltaCents }
+  selectedModifiers       Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Cascade: Cascade — lines belong to their order.
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  // Cascade: SetNull — deleting a menu item must not destroy historical order lines.
+  menuItem MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([orderId])
+  @@index([menuItemId])
+}
+
+/// Atomic, gap-free sequential order-number allocation under concurrent access.
+/// WHY NOT A DATABASE SEQUENCE: the counter must be readable, resettable, and auditable from
+/// the admin panel, and its current value must be visible without special privileges.
+/// Allocation: BEGIN; SELECT … FOR UPDATE; increment; write; COMMIT.
+/// The prefix is NOT stored here — it lives in StoreConfig so it can change without touching the counter.
+model OrderNumberCounter {
+  /// Fixed single-row identifier.
+  id           String   @id @default("default")
+  currentValue Int
+  updatedAt    DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fulfilment and operations
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Single ticket destined for the thermal printer. Sprint 5 implements transport.
+model PrintJob {
+  id             String         @id @default(cuid())
+  orderId        String
+  target         PrintTarget
+  status         PrintJobStatus @default(QUEUED)
+  /// Stored payload so a reprint reproduces the original ticket byte for byte.
+  payload        String
+  printerSerial  String
+  attemptCount   Int            @default(0)
+  maxAttempts    Int            @default(3)
+  /// When the payload was handed to the printer (nullable until sent).
+  sentAt         DateTime?
+  /// When the printer acknowledged completion (nullable until ack). Gap vs sentAt detects silent failures.
+  acknowledgedAt DateTime?
+  lastError      String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Cascade: Cascade — print jobs belong to their order.
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([orderId])
+  /// Hottest query: printer polls for queued work addressed to it every few seconds.
+  @@index([status, printerSerial])
+}
+
+/// Generic deferred-work table. No Redis — a long-lived in-process worker drains this on an interval.
+model BackgroundJob {
+  id            String    @id @default(cuid())
+  type          JobType
+  status        JobStatus @default(PENDING)
+  payload       Json
+  attemptCount  Int       @default(0)
+  maxAttempts   Int       @default(5)
+  /// Earliest time the job may run — enables retry-with-backoff without a scheduler.
+  runAfter      DateTime  @default(now())
+  lastAttemptAt DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  /// Worker polling query: pending/failed jobs whose runAfter has passed.
+  @@index([status, runAfter])
+}
+
+/// Single-row store configuration. Fixed PK so the row is always fetchable without "first row" queries.
+/// Singleton is enforced by PK(id) plus a DB check constraint requiring id = 'default' (see migration SQL).
+model StoreConfig {
+  /// Fixed known primary key — enforces singleton together with StoreConfig_singleton_check.
+  id String @id @default("default")
+
+  // Identity
+  storeName    String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  postalCode   String
+  contactPhone String
+  /// IANA timezone (e.g. America/Chicago). Not optional — order timestamps are UTC; staff see store-local time.
+  timezone     String
+
+  // Tax
+  /// Tax rate in basis points (1010 = 10.10%).
+  taxRateBps            Int
+  /// When true, tax applies to the pre-discount subtotal.
+  taxAppliedPreDiscount Boolean @default(true)
+
+  // Order numbering
+  orderNumberPrefix     String
+  orderNumberStartValue Int
+
+  // Prep time — nothing computes prep from queue depth in v1.
+  normalPrepMinutes Int
+  busyPrepMinutes   Int
+  isBusy            Boolean @default(false)
+
+  // Tipping — calculated on the post-tax total.
+  tippingEnabled        Boolean @default(true)
+  /// Ordered list of tip percentages in basis points (e.g. [1500, 1800, 2000] = 15/18/20%).
+  tipPresetsBps         Int[]
+  defaultTipPresetIndex Int     @default(0)
+
+  // Operations
+  acceptingOrders     Boolean @default(true)
+  notAcceptingMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Weekly opening hours — one row per day of week (0 = Sunday … 6 = Saturday).
+/// Times are local wall-clock against StoreConfig.timezone, not absolute timestamps.
+/// A closing time earlier than opening denotes a session crossing midnight.
+model StoreHours {
+  id        String   @id @default(cuid())
+  /// 0 = Sunday, 6 = Saturday.
+  dayOfWeek Int
+  /// Local wall-clock open time as "HH:mm" (24h). Null when isClosed.
+  openTime  String?
+  /// Local wall-clock close time as "HH:mm" (24h). Null when isClosed.
+  /// If closeTime < openTime, the session crosses midnight.
+  closeTime String?
+  isClosed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dayOfWeek])
+}
+
+/// One-off closure dates (holidays, etc.).
+model StoreClosure {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date])
+}

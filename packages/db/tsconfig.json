@@ -1,0 +1,12 @@
+{
+  "extends": "@harolds/config/tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "types": ["node"],
+    // Prisma generated client uses CommonJS-style exports; skip verbatim for this package.
+    "verbatimModuleSyntax": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "src/generated"]
+}

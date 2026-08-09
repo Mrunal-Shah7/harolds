@@ -1,0 +1,33 @@
+{
+  "name": "harolds",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Harold's Chicken Oak Lawn — in-house online ordering system",
+  "engines": {
+    "node": "24.x",
+    "pnpm": "9.x"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter @harolds/web dev",
+    "build": "pnpm -r --filter=./packages/* build && pnpm --filter @harolds/web build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @harolds/db generate",
+    "db:migrate": "pnpm --filter @harolds/db migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @harolds/db migrate:deploy",
+    "db:seed": "pnpm --filter @harolds/db seed",
+    "db:verify": "pnpm --filter @harolds/db verify",
+    "db:studio": "pnpm --filter @harolds/db studio"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.1",
+    "eslint": "^10.8.1",
+    "prettier": "^3.9.6",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.19.0"
+  }
+}
