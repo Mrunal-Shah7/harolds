@@ -1,0 +1,879 @@
+# SPRINT-2: Harold's Chicken Oak Lawn — public Menu + Store Status API (v1)
+# Contract version 1.0.0 — frozen; post-freeze changes are additive only.
+openapi: 3.0.3
+info:
+  title: Harold's Chicken Oak Lawn — Public API
+  version: "1.0.0"
+  description: |
+    Read-only public API for the Harold's Chicken Oak Lawn online ordering storefront.
+
+    ## Contract freeze
+
+    This document describes **contract version 1.0.0**, frozen at the end of Sprint 2.
+    After the freeze, changes are **additive only** (new optional fields / new endpoints under a
+    version bump when breaking). Renames and removals are not permitted without an explicit
+    version bump agreed in advance.
+
+    ## Scope (v1)
+
+    Pickup only, guest checkout only, ASAP orders only. Cart, pricing, checkout, and order
+    placement arrive in later sprints and are **not** part of this document.
+
+    ## Response envelope
+
+    Success responses:
+
+    ```json
+    { "data": <payload>, "meta": { "serverTime": "<ISO UTC>", "version": "1.0.0" } }
+    ```
+
+    Failure responses:
+
+    ```json
+    {
+      "error": { "code": "<ApiErrorCode>", "message": "<string>", "details": null },
+      "meta": { "serverTime": "<ISO UTC>", "version": "1.0.0" }
+    }
+    ```
+
+    ## Serialisation rules
+
+    - Money is an **integer number of US cents**, never a string, never a float. Money field
+      names end in `Cents` (for example `basePriceCents`, `priceDeltaCents`).
+    - Timestamps are ISO 8601 strings in **UTC** with an explicit zone designator
+      (for example `2026-08-09T17:00:00.000Z`).
+    - Wall-clock store hours (`openTime` / `closeTime`) are strings in 24-hour `HH:mm` form.
+      They are **not** timestamps — they carry no date and no zone, and are interpreted against
+      the store's configured `timezone` (America/Chicago).
+    - Dates without times (`closures[].date`) are ISO calendar dates (`YYYY-MM-DD`).
+    - Nullable fields are present with a `null` value rather than omitted.
+    - Field names are camelCase throughout.
+
+    ## Error codes
+
+    | code | HTTP | meaning |
+    |------|------|---------|
+    | NOT_FOUND | 404 | Unknown path, or unknown menu item / slug pair |
+    | VALIDATION_ERROR | 400 | Request failed validation (reserved for later write endpoints; mock-triggerable today) |
+    | STORE_CLOSED | 409 | Store is outside opening hours / closed for the day |
+    | STORE_NOT_ACCEPTING_ORDERS | 409 | Store is open but not accepting online orders |
+    | ITEM_UNAVAILABLE | 409 | Requested item cannot be ordered (for example sold out) |
+    | INTERNAL_ERROR | 500 | Unexpected server failure; details never leak to the client |
+
+    ## Mock server triggers (development only)
+
+    The fixture-backed mock (`pnpm mock`, port 4001) honours:
+
+    - Query `?forceError=<ApiErrorCode>` or header `X-Mock-Error: <ApiErrorCode>`
+    - Query `?forceStore=closed` → `isOpen=false`
+    - Query `?forceStore=not-accepting` → `acceptingOrders=false` with a message
+
+    The real application API does **not** honour these triggers.
+  contact:
+    name: Harold's engineering
+servers:
+  - url: http://localhost:3000
+    description: Next.js application (real API + DB)
+  - url: http://localhost:4001
+    description: Fixture mock (@harolds/mock-api) — no database required
+
+tags:
+  - name: Menu
+    description: Catalogue reads — categories, items, curated lists
+  - name: Store
+    description: Store identity, hours, open/closed, money and prep settings
+
+paths:
+  /api/v1/menu:
+    get:
+      tags: [Menu]
+      summary: Full menu catalogue
+      description: |
+        Returns every active category with nested active items and each item's bound
+        modifier groups. No pagination (catalogue is under 100 items). Sold-out items and
+        options are included with `isSoldOut: true`.
+      operationId: getFullMenu
+      parameters:
+        - $ref: "#/components/parameters/ForceError"
+        - $ref: "#/components/parameters/MockErrorHeader"
+      responses:
+        "200":
+          description: Full menu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FullMenuSuccess"
+              examples:
+                seeded:
+                  summary: Harold's seeded Whole Dinners excerpt
+                  value:
+                    data:
+                      categories:
+                        - id: cat_cuid_example
+                          slug: whole-dinners
+                          name: Whole Dinners
+                          description: null
+                          sortOrder: 1
+                          items:
+                            - id: itm_cuid_example
+                              slug: 2-pc-whole-dinner
+                              name: 2 PC Whole Dinner
+                              description: null
+                              basePriceCents: 879
+                              imageUrl: null
+                              isSoldOut: false
+                              isFeatured: false
+                              isMostOrdered: false
+                              sortOrder: 1
+                              modifierGroups: []
+                    meta:
+                      serverTime: "2026-08-09T17:00:00.000Z"
+                      version: "1.0.0"
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Entity tag derived from max menu-related updatedAt (real API)
+            Cache-Control:
+              schema: { type: string }
+              description: "public, max-age=30, stale-while-revalidate=60 (real API)"
+        "304":
+          description: Not modified (If-None-Match matched ETag) — real API only
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictErrors"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/menu/categories:
+    get:
+      tags: [Menu]
+      summary: Category summaries
+      description: Active categories without nested items, including active item counts.
+      operationId: getMenuCategories
+      parameters:
+        - $ref: "#/components/parameters/ForceError"
+        - $ref: "#/components/parameters/MockErrorHeader"
+      responses:
+        "200":
+          description: Category list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesSuccess"
+              examples:
+                seeded:
+                  value:
+                    data:
+                      categories:
+                        - id: cat_cuid_example
+                          slug: whole-dinners
+                          name: Whole Dinners
+                          description: null
+                          sortOrder: 1
+                          activeItemCount: 5
+                        - id: cat_cuid_chicken
+                          slug: chicken-dinners
+                          name: Chicken Dinners
+                          description: null
+                          sortOrder: 2
+                          activeItemCount: 6
+                    meta:
+                      serverTime: "2026-08-09T17:00:00.000Z"
+                      version: "1.0.0"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictErrors"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/menu/items/{id}:
+    get:
+      tags: [Menu]
+      summary: Menu item by id
+      operationId: getMenuItemById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: Menu item cuid
+          example: cmsl1w65q0016ur9w72xcttlp
+        - $ref: "#/components/parameters/ForceError"
+        - $ref: "#/components/parameters/MockErrorHeader"
+      responses:
+        "200":
+          description: Item detail with modifiers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItemDetailSuccess"
+              examples:
+                chickenDinner:
+                  summary: 1/2 Chicken Dinner with toppings + prep
+                  value:
+                    data:
+                      id: itm_cuid_half
+                      slug: 1-2-chicken-dinner
+                      name: 1/2 Chicken Dinner
+                      description: null
+                      basePriceCents: 1149
+                      imageUrl: null
+                      isSoldOut: false
+                      isFeatured: false
+                      isMostOrdered: false
+                      sortOrder: 2
+                      categoryId: cat_cuid_chicken
+                      categorySlug: chicken-dinners
+                      modifierGroups:
+                        - id: mg_cuid_toppings
+                          prompt: Choose your topping
+                          isRequired: false
+                          minSelect: 0
+                          maxSelect: 3
+                          sortOrder: 1
+                          options:
+                            - id: mo_cuid_hot
+                              name: Hot Sauce
+                              priceDeltaCents: 0
+                              isSoldOut: false
+                              isDefaultSelected: false
+                              sortOrder: 1
+                        - id: mg_cuid_prep
+                          prompt: How would you like it cooked?
+                          isRequired: true
+                          minSelect: 1
+                          maxSelect: 1
+                          sortOrder: 2
+                          options:
+                            - id: mo_cuid_fried_hard
+                              name: Fried Hard
+                              priceDeltaCents: 0
+                              isSoldOut: false
+                              isDefaultSelected: false
+                              sortOrder: 1
+                    meta:
+                      serverTime: "2026-08-09T17:00:00.000Z"
+                      version: "1.0.0"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictErrors"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/menu/categories/{categorySlug}/items/{itemSlug}:
+    get:
+      tags: [Menu]
+      summary: Menu item by category + item slugs
+      operationId: getMenuItemBySlugs
+      parameters:
+        - name: categorySlug
+          in: path
+          required: true
+          schema: { type: string }
+          example: whole-dinners
+        - name: itemSlug
+          in: path
+          required: true
+          schema: { type: string }
+          example: 2-pc-whole-dinner
+        - $ref: "#/components/parameters/ForceError"
+        - $ref: "#/components/parameters/MockErrorHeader"
+      responses:
+        "200":
+          description: Item detail with modifiers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItemDetailSuccess"
+              examples:
+                wholeDinner:
+                  value:
+                    data:
+                      id: itm_cuid_whole_2pc
+                      slug: 2-pc-whole-dinner
+                      name: 2 PC Whole Dinner
+                      description: null
+                      basePriceCents: 879
+                      imageUrl: null
+                      isSoldOut: false
+                      isFeatured: false
+                      isMostOrdered: false
+                      sortOrder: 1
+                      categoryId: cat_cuid_whole
+                      categorySlug: whole-dinners
+                      modifierGroups: []
+                    meta:
+                      serverTime: "2026-08-09T17:00:00.000Z"
+                      version: "1.0.0"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictErrors"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/menu/featured:
+    get:
+      tags: [Menu]
+      summary: Curated featured items
+      description: May be an empty list when no items are flagged featured.
+      operationId: getFeaturedItems
+      parameters:
+        - $ref: "#/components/parameters/ForceError"
+        - $ref: "#/components/parameters/MockErrorHeader"
+      responses:
+        "200":
+          description: Featured item summaries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedItemsSuccess"
+              examples:
+                emptySeed:
+                  summary: Seed currently has no featured flags
+                  value:
+                    data: { items: [] }
+                    meta:
+                      serverTime: "2026-08-09T17:00:00.000Z"
+                      version: "1.0.0"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictErrors"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/menu/most-ordered:
+    get:
+      tags: [Menu]
+      summary: Curated most-ordered items
+      description: May be an empty list when no items are flagged most-ordered.
+      operationId: getMostOrderedItems
+      parameters:
+        - $ref: "#/components/parameters/ForceError"
+        - $ref: "#/components/parameters/MockErrorHeader"
+      responses:
+        "200":
+          description: Most-ordered item summaries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedItemsSuccess"
+              examples:
+                emptySeed:
+                  value:
+                    data: { items: [] }
+                    meta:
+                      serverTime: "2026-08-09T17:00:00.000Z"
+                      version: "1.0.0"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictErrors"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/store/status:
+    get:
+      tags: [Store]
+      summary: Store status
+      description: |
+        Identity, weekly hours, closures, open/closed evaluation, accepting-orders flag,
+        prep estimate, tax, and tip presets. Always read through StoreConfig at runtime —
+        never hard-coded in route handlers.
+      operationId: getStoreStatus
+      parameters:
+        - $ref: "#/components/parameters/ForceError"
+        - $ref: "#/components/parameters/MockErrorHeader"
+        - name: forceStore
+          in: query
+          required: false
+          description: Mock only — force closed or not-accepting edge states
+          schema:
+            type: string
+            enum: [closed, not-accepting]
+      responses:
+        "200":
+          description: Current store status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreStatusSuccess"
+              examples:
+                oakLawn:
+                  summary: Harold's Chicken Oak Lawn (seeded)
+                  value:
+                    data:
+                      storeName: Harold's Chicken Oak Lawn
+                      addressLine1: "TODO: CONFIRM STREET ADDRESS"
+                      addressLine2: null
+                      city: Oak Lawn
+                      state: IL
+                      postalCode: TODO
+                      contactPhone: "TODO: CONFIRM PHONE"
+                      timezone: America/Chicago
+                      hours:
+                        - dayOfWeek: 0
+                          openTime: "10:30"
+                          closeTime: "23:00"
+                          isClosed: false
+                        - dayOfWeek: 1
+                          openTime: "10:30"
+                          closeTime: "23:00"
+                          isClosed: false
+                      closures: []
+                      isOpen: true
+                      nextOpenAt: null
+                      acceptingOrders: true
+                      notAcceptingMessage: null
+                      prepMinutes: 20
+                      estimatedReadyAt: "2026-08-09T17:20:00.000Z"
+                      taxRateBps: 1010
+                      taxAppliedPreDiscount: true
+                      tippingEnabled: true
+                      tipPresetsBps: [1500, 1800, 2000, 2500]
+                      defaultTipPresetIndex: 1
+                    meta:
+                      serverTime: "2026-08-09T17:00:00.000Z"
+                      version: "1.0.0"
+          headers:
+            Cache-Control:
+              schema: { type: string }
+              description: no-store (real API)
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictErrors"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  parameters:
+    ForceError:
+      name: forceError
+      in: query
+      required: false
+      description: Mock only — force a specific error envelope
+      schema:
+        $ref: "#/components/schemas/ApiErrorCode"
+    MockErrorHeader:
+      name: X-Mock-Error
+      in: header
+      required: false
+      description: Mock only — same effect as forceError
+      schema:
+        $ref: "#/components/schemas/ApiErrorCode"
+
+  responses:
+    NotFound:
+      description: Resource or endpoint not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            notFound:
+              value:
+                error:
+                  code: NOT_FOUND
+                  message: Endpoint not found.
+                  details: null
+                meta:
+                  serverTime: "2026-08-09T17:00:00.000Z"
+                  version: "1.0.0"
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            validation:
+              value:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Request validation failed.
+                  details: null
+                meta:
+                  serverTime: "2026-08-09T17:00:00.000Z"
+                  version: "1.0.0"
+    ConflictErrors:
+      description: Business conflict (closed / not accepting / item unavailable)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            storeClosed:
+              value:
+                error:
+                  code: STORE_CLOSED
+                  message: The store is currently closed.
+                  details: null
+                meta:
+                  serverTime: "2026-08-09T17:00:00.000Z"
+                  version: "1.0.0"
+            notAccepting:
+              value:
+                error:
+                  code: STORE_NOT_ACCEPTING_ORDERS
+                  message: The store is not accepting orders right now.
+                  details: null
+                meta:
+                  serverTime: "2026-08-09T17:00:00.000Z"
+                  version: "1.0.0"
+            itemUnavailable:
+              value:
+                error:
+                  code: ITEM_UNAVAILABLE
+                  message: This item is unavailable.
+                  details: null
+                meta:
+                  serverTime: "2026-08-09T17:00:00.000Z"
+                  version: "1.0.0"
+    InternalError:
+      description: Unexpected failure (no internal detail in body)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            internal:
+              value:
+                error:
+                  code: INTERNAL_ERROR
+                  message: An unexpected error occurred.
+                  details: null
+                meta:
+                  serverTime: "2026-08-09T17:00:00.000Z"
+                  version: "1.0.0"
+
+  schemas:
+    ApiErrorCode:
+      type: string
+      enum:
+        - NOT_FOUND
+        - VALIDATION_ERROR
+        - STORE_CLOSED
+        - STORE_NOT_ACCEPTING_ORDERS
+        - ITEM_UNAVAILABLE
+        - INTERNAL_ERROR
+
+    ResponseMeta:
+      type: object
+      required: [serverTime, version]
+      additionalProperties: false
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+          description: Server UTC timestamp (ISO 8601 with zone)
+        version:
+          type: string
+          example: "1.0.0"
+          description: Frozen contract version
+
+    ApiErrorBody:
+      type: object
+      required: [code, message, details]
+      additionalProperties: false
+      properties:
+        code:
+          $ref: "#/components/schemas/ApiErrorCode"
+        message:
+          type: string
+        details:
+          nullable: true
+          type: object
+          additionalProperties: true
+
+    ErrorEnvelope:
+      type: object
+      required: [error, meta]
+      additionalProperties: false
+      properties:
+        error:
+          $ref: "#/components/schemas/ApiErrorBody"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    MenuModifierOption:
+      type: object
+      required: [id, name, priceDeltaCents, isSoldOut, isDefaultSelected, sortOrder]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        priceDeltaCents:
+          type: integer
+          description: Price delta in US cents (may be 0; Add Fries is 449)
+        isSoldOut: { type: boolean }
+        isDefaultSelected: { type: boolean }
+        sortOrder: { type: integer }
+
+    MenuModifierGroup:
+      type: object
+      required: [id, prompt, isRequired, minSelect, maxSelect, sortOrder, options]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        prompt: { type: string }
+        isRequired: { type: boolean }
+        minSelect: { type: integer }
+        maxSelect: { type: integer }
+        sortOrder: { type: integer }
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuModifierOption"
+
+    MenuItemSummary:
+      type: object
+      required:
+        - id
+        - slug
+        - name
+        - description
+        - basePriceCents
+        - imageUrl
+        - isSoldOut
+        - isFeatured
+        - isMostOrdered
+        - sortOrder
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string, example: 2 PC Whole Dinner }
+        description: { type: string, nullable: true }
+        basePriceCents: { type: integer, example: 879 }
+        imageUrl: { type: string, nullable: true }
+        isSoldOut: { type: boolean }
+        isFeatured: { type: boolean }
+        isMostOrdered: { type: boolean }
+        sortOrder: { type: integer }
+
+    MenuItemWithModifiers:
+      allOf:
+        - $ref: "#/components/schemas/MenuItemSummary"
+        - type: object
+          required: [modifierGroups]
+          additionalProperties: false
+          properties:
+            modifierGroups:
+              type: array
+              items:
+                $ref: "#/components/schemas/MenuModifierGroup"
+
+    MenuItemDetail:
+      allOf:
+        - $ref: "#/components/schemas/MenuItemWithModifiers"
+        - type: object
+          required: [categoryId, categorySlug]
+          additionalProperties: false
+          properties:
+            categoryId: { type: string }
+            categorySlug: { type: string }
+
+    MenuCategory:
+      type: object
+      required: [id, slug, name, description, sortOrder, items]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        slug: { type: string, example: whole-dinners }
+        name: { type: string, example: Whole Dinners }
+        description: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItemWithModifiers"
+
+    FullMenu:
+      type: object
+      required: [categories]
+      additionalProperties: false
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuCategory"
+
+    CategorySummary:
+      type: object
+      required: [id, slug, name, description, sortOrder, activeItemCount]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        activeItemCount: { type: integer }
+
+    CategoriesPayload:
+      type: object
+      required: [categories]
+      additionalProperties: false
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategorySummary"
+
+    CuratedItemsPayload:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItemSummary"
+
+    StoreHoursRow:
+      type: object
+      required: [dayOfWeek, openTime, closeTime, isClosed]
+      additionalProperties: false
+      properties:
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0 = Sunday … 6 = Saturday
+        openTime: { type: string, nullable: true, example: "10:30" }
+        closeTime: { type: string, nullable: true, example: "23:00" }
+        isClosed: { type: boolean }
+
+    StoreClosureRow:
+      type: object
+      required: [date, reason]
+      additionalProperties: false
+      properties:
+        date: { type: string, format: date }
+        reason: { type: string, nullable: true }
+
+    StoreStatus:
+      type: object
+      required:
+        - storeName
+        - addressLine1
+        - addressLine2
+        - city
+        - state
+        - postalCode
+        - contactPhone
+        - timezone
+        - hours
+        - closures
+        - isOpen
+        - nextOpenAt
+        - acceptingOrders
+        - notAcceptingMessage
+        - prepMinutes
+        - estimatedReadyAt
+        - taxRateBps
+        - taxAppliedPreDiscount
+        - tippingEnabled
+        - tipPresetsBps
+        - defaultTipPresetIndex
+      additionalProperties: false
+      properties:
+        storeName: { type: string, example: Harold's Chicken Oak Lawn }
+        addressLine1: { type: string }
+        addressLine2: { type: string, nullable: true }
+        city: { type: string, example: Oak Lawn }
+        state: { type: string, example: IL }
+        postalCode: { type: string }
+        contactPhone: { type: string }
+        timezone: { type: string, example: America/Chicago }
+        hours:
+          type: array
+          items:
+            $ref: "#/components/schemas/StoreHoursRow"
+        closures:
+          type: array
+          items:
+            $ref: "#/components/schemas/StoreClosureRow"
+        isOpen: { type: boolean }
+        nextOpenAt: { type: string, format: date-time, nullable: true }
+        acceptingOrders: { type: boolean }
+        notAcceptingMessage: { type: string, nullable: true }
+        prepMinutes: { type: integer, example: 20 }
+        estimatedReadyAt: { type: string, format: date-time }
+        taxRateBps: { type: integer, example: 1010, description: 10.10% → 1010 bps }
+        taxAppliedPreDiscount: { type: boolean }
+        tippingEnabled: { type: boolean }
+        tipPresetsBps:
+          type: array
+          items: { type: integer }
+          example: [1500, 1800, 2000, 2500]
+        defaultTipPresetIndex: { type: integer }
+
+    FullMenuSuccess:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/FullMenu"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    CategoriesSuccess:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/CategoriesPayload"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    MenuItemDetailSuccess:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/MenuItemDetail"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    CuratedItemsSuccess:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/CuratedItemsPayload"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    StoreStatusSuccess:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/StoreStatus"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"

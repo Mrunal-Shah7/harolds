@@ -14,8 +14,10 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/seed/index.ts",
     "verify": "tsx src/verify.ts",
+    "export-fixtures": "tsx src/export-fixtures.ts",
     "studio": "prisma studio",
     "test:currency": "tsx --test src/seed/currency.test.ts",
+    "test": "tsx --test src/**/*.test.ts src/seed/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "build": "tsc --noEmit"
@@ -25,9 +27,11 @@
     "@harolds/types": "workspace:*",
     "@prisma/client": "^6.1.0",
     "dotenv": "^16.4.7",
+    "luxon": "^3.7.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/luxon": "^3.7.4",
     "@types/node": "^22.10.5",
     "prisma": "^6.1.0",
     "tsx": "^4.19.2",

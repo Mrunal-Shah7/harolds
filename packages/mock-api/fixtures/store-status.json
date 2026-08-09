@@ -1,0 +1,71 @@
+{
+  "storeName": "Harold's Chicken Oak Lawn",
+  "addressLine1": "TODO: CONFIRM STREET ADDRESS",
+  "addressLine2": null,
+  "city": "Oak Lawn",
+  "state": "IL",
+  "postalCode": "TODO",
+  "contactPhone": "TODO: CONFIRM PHONE",
+  "timezone": "America/Chicago",
+  "hours": [
+    {
+      "dayOfWeek": 0,
+      "openTime": "10:30",
+      "closeTime": "23:00",
+      "isClosed": false
+    },
+    {
+      "dayOfWeek": 1,
+      "openTime": "10:30",
+      "closeTime": "23:00",
+      "isClosed": false
+    },
+    {
+      "dayOfWeek": 2,
+      "openTime": "10:30",
+      "closeTime": "23:00",
+      "isClosed": false
+    },
+    {
+      "dayOfWeek": 3,
+      "openTime": "10:30",
+      "closeTime": "23:00",
+      "isClosed": false
+    },
+    {
+      "dayOfWeek": 4,
+      "openTime": "10:30",
+      "closeTime": "23:00",
+      "isClosed": false
+    },
+    {
+      "dayOfWeek": 5,
+      "openTime": "10:30",
+      "closeTime": "23:00",
+      "isClosed": false
+    },
+    {
+      "dayOfWeek": 6,
+      "openTime": "10:30",
+      "closeTime": "23:00",
+      "isClosed": false
+    }
+  ],
+  "closures": [],
+  "isOpen": true,
+  "nextOpenAt": null,
+  "acceptingOrders": true,
+  "notAcceptingMessage": null,
+  "prepMinutes": 20,
+  "estimatedReadyAt": "2026-08-09T17:23:17.024Z",
+  "taxRateBps": 1010,
+  "taxAppliedPreDiscount": true,
+  "tippingEnabled": true,
+  "tipPresetsBps": [
+    1500,
+    1800,
+    2000,
+    2500
+  ],
+  "defaultTipPresetIndex": 1
+}

@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-08-09T17:03:17.312Z",
+  "notes": [
+    "Fixtures exported from a seeded database then mutated in-memory for storefront edge cases.",
+    "isRequired=true on one modifier group is fixture-only (seed has no required groups).",
+    "No DATABASE_URL is required to run @harolds/mock-api — it reads these JSON files only."
+  ],
+  "edgeCases": {
+    "soldOutItemId": "cmsl1w65q0016ur9w72xcttlp",
+    "soldOutItemName": "2 PC Whole Dinner",
+    "soldOutOptionId": "cmsl1w657000mur9w6td7tbye",
+    "soldOutOptionName": "Hot Sauce",
+    "requiredGroupId": "cmsl1w653000iur9wum9oim4w",
+    "requiredGroupPrompt": "How would you like it cooked?",
+    "optionalMultiSelectGroupId": "cmsl1w650000hur9wyu4hchsp",
+    "optionalMultiSelectGroupPrompt": "Choose your topping",
+    "optionalMultiSelectMax": 3,
+    "pricedOptionId": "cmsl1w65m0012ur9wk7phy3g0",
+    "pricedOptionName": "Add Fries",
+    "pricedOptionDeltaCents": 449,
+    "itemWithNoModifiersId": "cmsl1w65q0016ur9w72xcttlp",
+    "itemWithNoModifiersName": "2 PC Whole Dinner",
+    "longestItemNameId": "cmsl1w66l0024ur9wxugmr1bu",
+    "longestItemName": "10 PC Tenders & Wing Basket",
+    "longestItemNameLength": 27,
+    "singleItemCategory": {
+      "present": false,
+      "categoryId": null,
+      "categoryName": null,
+      "note": "Seeded catalogue has no single-item category (minimum 2 items per category after seed). Storefront should still handle the case."
+    }
+  }
+}

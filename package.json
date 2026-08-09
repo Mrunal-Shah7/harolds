@@ -5,9 +5,9 @@
   "description": "Harold's Chicken Oak Lawn — in-house online ordering system",
   "engines": {
     "node": "24.x",
-    "pnpm": "9.x"
+    "pnpm": "11.8.0"
   },
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@11.8.0",
   "scripts": {
     "dev": "pnpm --filter @harolds/web dev",
     "build": "pnpm -r --filter=./packages/* build && pnpm --filter @harolds/web build",
@@ -20,7 +20,11 @@
     "db:migrate:deploy": "pnpm --filter @harolds/db migrate:deploy",
     "db:seed": "pnpm --filter @harolds/db seed",
     "db:verify": "pnpm --filter @harolds/db verify",
-    "db:studio": "pnpm --filter @harolds/db studio"
+    "db:studio": "pnpm --filter @harolds/db studio",
+    "db:export-fixtures": "pnpm --filter @harolds/db export-fixtures",
+    "mock": "pnpm --filter @harolds/mock-api start",
+    "test:db": "pnpm --filter @harolds/db test",
+    "openapi:validate": "pnpm --filter @harolds/web openapi:validate"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

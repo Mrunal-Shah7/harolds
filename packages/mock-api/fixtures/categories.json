@@ -1,0 +1,140 @@
+{
+  "categories": [
+    {
+      "id": "cmsl1w6410000ur9wf15etd0f",
+      "slug": "whole-dinners",
+      "name": "Whole Dinners",
+      "description": null,
+      "sortOrder": 1,
+      "activeItemCount": 5
+    },
+    {
+      "id": "cmsl1w64h0001ur9wrcck33nz",
+      "slug": "chicken-dinners",
+      "name": "Chicken Dinners",
+      "description": null,
+      "sortOrder": 2,
+      "activeItemCount": 6
+    },
+    {
+      "id": "cmsl1w64i0002ur9whvqb9u71",
+      "slug": "tender-dinners",
+      "name": "Tender Dinners",
+      "description": null,
+      "sortOrder": 3,
+      "activeItemCount": 3
+    },
+    {
+      "id": "cmsl1w64k0003ur9wy71uws8f",
+      "slug": "tenders-and-wing-basket",
+      "name": "Tenders & Wing Basket",
+      "description": null,
+      "sortOrder": 4,
+      "activeItemCount": 4
+    },
+    {
+      "id": "cmsl1w64l0004ur9w39znx5kw",
+      "slug": "livers-and-gizzards-dinners",
+      "name": "Livers & Gizzards Dinners",
+      "description": null,
+      "sortOrder": 5,
+      "activeItemCount": 3
+    },
+    {
+      "id": "cmsl1w64m0005ur9w3887reom",
+      "slug": "chicken-gizzards",
+      "name": "Chicken Gizzards",
+      "description": null,
+      "sortOrder": 6,
+      "activeItemCount": 3
+    },
+    {
+      "id": "cmsl1w64n0006ur9wvuygn0v8",
+      "slug": "fish-dinners",
+      "name": "Fish Dinners",
+      "description": null,
+      "sortOrder": 7,
+      "activeItemCount": 5
+    },
+    {
+      "id": "cmsl1w64o0007ur9wkmnkijq3",
+      "slug": "fish-basket",
+      "name": "Fish Basket",
+      "description": null,
+      "sortOrder": 8,
+      "activeItemCount": 2
+    },
+    {
+      "id": "cmsl1w64p0008ur9w2cqjgf3f",
+      "slug": "combos",
+      "name": "Combos",
+      "description": null,
+      "sortOrder": 9,
+      "activeItemCount": 8
+    },
+    {
+      "id": "cmsl1w64q0009ur9w940ubivv",
+      "slug": "pizza-puff-and-roll",
+      "name": "Pizza Puff & Roll",
+      "description": null,
+      "sortOrder": 10,
+      "activeItemCount": 3
+    },
+    {
+      "id": "cmsl1w64r000aur9wtmq6cfuf",
+      "slug": "extra-pieces",
+      "name": "Extra Pieces",
+      "description": null,
+      "sortOrder": 11,
+      "activeItemCount": 5
+    },
+    {
+      "id": "cmsl1w64s000bur9wjnziwlrs",
+      "slug": "sides",
+      "name": "Sides",
+      "description": null,
+      "sortOrder": 12,
+      "activeItemCount": 8
+    },
+    {
+      "id": "cmsl1w64u000cur9wvpwl52f8",
+      "slug": "tasty-sides",
+      "name": "Tasty Sides",
+      "description": null,
+      "sortOrder": 13,
+      "activeItemCount": 6
+    },
+    {
+      "id": "cmsl1w64v000dur9w1c1b2b0v",
+      "slug": "extras-and-dressings",
+      "name": "Extras & Dressings",
+      "description": null,
+      "sortOrder": 14,
+      "activeItemCount": 11
+    },
+    {
+      "id": "cmsl1w64w000eur9wenfj8exq",
+      "slug": "beverages",
+      "name": "Beverages",
+      "description": null,
+      "sortOrder": 15,
+      "activeItemCount": 6
+    },
+    {
+      "id": "cmsl1w64x000fur9woonshosu",
+      "slug": "desserts",
+      "name": "Desserts",
+      "description": null,
+      "sortOrder": 16,
+      "activeItemCount": 2
+    },
+    {
+      "id": "cmsl1w64y000gur9wqkzin2al",
+      "slug": "catering",
+      "name": "Catering",
+      "description": null,
+      "sortOrder": 17,
+      "activeItemCount": 7
+    }
+  ]
+}

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "openapi:validate": "tsx scripts/openapi-validate.ts && tsx scripts/openapi-drift.ts"
   },
   "dependencies": {
     "@harolds/config": "workspace:*",
@@ -30,7 +31,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.23",
+    "@apidevtools/swagger-parser": "^12.0.0",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }
