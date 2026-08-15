@@ -10,6 +10,7 @@ export const OrderStatus = {
   PICKED_UP: "PICKED_UP",
   CANCELLED: "CANCELLED",
   REFUNDED: "REFUNDED",
+  ABANDONED: "ABANDONED",
 } as const;
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
 
@@ -18,6 +19,7 @@ export const PaymentStatus = {
   AUTHORISED: "AUTHORISED",
   CAPTURED: "CAPTURED",
   FAILED: "FAILED",
+  UNKNOWN: "UNKNOWN",
   REFUNDED: "REFUNDED",
   PARTIALLY_REFUNDED: "PARTIALLY_REFUNDED",
 } as const;
@@ -48,8 +50,36 @@ export const JobType = {
   SMS_ORDER_CONFIRMATION: "SMS_ORDER_CONFIRMATION",
   EMAIL_ORDER_RECEIPT: "EMAIL_ORDER_RECEIPT",
   EMAIL_ORDER_READY: "EMAIL_ORDER_READY",
+  // SPRINT-2: manager alert job types
+  ALERT_MANAGER_PRINT_FAILED: "ALERT_MANAGER_PRINT_FAILED",
+  ALERT_MANAGER_JOB_DEAD: "ALERT_MANAGER_JOB_DEAD",
+  ALERT_MANAGER_ORDER_UNACKNOWLEDGED: "ALERT_MANAGER_ORDER_UNACKNOWLEDGED",
+  ALERT_MANAGER_PAYMENT_DISCREPANCY: "ALERT_MANAGER_PAYMENT_DISCREPANCY",
 } as const;
 export type JobType = (typeof JobType)[keyof typeof JobType];
+
+/** Every declared job type — the worker registry must have a handler for each. */
+export const ALL_JOB_TYPES = [
+  JobType.SMS_ORDER_READY,
+  JobType.SMS_ORDER_CONFIRMATION,
+  JobType.EMAIL_ORDER_RECEIPT,
+  JobType.EMAIL_ORDER_READY,
+  JobType.ALERT_MANAGER_PRINT_FAILED,
+  JobType.ALERT_MANAGER_JOB_DEAD,
+  JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED,
+  JobType.ALERT_MANAGER_PAYMENT_DISCREPANCY,
+] as const satisfies readonly JobType[];
+
+export const MANAGER_ALERT_JOB_TYPES = [
+  JobType.ALERT_MANAGER_PRINT_FAILED,
+  JobType.ALERT_MANAGER_JOB_DEAD,
+  JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED,
+  JobType.ALERT_MANAGER_PAYMENT_DISCREPANCY,
+] as const satisfies readonly JobType[];
+
+export function isManagerAlertJobType(type: string): boolean {
+  return (MANAGER_ALERT_JOB_TYPES as readonly string[]).includes(type);
+}
 
 export const JobStatus = {
   PENDING: "PENDING",
@@ -57,16 +87,18 @@ export const JobStatus = {
   SUCCEEDED: "SUCCEEDED",
   FAILED: "FAILED",
   DEAD: "DEAD",
+  /// SPRINT-7: operator cancelled — not selected, not a dead-letter that needs retry.
+  CANCELLED: "CANCELLED",
 } as const;
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
-/** Snapshot entry stored on OrderLine.selectedModifiers */
-export type SelectedModifierSnapshot = {
-  groupName: string;
-  groupPrompt: string;
-  optionName: string;
-  priceDeltaCents: number;
-};
+// SPRINT-2: admin auth roles
+export const AdminRole = {
+  OWNER: "OWNER",
+  MANAGER: "MANAGER",
+  STAFF: "STAFF",
+} as const;
+export type AdminRole = (typeof AdminRole)[keyof typeof AdminRole];
 
 /** Menu domain shapes (Sprint 1) — re-exported so app code need not import the DB client for typing. */
 export type Category = {
@@ -86,6 +118,8 @@ export type MenuItem = {
   workbookId: string;
   categoryId: string;
   name: string;
+  // SPRINT-2: URL/storefront slug unique within category
+  slug: string;
   boardLabel: string | null;
   description: string | null;
   basePriceCents: number;
@@ -155,6 +189,9 @@ export type StoreConfigData = {
   taxAppliedPreDiscount: boolean;
   orderNumberPrefix: string;
   orderNumberStartValue: number;
+  // SPRINT-2: daily reset / pad + manager alert contacts
+  orderNumberResetHour: number;
+  orderNumberPadWidth: number;
   normalPrepMinutes: number;
   busyPrepMinutes: number;
   isBusy: boolean;
@@ -163,4 +200,22 @@ export type StoreConfigData = {
   defaultTipPresetIndex: number;
   acceptingOrders: boolean;
   notAcceptingMessage: string | null;
+  managerAlertPhone: string | null;
+  managerAlertEmail: string | null;
 };
+
+// SPRINT-2: public API contract + error codes
+export * from "./api/contract";
+export * from "./api/errors";
+
+// SPRINT-3: cart request / quote result contract (version 1.1.0)
+export * from "./api/cart";
+
+// SPRINT-4: order create / status contract (version 1.2.0)
+export * from "./api/order";
+
+// SPRINT-6: kitchen display internal types (not in docs/openapi/v1.yaml)
+export * from "./kitchen";
+
+// SPRINT-8: admin back-office internal types (not in docs/openapi/v1.yaml)
+export * from "./admin";

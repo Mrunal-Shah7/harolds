@@ -1,0 +1,355 @@
+/* SPRINT-8: admin back-office — dense ledger, office laptop and phone behind the counter */
+.adm-root {
+  min-height: 100dvh;
+  background: #efe6d4;
+  color: #1a140c;
+  font-family: var(--font-adm-sans), "IBM Plex Sans", ui-sans-serif, sans-serif;
+}
+
+.adm-root *,
+.adm-root *::before,
+.adm-root *::after {
+  box-sizing: border-box;
+}
+
+.adm-app {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 13.5rem 1fr;
+}
+
+.adm-nav {
+  background: #1a140c;
+  color: #f3ead8;
+  padding: 1rem 0.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  border-right: 4px solid #9b1c1c;
+}
+
+.adm-brand {
+  font-family: var(--font-adm-display), Georgia, serif;
+  font-size: 1.35rem;
+  line-height: 1.05;
+  margin: 0 0.4rem 0.15rem;
+}
+
+.adm-brand-sub {
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #d4b45a;
+  margin: 0 0.4rem 1rem;
+}
+
+.adm-nav a {
+  color: #f3ead8;
+  text-decoration: none;
+  padding: 0.45rem 0.55rem;
+  border-radius: 2px;
+  font-size: 0.88rem;
+}
+
+.adm-nav a:hover,
+.adm-nav a.is-active {
+  background: #9b1c1c;
+}
+
+.adm-nav-user {
+  margin-top: auto;
+  padding: 0.75rem 0.55rem 0;
+  font-size: 0.75rem;
+  color: #cbbba0;
+}
+
+.adm-nav-user strong {
+  display: block;
+  color: #f3ead8;
+  font-size: 0.85rem;
+}
+
+.adm-main {
+  padding: 1rem 1.25rem 2.5rem;
+  min-width: 0;
+}
+
+.adm-h1 {
+  font-family: var(--font-adm-display), Georgia, serif;
+  font-size: 1.7rem;
+  margin: 0 0 0.25rem;
+}
+
+.adm-lead {
+  margin: 0 0 1rem;
+  color: #5c5346;
+  font-size: 0.9rem;
+}
+
+.adm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+}
+
+.adm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5c5346;
+}
+
+.adm-field input,
+.adm-field select,
+.adm-field textarea {
+  font: inherit;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #1a140c;
+  background: #fffdf7;
+  border: 1px solid #c9bda8;
+  padding: 0.4rem 0.5rem;
+  min-width: 8rem;
+}
+
+.adm-field textarea {
+  min-height: 4.5rem;
+}
+
+.adm-btn {
+  font: inherit;
+  font-weight: 600;
+  background: #1a140c;
+  color: #f3ead8;
+  border: 0;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+}
+
+.adm-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.adm-btn-ghost {
+  background: transparent;
+  color: #1a140c;
+  border: 1px solid #1a140c;
+}
+
+.adm-btn-danger {
+  background: #9b1c1c;
+  color: #fff;
+}
+
+.adm-btn-warn {
+  background: #c45c12;
+  color: #fff;
+}
+
+.adm-table-wrap {
+  overflow: auto;
+  border: 1px solid #c9bda8;
+  background: #fffdf7;
+}
+
+.adm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.adm-table th,
+.adm-table td {
+  text-align: left;
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid #e4d9c4;
+  white-space: nowrap;
+}
+
+.adm-table th {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5c5346;
+  background: #f6efe1;
+  position: sticky;
+  top: 0;
+}
+
+.adm-money {
+  font-family: var(--font-adm-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid currentColor;
+}
+
+.adm-badge-hot {
+  color: #9b1c1c;
+  background: #f8d9d4;
+}
+
+.adm-badge-ok {
+  color: #1d6b3a;
+  background: #d8f0e0;
+}
+
+.adm-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.adm-card {
+  background: #fffdf7;
+  border: 1px solid #c9bda8;
+  padding: 0.85rem 0.9rem;
+}
+
+.adm-card h2 {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0 0 0.4rem;
+  color: #5c5346;
+}
+
+.adm-stat {
+  font-family: var(--font-adm-mono), ui-monospace, monospace;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.adm-dead {
+  background: #9b1c1c;
+  color: #fff;
+  border-color: #6e1010;
+}
+
+.adm-dead h2 {
+  color: #ffd0c8;
+}
+
+.adm-error {
+  background: #f8d9d4;
+  border: 1px solid #9b1c1c;
+  color: #6e1010;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.adm-ok {
+  background: #d8f0e0;
+  border: 1px solid #1d6b3a;
+  color: #14532d;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.adm-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.65rem;
+  background: #fffdf7;
+  border: 1px solid #c9bda8;
+  padding: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.adm-form-wide {
+  grid-column: 1 / -1;
+}
+
+.adm-warn {
+  grid-column: 1 / -1;
+  background: #f7e3c4;
+  border: 1px solid #c45c12;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.88rem;
+}
+
+.adm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 20, 12, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 40;
+}
+
+.adm-dialog {
+  width: min(28rem, 100%);
+  background: #fffdf7;
+  border: 3px solid #9b1c1c;
+  padding: 1rem 1.1rem;
+}
+
+.adm-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-adm-display), Georgia, serif;
+}
+
+.adm-signin {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(155, 28, 28, 0.05) 28px),
+    #efe6d4;
+}
+
+.adm-signin-card {
+  width: min(26rem, 100%);
+  background: #fffdf7;
+  border: 3px solid #1a140c;
+  box-shadow: 8px 8px 0 #9b1c1c;
+  padding: 1.4rem 1.25rem 1.5rem;
+}
+
+.adm-link {
+  color: #9b1c1c;
+  font-weight: 600;
+}
+
+.adm-muted {
+  color: #5c5346;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 800px) {
+  .adm-app {
+    grid-template-columns: 1fr;
+  }
+  .adm-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: 0;
+    border-bottom: 4px solid #9b1c1c;
+    gap: 0.25rem;
+  }
+  .adm-brand,
+  .adm-brand-sub {
+    width: 100%;
+  }
+  .adm-nav-user {
+    margin-top: 0;
+    width: 100%;
+  }
+}

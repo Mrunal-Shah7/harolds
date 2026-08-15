@@ -26,7 +26,7 @@ async function main(): Promise<void> {
     configCount,
     hoursCount,
     closureCount,
-    counter,
+    counterCount,
   ] = await Promise.all([
     prisma.category.count(),
     prisma.menuItem.count(),
@@ -40,7 +40,8 @@ async function main(): Promise<void> {
     prisma.storeConfig.count(),
     prisma.storeHours.count(),
     prisma.storeClosure.count(),
-    prisma.orderNumberCounter.findUnique({ where: { id: "default" } }),
+    // SPRINT-2: counters are per business date (created on first order), not a singleton.
+    prisma.orderNumberCounter.count(),
   ]);
 
   const unverifiedCount = await prisma.menuItem.count({ where: { isUnverifiedPrice: true } });
@@ -75,7 +76,7 @@ async function main(): Promise<void> {
   console.log(`  StoreConfig          ${configCount}`);
   console.log(`  StoreHours           ${hoursCount}`);
   console.log(`  StoreClosure         ${closureCount}`);
-  console.log(`  OrderNumberCounter   ${counter ? 1 : 0}`);
+  console.log(`  OrderNumberCounter   ${counterCount}`);
 
   console.log("\nItems per category:");
   for (const cat of categories) {
@@ -95,7 +96,9 @@ async function main(): Promise<void> {
     console.log(`  busyPrepMinutes:     ${config.busyPrepMinutes}`);
     console.log(`  orderNumberPrefix:   ${config.orderNumberPrefix}`);
   }
-  console.log(`  order counter value: ${counter?.currentValue ?? "MISSING"}`);
+  console.log(
+    `  order counters:      ${counterCount === 0 ? "none (created on first order)" : `${counterCount} row(s)`}`,
+  );
 
   // --- Invariants ---
   const badPriceItems = await prisma.menuItem.findMany({

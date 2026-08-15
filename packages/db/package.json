@@ -13,11 +13,14 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/seed/index.ts",
+    "seed:menu": "tsx src/seed/index.ts --menu-only",
+    "seed:accounts": "tsx src/seed/index.ts --accounts-only",
     "verify": "tsx src/verify.ts",
+    "cancel-orphans": "tsx --env-file=../../.env src/cancel-orphan-print-jobs.ts",
     "export-fixtures": "tsx src/export-fixtures.ts",
     "studio": "prisma studio",
     "test:currency": "tsx --test src/seed/currency.test.ts",
-    "test": "tsx --test src/**/*.test.ts src/seed/**/*.test.ts",
+    "test": "tsx --env-file=../../.env --test src/**/*.test.ts src/seed/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "build": "tsc --noEmit"
@@ -25,8 +28,12 @@
   "dependencies": {
     "@harolds/config": "workspace:*",
     "@harolds/types": "workspace:*",
+    "@harolds/square": "workspace:*",
+    "@harolds/print": "workspace:*",
+    "@harolds/pricing": "workspace:*",
     "@prisma/client": "^6.1.0",
     "dotenv": "^16.4.7",
+    "libphonenumber-js": "^1.13.10",
     "luxon": "^3.7.2",
     "xlsx": "^0.18.5"
   },

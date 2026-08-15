@@ -1,10 +1,10 @@
 {
   "storeName": "Harold's Chicken Oak Lawn",
-  "addressLine1": "TODO: CONFIRM STREET ADDRESS",
+  "addressLine1": "4709 W 95th St",
   "addressLine2": null,
   "city": "Oak Lawn",
   "state": "IL",
-  "postalCode": "TODO",
+  "postalCode": "60453-2515",
   "contactPhone": "TODO: CONFIRM PHONE",
   "timezone": "America/Chicago",
   "hours": [
@@ -57,7 +57,7 @@
   "acceptingOrders": true,
   "notAcceptingMessage": null,
   "prepMinutes": 20,
-  "estimatedReadyAt": "2026-08-09T17:23:17.024Z",
+  "estimatedReadyAt": "2026-08-09T18:53:08.097Z",
   "taxRateBps": 1010,
   "taxAppliedPreDiscount": true,
   "tippingEnabled": true,

@@ -1,4 +1,19 @@
-# SPRINT-1: pnpm workspace definition — apps and packages
+# SPRINT-1 / SPRINT-2: pnpm workspace definition and pnpm 11 settings
 packages:
   - "apps/*"
   - "packages/*"
+
+# pnpm 11: settings live here (not in .npmrc)
+nodeLinker: hoisted
+shamefullyHoist: true
+minimumReleaseAge: 0
+strictDepBuilds: true
+confirmModulesPurge: false
+
+allowBuilds:
+  "@prisma/client": true
+  "@prisma/engines": true
+  prisma: true
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

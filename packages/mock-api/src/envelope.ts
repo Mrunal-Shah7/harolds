@@ -41,6 +41,10 @@ export const FORCE_ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   [ApiErrorCode.STORE_NOT_ACCEPTING_ORDERS]: "The store is not accepting orders right now.",
   [ApiErrorCode.ITEM_UNAVAILABLE]: "This item is unavailable.",
   [ApiErrorCode.INTERNAL_ERROR]: "An unexpected error occurred.",
+  [ApiErrorCode.PAYMENT_DECLINED]: "Card was declined.",
+  [ApiErrorCode.PAYMENT_FAILED]: "Payment could not be confirmed.",
+  [ApiErrorCode.IDEMPOTENCY_CONFLICT]: "Idempotency key conflict.",
+  [ApiErrorCode.UNAUTHORIZED]: "Unauthorized.",
 };
 
 export function parseForceError(

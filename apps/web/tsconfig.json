@@ -18,6 +18,10 @@
       "@harolds/config/*": ["../../packages/config/src/*"],
       "@harolds/db": ["../../packages/db/src/index.ts"],
       "@harolds/db/*": ["../../packages/db/src/*"],
+      "@harolds/print": ["../../packages/print/src/index.ts"],
+      "@harolds/sms": ["../../packages/sms/src/index.ts"],
+      "@harolds/email": ["../../packages/email/src/index.ts"],
+      "@harolds/notify": ["../../packages/notify/src/index.ts"],
       "@harolds/types": ["../../packages/types/src/index.ts"]
     },
     "types": ["node"]

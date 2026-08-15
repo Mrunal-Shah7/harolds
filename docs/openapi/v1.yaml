@@ -1,30 +1,33 @@
-# SPRINT-2: Harold's Chicken Oak Lawn — public Menu + Store Status API (v1)
-# Contract version 1.0.0 — frozen; post-freeze changes are additive only.
+# SPRINT-2 / SPRINT-3: Harold's Chicken Oak Lawn — public Menu + Store Status + Quote API (v1)
+# Contract version 1.2.0 — additive extension of frozen 1.0.0 (quote endpoint + validation reasons).
 openapi: 3.0.3
 info:
   title: Harold's Chicken Oak Lawn — Public API
-  version: "1.0.0"
+  version: "1.2.0"
   description: |
-    Read-only public API for the Harold's Chicken Oak Lawn online ordering storefront.
+    Public API for the Harold's Chicken Oak Lawn online ordering storefront.
 
-    ## Contract freeze
+    ## Contract versions
 
-    This document describes **contract version 1.0.0**, frozen at the end of Sprint 2.
-    After the freeze, changes are **additive only** (new optional fields / new endpoints under a
-    version bump when breaking). Renames and removals are not permitted without an explicit
-    version bump agreed in advance.
+    - **1.0.0** (Sprint 2): menu + store status reads — frozen; no renames/removals.
+    - **1.1.0** (Sprint 3):
+    - **1.2.0** (Sprint 4): additive — orders, payment, webhooks, health additive — `POST /api/v1/quote` (stateless pricing) and cart validation
+      reason codes. Nothing from 1.0.0 was renamed or removed.
+
+    After each freeze, changes are **additive only**. Renames and removals are not permitted
+    without an explicit version bump agreed in advance.
 
     ## Scope (v1)
 
-    Pickup only, guest checkout only, ASAP orders only. Cart, pricing, checkout, and order
-    placement arrive in later sprints and are **not** part of this document.
+    Pickup only, guest checkout only, ASAP orders only. Checkout / order placement arrive
+    in Sprint 4 and are **not** part of this document yet.
 
     ## Response envelope
 
     Success responses:
 
     ```json
-    { "data": <payload>, "meta": { "serverTime": "<ISO UTC>", "version": "1.0.0" } }
+    { "data": <payload>, "meta": { "serverTime": "<ISO UTC>", "version": "1.1.0" } }
     ```
 
     Failure responses:
@@ -32,14 +35,19 @@ info:
     ```json
     {
       "error": { "code": "<ApiErrorCode>", "message": "<string>", "details": null },
-      "meta": { "serverTime": "<ISO UTC>", "version": "1.0.0" }
+      "meta": { "serverTime": "<ISO UTC>", "version": "1.1.0" }
     }
     ```
+
+    Quote validation failures put a `reasons` array in `error.details`.
 
     ## Serialisation rules
 
     - Money is an **integer number of US cents**, never a string, never a float. Money field
       names end in `Cents` (for example `basePriceCents`, `priceDeltaCents`).
+    - **The client never sends a price.** Cart requests carry identifiers and quantities only.
+      Every price is resolved server-side. A request body containing any price-like field is
+      rejected with `VALIDATION_ERROR` / `PRICE_FIELD_FORBIDDEN`.
     - Timestamps are ISO 8601 strings in **UTC** with an explicit zone designator
       (for example `2026-08-09T17:00:00.000Z`).
     - Wall-clock store hours (`openTime` / `closeTime`) are strings in 24-hour `HH:mm` form.
@@ -54,8 +62,8 @@ info:
     | code | HTTP | meaning |
     |------|------|---------|
     | NOT_FOUND | 404 | Unknown path, or unknown menu item / slug pair |
-    | VALIDATION_ERROR | 400 | Request failed validation (reserved for later write endpoints; mock-triggerable today) |
-    | STORE_CLOSED | 409 | Store is outside opening hours / closed for the day |
+    | VALIDATION_ERROR | 400 | Request failed validation (cart structure / modifiers / tip) |
+    | STORE_CLOSED | 409 | Store is outside opening hours / closed for the day (also used in quote `blockingReasons`) |
     | STORE_NOT_ACCEPTING_ORDERS | 409 | Store is open but not accepting online orders |
     | ITEM_UNAVAILABLE | 409 | Requested item cannot be ordered (for example sold out) |
     | INTERNAL_ERROR | 500 | Unexpected server failure; details never leak to the client |
@@ -65,8 +73,9 @@ info:
     The fixture-backed mock (`pnpm mock`, port 4001) honours:
 
     - Query `?forceError=<ApiErrorCode>` or header `X-Mock-Error: <ApiErrorCode>`
-    - Query `?forceStore=closed` → `isOpen=false`
+    - Query `?forceStore=closed` → `isOpen=false` (store status and quote orderability)
     - Query `?forceStore=not-accepting` → `acceptingOrders=false` with a message
+    - Query `?forceSoldOut=item|option` on `POST /api/v1/quote` → sold-out validation reasons
 
     The real application API does **not** honour these triggers.
   contact:
@@ -82,6 +91,12 @@ tags:
     description: Catalogue reads — categories, items, curated lists
   - name: Store
     description: Store identity, hours, open/closed, money and prep settings
+  - name: Quote
+    description: Stateless cart pricing (no persistence)
+  - name: Orders
+    description: Checkout and public order status
+  - name: Webhooks
+    description: Processor callbacks (Square only)
 
 paths:
   /api/v1/menu:
@@ -420,11 +435,11 @@ paths:
                   value:
                     data:
                       storeName: Harold's Chicken Oak Lawn
-                      addressLine1: "TODO: CONFIRM STREET ADDRESS"
+                      addressLine1: "4709 W 95th St"
                       addressLine2: null
                       city: Oak Lawn
                       state: IL
-                      postalCode: TODO
+                      postalCode: "60453-2515"
                       contactPhone: "TODO: CONFIRM PHONE"
                       timezone: America/Chicago
                       hours:
@@ -450,7 +465,7 @@ paths:
                       defaultTipPresetIndex: 1
                     meta:
                       serverTime: "2026-08-09T17:00:00.000Z"
-                      version: "1.0.0"
+                      version: "1.2.0"
           headers:
             Cache-Control:
               schema: { type: string }
@@ -463,6 +478,247 @@ paths:
           $ref: "#/components/responses/ConflictErrors"
         "500":
           $ref: "#/components/responses/InternalError"
+
+  /api/v1/quote:
+    post:
+      tags: [Quote]
+      summary: Price a cart (stateless)
+      description: |
+        Accepts a cart of item identifiers, quantities, selected modifier option identifiers,
+        and an optional tip. Returns a fully priced result with line snapshots, tax, tip,
+        grand total, and an orderability verdict.
+
+        This endpoint is a `POST` only because it carries a body. It is **stateless,
+        idempotent, and free of side effects**: it writes nothing. Calling it a hundred times
+        with the same body produces a hundred identically shaped priced responses and leaves
+        no database row. It is **not** cart creation.
+
+        Quotes are **advisory for display**. Sprint 4 recomputes prices authoritatively at
+        checkout — the storefront must never send computed totals to the order endpoint.
+
+        Caching is forbidden (`Cache-Control: no-store`). A cached quote is a customer charged
+        yesterday's price.
+      operationId: postQuote
+      parameters:
+        - $ref: "#/components/parameters/ForceError"
+        - $ref: "#/components/parameters/MockErrorHeader"
+        - name: forceStore
+          in: query
+          required: false
+          description: Mock only — force closed / not-accepting on the orderability verdict
+          schema:
+            type: string
+            enum: [closed, not-accepting]
+        - name: forceSoldOut
+          in: query
+          required: false
+          description: Mock only — force first line item or a fixture option sold out
+          schema:
+            type: string
+            enum: [item, option]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartRequest"
+            examples:
+              realisticMultiLine:
+                summary: Mayo ×2, PC Gizzards + fries, Pizza Puff + cheese, 18% tip preset
+                value:
+                  lines:
+                    - itemId: cmsl1w68u004yur9walbqusod
+                      quantity: 2
+                      selectedOptionIds: []
+                    - itemId: cmsl1w66t002cur9w5eh1hs4y
+                      quantity: 1
+                      selectedOptionIds: [cmsl1w65m0012ur9wk7phy3g0]
+                      customerNote: Extra crispy if possible
+                    - itemId: cmsl1w67m003eur9wfbdd256t
+                      quantity: 1
+                      selectedOptionIds: [cmsl1w65n0014ur9w081tyj87]
+                  tip:
+                    type: preset
+                    presetIndex: 1
+      responses:
+        "200":
+          description: Priced cart (may have orderable=false with blockingReasons)
+          headers:
+            Cache-Control:
+              schema: { type: string }
+              description: Always no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteSuccess"
+              examples:
+                realisticMultiLine:
+                  summary: Hand-checked totals — sub 2254 + tax 228 + tip 447 = 2929
+                  value:
+                    data:
+                      lines:
+                        - itemId: cmsl1w68u004yur9walbqusod
+                          snapshot:
+                            itemName: Mayo Packet
+                            boardLabel: "MAYO PACKETS"
+                            baseUnitPriceCents: 29
+                            modifierTotalCents: 0
+                            effectiveUnitPriceCents: 29
+                            quantity: 2
+                            lineTotalCents: 58
+                            selectedModifiers: []
+                            customerNote: null
+                        - itemId: cmsl1w66t002cur9w5eh1hs4y
+                          snapshot:
+                            itemName: PC Gizzards
+                            boardLabel: "PC GIZZARDS"
+                            baseUnitPriceCents: 1279
+                            modifierTotalCents: 449
+                            effectiveUnitPriceCents: 1728
+                            quantity: 1
+                            lineTotalCents: 1728
+                            selectedModifiers:
+                              - groupName: Add ons
+                                groupPrompt: Add ons
+                                optionName: Add Fries
+                                priceDeltaCents: 449
+                            customerNote: Extra crispy if possible
+                        - itemId: cmsl1w67m003eur9wfbdd256t
+                          snapshot:
+                            itemName: Pizza Puff
+                            boardLabel: "PIZZA PUFF ONLY"
+                            baseUnitPriceCents: 349
+                            modifierTotalCents: 119
+                            effectiveUnitPriceCents: 468
+                            quantity: 1
+                            lineTotalCents: 468
+                            selectedModifiers:
+                              - groupName: Add ons
+                                groupPrompt: Add ons
+                                optionName: Add Cheese
+                                priceDeltaCents: 119
+                            customerNote: null
+                      subtotalCents: 2254
+                      taxCents: 228
+                      taxRateBps: 1010
+                      taxAppliedPreDiscount: true
+                      tip:
+                        type: preset
+                        presetIndex: 1
+                        rateBps: 1800
+                        tipCents: 447
+                      totalCents: 2929
+                      orderable: true
+                      blockingReasons: []
+                      estimatedReadyAt: "2026-08-09T17:20:00.000Z"
+                    meta:
+                      serverTime: "2026-08-09T17:00:00.000Z"
+                      version: "1.2.0"
+        "400":
+          description: Structural or modifier validation failed — details.reasons lists every problem
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      summary: Create order and take payment
+      description: |
+        Authoritatively prices the cart, creates a pending order, charges via Square, and on
+        success allocates an order number. **Stateless cart — no prices from the client.**
+        Client sends a Square Web Payments SDK token only — never card data.
+        Idempotent on `idempotencyKey`.
+      operationId: postOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            example:
+              cart:
+                lines:
+                  - itemId: cmsl1w68u004yur9walbqusod
+                    quantity: 2
+                    selectedOptionIds: []
+              customer:
+                firstName: Casey
+                lastName: Cook
+                phone: "+17085550100"
+                email: casey@example.com
+                smsConsent: true
+              paymentToken: cnon:card-nonce-ok
+              idempotencyKey: checkout-attempt-001
+      responses:
+        '200':
+          description: Order created / replayed
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '402':
+          description: Payment declined
+        '409':
+          $ref: '#/components/responses/ConflictErrors'
+        '502':
+          description: Payment failed / unknown
+
+  /api/v1/orders/status/{lookupToken}:
+    get:
+      tags: [Orders]
+      summary: Public order status by unguessable token
+      description: Never look up by order number. Returns first name + money + lines only.
+      operationId: getOrderStatus
+      parameters:
+        - name: lookupToken
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Order status
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/webhooks/square:
+    post:
+      tags: [Webhooks]
+      summary: Square webhook receiver (NOT storefront)
+      description: |
+        Square only. Verifies HMAC signature over the raw body. Exactly-once by event id.
+      operationId: postSquareWebhook
+      responses:
+        '200':
+          description: Accepted
+        '401':
+          description: Invalid signature
+
+  /api/v1/health:
+    get:
+      tags: [Store]
+      summary: Health / Square environment selector
+      operationId: getHealth
+      responses:
+        '200':
+          description: |
+            Process, database, and worker are up.
+            `data.ok` is true. `data.squareEnvironment` is `sandbox` or `production`.
+            Additive Sprint 9 fields: `data.checks.database`, `data.checks.worker`, `data.worker.lastPassAt`.
+        '503':
+          description: |
+            Additive Sprint 9 — process is reachable but a dependency is down
+            (`data.ok` false; `checks.database` or `checks.worker` not up). Same envelope as 200.
+
+
 
 components:
   parameters:
@@ -575,6 +831,10 @@ components:
         - STORE_NOT_ACCEPTING_ORDERS
         - ITEM_UNAVAILABLE
         - INTERNAL_ERROR
+        - PAYMENT_DECLINED
+        - PAYMENT_FAILED
+        - IDEMPOTENCY_CONFLICT
+        - UNAUTHORIZED
 
     ResponseMeta:
       type: object
@@ -587,8 +847,8 @@ components:
           description: Server UTC timestamp (ISO 8601 with zone)
         version:
           type: string
-          example: "1.0.0"
-          description: Frozen contract version
+          example: "1.1.0"
+          description: Contract version (currently 1.1.0)
 
     ApiErrorBody:
       type: object
@@ -877,3 +1137,260 @@ components:
           $ref: "#/components/schemas/StoreStatus"
         meta:
           $ref: "#/components/schemas/ResponseMeta"
+
+    # —— Sprint 3: cart / quote ——
+    CartValidationReasonCode:
+      type: string
+      description: |
+        Machine-readable cart validation reason. Availability-class codes
+        (`ITEM_SOLD_OUT`, `OPTION_SOLD_OUT`, `OPTION_INACTIVE`, `GROUP_INACTIVE`,
+        `ITEM_NOT_FOUND`) should be presented differently from customer-fixable
+        selection mistakes.
+      enum:
+        - EMPTY_CART
+        - TOO_MANY_LINES
+        - INVALID_QUANTITY
+        - TOO_MANY_ITEMS
+        - NOTE_TOO_LONG
+        - TIP_OUT_OF_RANGE
+        - TIP_DISABLED
+        - TIP_PRESET_INVALID
+        - PRICE_FIELD_FORBIDDEN
+        - MALFORMED_BODY
+        - ITEM_NOT_FOUND
+        - ITEM_SOLD_OUT
+        - OPTION_NOT_FOUND
+        - OPTION_INACTIVE
+        - OPTION_SOLD_OUT
+        - OPTION_NOT_BOUND
+        - GROUP_INACTIVE
+        - DUPLICATE_OPTION
+        - BELOW_MIN_SELECT
+        - ABOVE_MAX_SELECT
+
+    CartValidationReason:
+      type: object
+      required: [code, message, lineIndex, itemId, groupId, optionId, isAvailability]
+      additionalProperties: false
+      properties:
+        code:
+          $ref: "#/components/schemas/CartValidationReasonCode"
+        message: { type: string }
+        lineIndex: { type: integer, nullable: true }
+        itemId: { type: string, nullable: true }
+        groupId: { type: string, nullable: true }
+        optionId: { type: string, nullable: true }
+        isAvailability:
+          type: boolean
+          description: true when availability changed underneath the customer
+
+    TipRequest:
+      description: Exactly one of preset / rate / amount. Omit tip for absent; amountCents 0 is explicit decline.
+      oneOf:
+        - type: object
+          required: [type, presetIndex]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [preset] }
+            presetIndex: { type: integer, minimum: 0 }
+        - type: object
+          required: [type, rateBps]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [rate] }
+            rateBps: { type: integer, minimum: 0 }
+        - type: object
+          required: [type, amountCents]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [amount] }
+            amountCents: { type: integer, minimum: 0 }
+
+    CartLineRequest:
+      type: object
+      required: [itemId, quantity, selectedOptionIds]
+      additionalProperties: false
+      properties:
+        itemId: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        selectedOptionIds:
+          type: array
+          items: { type: string }
+        customerNote: { type: string, nullable: true }
+
+    CartRequest:
+      type: object
+      required: [lines]
+      additionalProperties: false
+      description: Identifiers and quantities only — never prices, names, or totals.
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CartLineRequest"
+        tip:
+          $ref: "#/components/schemas/TipRequest"
+
+    SelectedModifierSnapshot:
+      type: object
+      required: [groupName, groupPrompt, optionName, priceDeltaCents]
+      additionalProperties: false
+      properties:
+        groupName: { type: string }
+        groupPrompt: { type: string }
+        optionName: { type: string }
+        priceDeltaCents: { type: integer }
+
+    PricedLineSnapshot:
+      type: object
+      required:
+        - itemName
+        - boardLabel
+        - baseUnitPriceCents
+        - modifierTotalCents
+        - effectiveUnitPriceCents
+        - quantity
+        - lineTotalCents
+        - selectedModifiers
+        - customerNote
+      additionalProperties: false
+      properties:
+        itemName: { type: string }
+        boardLabel: { type: string, nullable: true }
+        baseUnitPriceCents: { type: integer }
+        modifierTotalCents: { type: integer }
+        effectiveUnitPriceCents: { type: integer }
+        quantity: { type: integer }
+        lineTotalCents: { type: integer }
+        selectedModifiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/SelectedModifierSnapshot"
+        customerNote: { type: string, nullable: true }
+
+    PricedLine:
+      type: object
+      required: [itemId, snapshot]
+      additionalProperties: false
+      properties:
+        itemId: { type: string }
+        snapshot:
+          $ref: "#/components/schemas/PricedLineSnapshot"
+
+    TipApplied:
+      oneOf:
+        - type: object
+          required: [type, tipCents]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [none] }
+            tipCents: { type: integer, enum: [0] }
+        - type: object
+          required: [type, presetIndex, rateBps, tipCents]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [preset] }
+            presetIndex: { type: integer }
+            rateBps: { type: integer }
+            tipCents: { type: integer }
+        - type: object
+          required: [type, rateBps, tipCents]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [rate] }
+            rateBps: { type: integer }
+            tipCents: { type: integer }
+        - type: object
+          required: [type, tipCents]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [amount] }
+            tipCents: { type: integer }
+
+    QuoteResult:
+      type: object
+      required:
+        - lines
+        - subtotalCents
+        - taxCents
+        - taxRateBps
+        - taxAppliedPreDiscount
+        - tip
+        - totalCents
+        - orderable
+        - blockingReasons
+        - estimatedReadyAt
+      additionalProperties: false
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricedLine"
+        subtotalCents: { type: integer }
+        taxCents: { type: integer }
+        taxRateBps: { type: integer }
+        taxAppliedPreDiscount: { type: boolean }
+        tip:
+          $ref: "#/components/schemas/TipApplied"
+        totalCents: { type: integer }
+        orderable: { type: boolean }
+        blockingReasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiErrorCode"
+        estimatedReadyAt: { type: string, format: date-time }
+
+    QuoteSuccess:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/QuoteResult"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    QuoteValidationError:
+      type: object
+      required: [error, meta]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          additionalProperties: false
+          properties:
+            code: { type: string, enum: [VALIDATION_ERROR] }
+            message: { type: string }
+            details:
+              type: object
+              required: [reasons]
+              additionalProperties: false
+              properties:
+                reasons:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/CartValidationReason"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    CreateOrderRequest:
+      type: object
+      required: [cart, customer, paymentToken, idempotencyKey]
+      additionalProperties: false
+      properties:
+        cart:
+          $ref: '#/components/schemas/CartRequest'
+        customer:
+          type: object
+          required: [firstName, lastName, phone, email, smsConsent]
+          properties:
+            firstName: { type: string }
+            lastName: { type: string }
+            phone: { type: string }
+            email: { type: string }
+            smsConsent: { type: boolean }
+        paymentToken: { type: string }
+        idempotencyKey: { type: string }
+        customerNote: { type: string, nullable: true }

@@ -228,6 +228,24 @@ async function main(): Promise<void> {
   await writeJson("most-ordered.json", mostOrderedPayload);
   await writeJson("meta.json", meta);
 
+  // SPRINT-3: board labels are not on the public menu contract, but quote snapshots need them.
+  // Export a side map so the mock pricing catalog matches the real API snapshots.
+  const boardRows = await prisma.menuItem.findMany({
+    select: { id: true, boardLabel: true },
+  });
+  const boardLabels: Record<string, string | null> = {};
+  for (const row of boardRows) boardLabels[row.id] = row.boardLabel;
+  await writeJson("board-labels.json", boardLabels);
+
+  // SPRINT-4: internal modifier group names are not on the public menu contract (prompt only).
+  // Side fixture so mock quote/order snapshots match the real API when name ≠ prompt.
+  const groupRows = await prisma.modifierGroup.findMany({
+    select: { id: true, name: true },
+  });
+  const groupNames: Record<string, string> = {};
+  for (const row of groupRows) groupNames[row.id] = row.name;
+  await writeJson("group-names.json", groupNames);
+
   console.log("edge cases:", JSON.stringify(edgeCases, null, 2));
 }
 

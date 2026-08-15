@@ -19,12 +19,22 @@
     "db:migrate": "pnpm --filter @harolds/db migrate:dev",
     "db:migrate:deploy": "pnpm --filter @harolds/db migrate:deploy",
     "db:seed": "pnpm --filter @harolds/db seed",
+    "db:seed:menu": "pnpm --filter @harolds/db seed:menu",
+    "db:seed:accounts": "pnpm --filter @harolds/db seed:accounts",
     "db:verify": "pnpm --filter @harolds/db verify",
+    "db:cancel-orphans": "pnpm --filter @harolds/db cancel-orphans",
     "db:studio": "pnpm --filter @harolds/db studio",
     "db:export-fixtures": "pnpm --filter @harolds/db export-fixtures",
     "mock": "pnpm --filter @harolds/mock-api start",
+    "test": "pnpm -r --if-present test",
     "test:db": "pnpm --filter @harolds/db test",
-    "openapi:validate": "pnpm --filter @harolds/web openapi:validate"
+    "test:pricing": "pnpm --filter @harolds/pricing test",
+    "ensure-env": "node scripts/ensure-env.mjs",
+    "reconcile": "pnpm --filter @harolds/db exec tsx src/reconcile-cli.ts",
+    "openapi:validate": "pnpm --filter @harolds/web openapi:validate",
+    "contract:probe": "node --env-file=.env scripts/sprint10-contract-probe.mjs",
+    "backup": "node --env-file=.env scripts/backup-postgres.mjs",
+    "backup:restore": "node --env-file=.env scripts/restore-postgres.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

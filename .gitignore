@@ -37,3 +37,9 @@ Thumbs.db
 
 # Test / coverage
 coverage/
+
+# Database backups (never commit dumps)
+backups/
+var/backups/
+*.dump
+*.sql.gz

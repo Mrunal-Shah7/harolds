@@ -25,6 +25,13 @@ packages/
   db/                  Prisma schema, client, seed, verify
   types/               Shared enums and domain types
   config/              Env schema, shared TS/ESLint config
+  pricing/             Integer-cents quoting
+  square/              Square payments (only file that imports the Square SDK)
+  print/               Kitchen/counter tickets and ePOS-Print XML
+  sms/                 Twilio SMS (only file that imports the Twilio SDK)
+  email/               Resend email (only file that imports the Resend SDK)
+  notify/              Background job worker, templates, handlers
+  mock-api/            Contract mock server
 docs/                  Sprint notes
 harolds-menu-reconciliation.xlsx   Authoritative menu source for the seed
 ```
@@ -43,8 +50,8 @@ harolds-menu-reconciliation.xlsx   Authoritative menu source for the seed
 pnpm install
 
 # 2. Environment
-cp .env.example .env
 # Edit .env — set DATABASE_URL, NODE_ENV=development, NEXT_PUBLIC_APP_URL
+# Prefer: pnpm ensure-env  (creates .env only if missing; never overwrites)
 
 # 3. Generate Prisma client
 pnpm db:generate
@@ -62,7 +69,19 @@ pnpm db:verify
 pnpm dev
 ```
 
-Open http://localhost:3000 (storefront), `/admin`, `/kitchen`, `/api`.
+Open http://localhost:3000 (storefront placeholder), `/admin`, `/kitchen`.
+
+## Documentation
+
+| Doc | Who |
+|---|---|
+| [`docs/LAUNCH-BLOCKERS.md`](docs/LAUNCH-BLOCKERS.md) | Owner — what must be true before go-live |
+| [`docs/OPERATOR-HANDBOOK.md`](docs/OPERATOR-HANDBOOK.md) | Managers — everyday ops index |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Developer — deploy / rollback |
+| [`docs/CUTOVER-PLAN.md`](docs/CUTOVER-PLAN.md) | Developer + owner — go-live steps (unexecuted) |
+| [`docs/HANDOVER.md`](docs/HANDOVER.md) | Future developer — architecture and deferred work |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | Incidents and credential rotation |
+| [`docs/API-CONTRACT-HANDOFF.md`](docs/API-CONTRACT-HANDOFF.md) | Storefront developer |
 
 ## Scripts
 

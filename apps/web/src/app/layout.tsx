@@ -1,5 +1,6 @@
 // SPRINT-1: root application layout — shared HTML shell for all route-group surfaces
 import type { Metadata } from "next";
+import { ClientErrorReporter } from "@/components/ClientErrorReporter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,7 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ClientErrorReporter />
+        {children}
+      </body>
     </html>
   );
 }

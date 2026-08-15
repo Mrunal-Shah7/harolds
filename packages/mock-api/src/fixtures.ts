@@ -29,6 +29,10 @@ export const categoriesFixture: CategoriesPayload = readJson("categories.json");
 export const featuredFixture: CuratedItemsPayload = readJson("featured.json");
 export const mostOrderedFixture: CuratedItemsPayload = readJson("most-ordered.json");
 export const metaFixture: FixtureMeta = readJson("meta.json");
+/** SPRINT-3: id → boardLabel for quote snapshots (not on public menu payloads). */
+export const boardLabelsFixture: Record<string, string | null> = readJson("board-labels.json");
+/** SPRINT-4: id → internal modifier group name for snapshots (not on public menu payloads). */
+export const groupNamesFixture: Record<string, string> = readJson("group-names.json");
 
 export function findItemById(id: string): MenuItemDetail | null {
   for (const category of menuFixture.categories) {

@@ -8,11 +8,18 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "test": "tsx --env-file=../../.env --test src/**/*.test.ts",
     "openapi:validate": "tsx scripts/openapi-validate.ts && tsx scripts/openapi-drift.ts"
   },
   "dependencies": {
     "@harolds/config": "workspace:*",
     "@harolds/db": "workspace:*",
+    "@harolds/pricing": "workspace:*",
+    "@harolds/print": "workspace:*",
+    "@harolds/square": "workspace:*",
+    "@harolds/sms": "workspace:*",
+    "@harolds/email": "workspace:*",
+    "@harolds/notify": "workspace:*",
     "@harolds/types": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

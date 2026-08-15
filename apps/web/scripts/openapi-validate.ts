@@ -1,4 +1,4 @@
-// SPRINT-2: validate docs/openapi/v1.yaml and assert documented paths match the published surface
+// SPRINT-2 / SPRINT-3 / SPRINT-4: validate docs/openapi/v1.yaml against published surface
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import SwaggerParser from "@apidevtools/swagger-parser";
@@ -6,8 +6,7 @@ import SwaggerParser from "@apidevtools/swagger-parser";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const specPath = path.join(rootDir, "docs/openapi/v1.yaml");
 
-/** Canonical Sprint 2 public GET paths (real + mock). */
-const EXPECTED_PATHS = [
+const EXPECTED_GET_PATHS = [
   "/api/v1/menu",
   "/api/v1/menu/categories",
   "/api/v1/menu/items/{id}",
@@ -15,7 +14,17 @@ const EXPECTED_PATHS = [
   "/api/v1/menu/featured",
   "/api/v1/menu/most-ordered",
   "/api/v1/store/status",
+  "/api/v1/orders/status/{lookupToken}",
+  "/api/v1/health",
 ] as const;
+
+const EXPECTED_POST_PATHS = [
+  "/api/v1/quote",
+  "/api/v1/orders",
+  "/api/v1/webhooks/square",
+] as const;
+
+const EXPECTED_PATHS = [...EXPECTED_GET_PATHS, ...EXPECTED_POST_PATHS] as const;
 
 const EXPECTED_ERROR_CODES = [
   "NOT_FOUND",
@@ -24,12 +33,16 @@ const EXPECTED_ERROR_CODES = [
   "STORE_NOT_ACCEPTING_ORDERS",
   "ITEM_UNAVAILABLE",
   "INTERNAL_ERROR",
+  "PAYMENT_DECLINED",
+  "PAYMENT_FAILED",
+  "IDEMPOTENCY_CONFLICT",
+  "UNAUTHORIZED",
 ] as const;
 
 async function main(): Promise<void> {
   console.log(`Validating OpenAPI: ${path.relative(rootDir, specPath)}`);
   const api = (await SwaggerParser.validate(specPath)) as {
-    paths?: Record<string, unknown>;
+    paths?: Record<string, Record<string, unknown>>;
     components?: { schemas?: { ApiErrorCode?: { enum?: string[] } } };
     info?: { version?: string };
   };
@@ -49,10 +62,16 @@ async function main(): Promise<void> {
     );
   }
 
-  for (const p of expected) {
-    const methods = api.paths?.[p] as Record<string, unknown> | undefined;
+  for (const p of EXPECTED_GET_PATHS) {
+    const methods = api.paths?.[p];
     if (!methods || typeof methods.get !== "object") {
       throw new Error(`OpenAPI drift: path ${p} must define a GET operation`);
+    }
+  }
+  for (const p of EXPECTED_POST_PATHS) {
+    const methods = api.paths?.[p];
+    if (!methods || typeof methods.post !== "object") {
+      throw new Error(`OpenAPI drift: path ${p} must define a POST operation`);
     }
   }
 
@@ -63,8 +82,8 @@ async function main(): Promise<void> {
     }
   }
 
-  if (api.info?.version !== "1.0.0") {
-    throw new Error(`Expected info.version "1.0.0", got ${String(api.info?.version)}`);
+  if (api.info?.version !== "1.2.0") {
+    throw new Error(`Expected info.version "1.2.0", got ${String(api.info?.version)}`);
   }
 
   console.log(`OK — ${documented.length} paths, ${codes.length} error codes, version ${api.info?.version}`);

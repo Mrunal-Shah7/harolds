@@ -1,0 +1,24 @@
+// SPRINT-11: kitchen ticket with modifiers + note — plain-text preview and ePOS document.
+// Hardware: printer was not reachable on this machine; this is the recorded document, not paper.
+
+=== PLAIN TEXT PREVIEW ===
+                  HC-S11
+------------------------------------------
+08/15/26  1:59 PM
+ONLINE
+Jamal W.
+                ** PAID **
+              ONLINE PICKUP
+------------------------------------------
+1/2 CHICKEN
+  MILD
+  ADD FRIES
+  ADD CHEESE
+  NOTE: Extra crispy if possible - no
+  pickles
+------------------------------------------
+                  HC-S11
+        Harold's Chicken Oak Lawn
+
+=== EPOS-PRINT XML ===
+<?xml version="1.0" encoding="utf-8"?><epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print"><text lang="en"/><text align="center" em="true" width="2" height="2">HC-S11&#10;</text><text align="left">------------------------------------------&#10;</text><text align="left">08/15/26  1:59 PM&#10;</text><text align="left">ONLINE&#10;</text><text align="left" em="true">Jamal W.&#10;</text><text align="center" em="true">** PAID **&#10;</text><text align="center" em="true">ONLINE PICKUP&#10;</text><text align="left">------------------------------------------&#10;</text><text align="left" em="true">1/2 CHICKEN&#10;</text><text align="left" font="font_b">  MILD&#10;</text><text align="left" font="font_b">  ADD FRIES&#10;</text><text align="left" font="font_b">  ADD CHEESE&#10;</text><text align="left" font="font_b" ul="true">  NOTE: Extra crispy if possible - no&#10;</text><text align="left" font="font_b" ul="true">  pickles&#10;</text><text align="left">------------------------------------------&#10;</text><text align="center" em="true" width="2" height="2">HC-S11&#10;</text><text align="center">Harold&apos;s Chicken Oak Lawn&#10;</text><cut type="feed"/></epos-print>

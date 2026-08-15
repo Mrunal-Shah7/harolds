@@ -1,4 +1,4 @@
-// SPRINT-1: typed StoreConfig accessor with short in-process TTL cache and explicit invalidation
+// SPRINT-1 / SPRINT-2: typed StoreConfig accessor with short in-process TTL cache and explicit invalidation
 import type { StoreConfigData } from "@harolds/types";
 import { prisma } from "./client";
 
@@ -20,6 +20,8 @@ function toData(row: {
   taxAppliedPreDiscount: boolean;
   orderNumberPrefix: string;
   orderNumberStartValue: number;
+  orderNumberResetHour: number;
+  orderNumberPadWidth: number;
   normalPrepMinutes: number;
   busyPrepMinutes: number;
   isBusy: boolean;
@@ -28,6 +30,8 @@ function toData(row: {
   defaultTipPresetIndex: number;
   acceptingOrders: boolean;
   notAcceptingMessage: string | null;
+  managerAlertPhone: string | null;
+  managerAlertEmail: string | null;
 }): StoreConfigData {
   return {
     id: row.id,
@@ -43,6 +47,8 @@ function toData(row: {
     taxAppliedPreDiscount: row.taxAppliedPreDiscount,
     orderNumberPrefix: row.orderNumberPrefix,
     orderNumberStartValue: row.orderNumberStartValue,
+    orderNumberResetHour: row.orderNumberResetHour,
+    orderNumberPadWidth: row.orderNumberPadWidth,
     normalPrepMinutes: row.normalPrepMinutes,
     busyPrepMinutes: row.busyPrepMinutes,
     isBusy: row.isBusy,
@@ -51,6 +57,8 @@ function toData(row: {
     defaultTipPresetIndex: row.defaultTipPresetIndex,
     acceptingOrders: row.acceptingOrders,
     notAcceptingMessage: row.notAcceptingMessage,
+    managerAlertPhone: row.managerAlertPhone,
+    managerAlertEmail: row.managerAlertEmail,
   };
 }
 

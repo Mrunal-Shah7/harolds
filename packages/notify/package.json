@@ -1,0 +1,28 @@
+{
+  "name": "@harolds/notify",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "build": "tsc --noEmit",
+    "test": "tsx --env-file=../../.env --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@harolds/config": "workspace:*",
+    "@harolds/db": "workspace:*",
+    "@harolds/email": "workspace:*",
+    "@harolds/pricing": "workspace:*",
+    "@harolds/sms": "workspace:*",
+    "@harolds/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

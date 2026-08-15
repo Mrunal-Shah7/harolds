@@ -26,6 +26,8 @@ enum OrderStatus {
   PICKED_UP
   CANCELLED
   REFUNDED
+  /// Checkout abandoned — never reached a Square payment id (Sprint 4 sweeper).
+  ABANDONED
 }
 
 enum PaymentStatus {
@@ -33,6 +35,8 @@ enum PaymentStatus {
   AUTHORISED
   CAPTURED
   FAILED
+  /// Synchronous Square call failed to complete — charge may or may not have succeeded (Sprint 4).
+  UNKNOWN
   REFUNDED
   PARTIALLY_REFUNDED
 }
@@ -61,6 +65,19 @@ enum JobType {
   SMS_ORDER_CONFIRMATION
   EMAIL_ORDER_RECEIPT
   EMAIL_ORDER_READY
+  // SPRINT-2: manager alert job types
+  ALERT_MANAGER_PRINT_FAILED
+  ALERT_MANAGER_JOB_DEAD
+  ALERT_MANAGER_ORDER_UNACKNOWLEDGED
+  // SPRINT-4: payment amount mismatch / reconciliation discrepancy
+  ALERT_MANAGER_PAYMENT_DISCREPANCY
+}
+
+// SPRINT-2: admin auth roles
+enum AdminRole {
+  OWNER
+  MANAGER
+  STAFF
 }
 
 enum JobStatus {
@@ -71,6 +88,8 @@ enum JobStatus {
   FAILED
   /// Attempt ceiling reached; human intervention required. Distinct from FAILED.
   DEAD
+  /// SPRINT-7: operator cancelled — kept for history, never selected by the worker.
+  CANCELLED
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,6 +121,8 @@ model MenuItem {
   workbookId           String   @unique
   categoryId           String
   name                 String
+  // SPRINT-2: URL/storefront slug unique within category
+  slug                 String
   /// Original menu-board text, preserved verbatim including capitalisation. Kitchen may prefer this.
   boardLabel           String?
   description          String?
@@ -128,6 +149,8 @@ model MenuItem {
   orderLines     OrderLine[]
 
   @@unique([categoryId, name])
+  // SPRINT-2: slug uniqueness scoped to category
+  @@unique([categoryId, slug])
   @@index([categoryId])
   @@index([sortOrder])
   @@index([isFeatured, featuredSortOrder])
@@ -214,10 +237,14 @@ model ItemModifierGroup {
 model Order {
   id String @id @default(cuid())
 
-  /// Human-readable order number including prefix (e.g. "HC-1042"). Unique; shown on ticket.
-  orderNumber   String @unique
+  // SPRINT-2 / SPRINT-4: order number allocated ONLY on successful payment (nullable until then).
+  // Nulls do not collide under PostgreSQL UNIQUE (businessDate, orderSequence).
+  /// Human-readable order number including prefix (e.g. "HC-001"). Shown on ticket; not globally unique.
+  orderNumber   String?
   /// Raw integer allocated from OrderNumberCounter — sorts correctly; prefix is applied when composing orderNumber.
-  orderSequence Int
+  orderSequence Int?
+  // SPRINT-2: business calendar date for daily order-number reset — set with the number at payment.
+  businessDate  DateTime? @db.Date
 
   // Customer (guest checkout — no account relation)
   customerFirstName String
@@ -239,12 +266,15 @@ model Order {
   taxRateBps            Int
   /// Whether tax was applied to the pre-discount subtotal for this order.
   taxAppliedPreDiscount Boolean
+  /// Tip rate in basis points when tip was percentage-based; null for fixed/none.
+  tipRateBps            Int?
 
-  // Payment (nullable until Sprint 4)
+  // Payment (Sprint 4)
   paymentStatus      PaymentStatus @default(PENDING)
   processorPaymentId String?
   processorOrderId   String?
   paymentCapturedAt  DateTime?
+  paymentFailureReason String?
 
   // Fulfilment
   fulfilmentType   FulfilmentType @default(PICKUP)
@@ -259,15 +289,36 @@ model Order {
   customerNote String?
   staffNote    String?
 
+  /// Last four digits of the card, only when Square supplied them. Never any other card data.
+  cardLast4          String?
+
+  // SPRINT-4: unguessable customer status lookup; never use order number as a public key.
+  lookupToken String @unique
+  // SPRINT-4: client-supplied checkout idempotency key (unique).
+  clientIdempotencyKey String @unique
+  /// Fingerprint of the cart+tip used at create — detects idempotency-key reuse with a different cart.
+  cartFingerprint String
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  lines     OrderLine[]
-  printJobs PrintJob[]
+  lines          OrderLine[]
+  printJobs      PrintJob[]
+  processorEvents ProcessorWebhookEvent[]
+  refunds        ProcessorRefund[]
+  // SPRINT-6: kitchen status transitions (attribution)
+  statusEvents   OrderStatusEvent[]
 
+  // SPRINT-2: uniqueness is (businessDate, orderSequence); orderNumber is indexed for lookup only
+  @@unique([businessDate, orderSequence])
+  @@index([orderNumber])
   @@index([status])
+  /// SPRINT-6: kitchen queue — filter by live statuses, oldest paid first.
+  @@index([status, paidAt])
   @@index([createdAt])
   @@index([customerPhone])
+  @@index([processorPaymentId])
+  @@index([paymentStatus, createdAt])
 }
 
 /// Line item with a COMPLETE purchase snapshot.
@@ -294,6 +345,8 @@ model OrderLine {
   lineTotalCents          Int
   /// JSON array of { groupName, groupPrompt, optionName, priceDeltaCents }
   selectedModifiers       Json
+  /// Per-line customer note from the cart (snapshotted).
+  customerNote            String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -311,12 +364,52 @@ model OrderLine {
 /// WHY NOT A DATABASE SEQUENCE: the counter must be readable, resettable, and auditable from
 /// the admin panel, and its current value must be visible without special privileges.
 /// Allocation: BEGIN; SELECT … FOR UPDATE; increment; write; COMMIT.
-/// The prefix is NOT stored here — it lives in StoreConfig so it can change without touching the counter.
+/// SPRINT-2: one row per business date; allocation locks this row (Sprint 4). Prefix lives in StoreConfig.
 model OrderNumberCounter {
-  /// Fixed single-row identifier.
-  id           String   @id @default("default")
+  id           String   @id @default(cuid())
+  /// Business calendar date this counter covers.
+  businessDate DateTime @unique @db.Date
   currentValue Int
   updatedAt    DateTime @updatedAt
+}
+
+/// SPRINT-4: Square (and later processors) webhook events — unique eventId for exactly-once processing.
+model ProcessorWebhookEvent {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  eventType   String
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  /// PROCESSED | DUPLICATE | IGNORED | ERROR | REJECTED_SIGNATURE
+  outcome     String
+  rawPayload  Json
+  orderId     String?
+  lastError   String?
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([orderId])
+  @@index([receivedAt])
+}
+
+/// SPRINT-4: refund attempts — idempotent by client key; webhook confirms.
+model ProcessorRefund {
+  id                   String   @id @default(cuid())
+  orderId              String
+  amountCents          Int
+  clientIdempotencyKey String   @unique
+  processorRefundId    String?  @unique
+  status               String   @default("PENDING")
+  /// SPRINT-8: acting back-office user; null for unattributed / webhook-only rows.
+  actedByUserId        String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  order   Order      @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  actedBy AdminUser? @relation(fields: [actedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([orderId])
+  @@index([actedByUserId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -333,12 +426,16 @@ model PrintJob {
   payload        String
   printerSerial  String
   attemptCount   Int            @default(0)
-  maxAttempts    Int            @default(3)
+  maxAttempts    Int            @default(5)
   /// When the payload was handed to the printer (nullable until sent).
   sentAt         DateTime?
   /// When the printer acknowledged completion (nullable until ack). Gap vs sentAt detects silent failures.
   acknowledgedAt DateTime?
   lastError      String?
+  /// Reprint jobs carry the original payload; banner is applied at send time only.
+  isReprint      Boolean        @default(false)
+  /// Earliest time this job may be handed to a poll — backoff after failures / unacked sends.
+  runAfter       DateTime       @default(now())
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -347,7 +444,15 @@ model PrintJob {
 
   @@index([orderId])
   /// Hottest query: printer polls for queued work addressed to it every few seconds.
-  @@index([status, printerSerial])
+  @@index([status, printerSerial, runAfter])
+  @@index([status, sentAt])
+}
+
+/// Last time each configured printer polled. Health signal: silent if this stalls.
+model PrinterHeartbeat {
+  printerSerial String   @id
+  lastPolledAt  DateTime
+  updatedAt     DateTime @updatedAt
 }
 
 /// Generic deferred-work table. No Redis — a long-lived in-process worker drains this on an interval.
@@ -362,15 +467,43 @@ model BackgroundJob {
   runAfter      DateTime  @default(now())
   lastAttemptAt DateTime?
   lastError     String?
+  /// SPRINT-7: provider message/email id recorded as soon as the send returns.
+  providerMessageId String?
+  /// SPRINT-7: SENT | SKIPPED_NO_CONSENT | SKIPPED_SUPPRESSED | SKIPPED_VOLUME_CAP | SKIPPED_NO_DESTINATION
+  result        String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   /// Worker polling query: pending/failed jobs whose runAfter has passed.
   @@index([status, runAfter])
+  /// SPRINT-7: stranded RUNNING recovery.
+  @@index([status, lastAttemptAt])
+}
+
+/// SPRINT-7: phone-level SMS suppression. Honoured on every subsequent send, not just one order.
+model SmsSuppression {
+  phoneE164  String    @id
+  suppressed Boolean   @default(true)
+  optedOutAt DateTime?
+  optedInAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+/// SPRINT-7: inbound Twilio webhook events — idempotent opt-out / opt-in.
+model SmsInboundEvent {
+  id              String   @id @default(cuid())
+  providerEventId String   @unique
+  fromPhone       String
+  body            String
+  kind            String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 /// Single-row store configuration. Fixed PK so the row is always fetchable without "first row" queries.
 /// Singleton is enforced by PK(id) plus a DB check constraint requiring id = 'default' (see migration SQL).
+/// SPRINT-2: singleton check constraint StoreConfig_singleton_check must be preserved in migrations.
 model StoreConfig {
   /// Fixed known primary key — enforces singleton together with StoreConfig_singleton_check.
   id String @id @default("default")
@@ -395,6 +528,9 @@ model StoreConfig {
   // Order numbering
   orderNumberPrefix     String
   orderNumberStartValue Int
+  // SPRINT-2: daily reset hour (0-23) and zero-pad width for composed order numbers
+  orderNumberResetHour  Int     @default(5) // 0-23
+  orderNumberPadWidth   Int     @default(3)
 
   // Prep time — nothing computes prep from queue depth in v1.
   normalPrepMinutes Int
@@ -411,8 +547,88 @@ model StoreConfig {
   acceptingOrders     Boolean @default(true)
   notAcceptingMessage String?
 
+  // SPRINT-2: manager alert contacts
+  managerAlertPhone String?
+  managerAlertEmail String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPRINT-2: Admin auth
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Admin panel user (owner / manager / kitchen staff).
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  displayName  String
+  role         AdminRole
+  isActive     Boolean   @default(true)
+  /// Hashed short numeric PIN for kitchen quick-auth.
+  pinHash      String?
+  /// SPRINT-6: consecutive failed PIN attempts; reset on successful sign-in.
+  failedPinAttempts Int       @default(0)
+  /// SPRINT-8: consecutive failed password attempts; independent of the PIN counter.
+  failedPasswordAttempts Int  @default(0)
+  /// SPRINT-6: when set and in the future, PIN and password attempts are rejected with a visible lockout.
+  lockedUntil       DateTime?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions  AdminSession[]
+  auditLogs AdminAuditLog[]
+  refunds   ProcessorRefund[]
+}
+
+/// Persistent admin session; token stored hashed, never plaintext.
+model AdminSession {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  ipAddress  String?
+  userAgent  String?
+  /// SPRINT-8: KITCHEN | ADMIN — a kitchen PIN session cannot authorise the back office.
+  purpose    String    @default("KITCHEN")
+  /// SPRINT-8: updated on each authorised admin request.
+  lastSeenAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+
+  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  // SPRINT-6: transitions attributed to this session
+  statusEvents OrderStatusEvent[]
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([purpose])
+}
+
+/// SPRINT-6: kitchen / automatic order-status history. Who marked an order ready lives here.
+model OrderStatusEvent {
+  id         String      @id @default(cuid())
+  orderId    String
+  fromStatus OrderStatus
+  toStatus   OrderStatus
+  /// Null for automatic transitions (kitchen ticket reaching printed).
+  sessionId  String?
+  userId     String?
+  /// KITCHEN_TICKET_PRINTED | KDS | ADMIN_CORRECTION
+  source     String
+  /// SPRINT-8: required for ADMIN_CORRECTION; unused for kitchen/print sources.
+  reason     String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  order   Order         @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  session AdminSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([sessionId])
 }
 
 /// Weekly opening hours — one row per day of week (0 = Sunday … 6 = Saturday).
@@ -443,4 +659,34 @@ model StoreClosure {
   updatedAt DateTime @updatedAt
 
   @@unique([date])
+}
+
+/// SPRINT-8: attributable back-office actions (refunds, menu prices, config, staff).
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  summary    String
+  createdAt  DateTime @default(now())
+
+  user AdminUser? @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([action])
+}
+
+/// SPRINT-11: one scheduled reconciliation pass per business date. Findings only; no repairs.
+model ReconciliationRun {
+  id           String   @id @default(cuid())
+  businessDate DateTime @db.Date
+  ranAt        DateTime
+  findingCount Int
+  findings     Json
+  createdAt    DateTime @default(now())
+
+  @@unique([businessDate])
+  @@index([ranAt])
 }

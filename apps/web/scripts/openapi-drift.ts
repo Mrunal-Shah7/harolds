@@ -1,4 +1,4 @@
-// SPRINT-2: assert OpenAPI paths stay in sync with mock-api route table (lightweight drift guard)
+// SPRINT-2 / SPRINT-4: assert OpenAPI paths stay in sync with mock-api route table
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +15,14 @@ const REQUIRED = [
   "/api/v1/menu/featured",
   "/api/v1/menu/most-ordered",
   "/api/v1/store/status",
+  "/api/v1/quote",
+  "/api/v1/orders",
+  "/api/v1/orders/status/:lookupToken",
+  "/api/v1/health",
 ] as const;
+
+/** Present in OpenAPI for Square only — real app has it; mock does not (and must not) serve webhooks. */
+const OPENAPI_ONLY = ["/api/v1/webhooks/square"] as const;
 
 function openApiPathToHono(openApiPath: string): string {
   return openApiPath.replace(/\{([^}]+)\}/g, ":$1");
@@ -38,7 +45,14 @@ function main(): void {
     }
   }
 
+  for (const p of OPENAPI_ONLY) {
+    if (!uniqueOpenApi.includes(p)) {
+      throw new Error(`Drift: OpenAPI missing webhook path ${p}`);
+    }
+  }
+
   for (const p of uniqueOpenApi) {
+    if ((OPENAPI_ONLY as readonly string[]).includes(p)) continue;
     const hono = openApiPathToHono(p);
     if (!REQUIRED.includes(hono as (typeof REQUIRED)[number])) {
       throw new Error(`Drift: OpenAPI has unexpected path ${p}`);
@@ -46,7 +60,7 @@ function main(): void {
   }
 
   console.log(
-    `OK — drift check passed (${REQUIRED.length} paths aligned between OpenAPI and mock-api)`,
+    `OK — drift check passed (${REQUIRED.length} mock-aligned paths + ${OPENAPI_ONLY.length} Square-only)`,
   );
 }
 
