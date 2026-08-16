@@ -1,9 +1,10 @@
-// SPRINT-1: storefront route-group layout.
-// Sprint ownership: storefront UI is owned by the other developer; API contract arrives in Sprint 2.
+// Storefront route-group layout — provides cart state to every page in this group.
+import { CartProvider } from "@/lib/cart-context";
+
 export default function StorefrontLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <>{children}</>;
+  return <CartProvider>{children}</CartProvider>;
 }

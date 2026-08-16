@@ -5,7 +5,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Harold's Chicken Oak Lawn",
-  description: "In-house online ordering — Harold's Chicken Oak Lawn",
+  description: "Order pickup online from Harold's Chicken Oak Lawn.",
+};
+
+export const viewport = {
+  themeColor: "#1a1a1a",
 };
 
 export default function RootLayout({

@@ -1,23 +1,24 @@
-// SPRINT-1: storefront placeholder — serves at `/` (route group name is not in the URL).
-// Demonstrates that workspace package imports resolve (@harolds/types, @harolds/config, @harolds/db).
-import { env } from "@harolds/config";
-import { prisma } from "@harolds/db";
-import { FulfilmentType, OrderStatus } from "@harolds/types";
+// Storefront home — full menu + store status, server-fetched from the public v1 API.
+import type { FullMenu, StoreStatus } from "@harolds/types";
+import { MenuBrowser } from "@/components/storefront/menu-browser";
 
-export default function StorefrontPage() {
-  // References prove package resolution at typecheck + build without executing DB I/O.
-  const _proof = [
-    FulfilmentType.PICKUP,
-    OrderStatus.AWAITING_PAYMENT,
-    env.NODE_ENV,
-    typeof prisma.$connect,
-  ].join(":");
+function apiBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
 
-  return (
-    <main style={{ padding: "2rem", fontFamily: "system-ui, sans-serif" }}>
-      <h1>Storefront</h1>
-      <p>Harold&apos;s Chicken Oak Lawn — customer ordering surface (placeholder).</p>
-      <p style={{ color: "#666", fontSize: "0.875rem" }}>Workspace proof: {_proof}</p>
-    </main>
-  );
+async function fetchMenu(): Promise<FullMenu> {
+  const res = await fetch(`${apiBaseUrl()}/api/v1/menu`, { cache: "no-store" });
+  const body = await res.json();
+  return body.data as FullMenu;
+}
+
+async function fetchStoreStatus(): Promise<StoreStatus> {
+  const res = await fetch(`${apiBaseUrl()}/api/v1/store/status`, { cache: "no-store" });
+  const body = await res.json();
+  return body.data as StoreStatus;
+}
+
+export default async function StorefrontPage() {
+  const [menu, status] = await Promise.all([fetchMenu(), fetchStoreStatus()]);
+  return <MenuBrowser menu={menu} status={status} />;
 }

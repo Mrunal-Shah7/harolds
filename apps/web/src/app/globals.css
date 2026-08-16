@@ -1,4 +1,4 @@
-/* SPRINT-1: global styles — Tailwind v4 + shadcn/ui neutral base CSS variables */
+/* Storefront theme — Harold's Chicken Oak Lawn brand (red / black / white, gold accent) */
 @import "tailwindcss";
 
 @theme inline {
@@ -20,31 +20,46 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-dark: var(--brand-dark);
+  --color-gold: var(--gold);
+  --font-display: var(--font-display);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+
+  /* Harold's red — primary brand color, from menu board signage */
+  --primary: oklch(0.47 0.19 25);
+  --primary-foreground: oklch(0.99 0 0);
+
   --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --secondary-foreground: oklch(0.145 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.96 0.01 25);
+  --accent-foreground: oklch(0.47 0.19 25);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.9 0 0);
+  --ring: oklch(0.47 0.19 25);
+
+  /* Brand-specific tokens (beyond shadcn base) */
+  --brand: oklch(0.47 0.19 25);
+  --brand-foreground: oklch(0.99 0 0);
+  --brand-dark: oklch(0.16 0 0);
+  --gold: oklch(0.75 0.14 80);
+  --font-display: "Georgia", "Times New Roman", serif;
 }
 
 @layer base {
@@ -55,3 +70,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-in {
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+.fade-in { animation-name: fade-in; }
+.slide-in-from-right { animation-name: slide-in-from-right; }
