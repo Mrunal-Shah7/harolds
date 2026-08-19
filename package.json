@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "pnpm --filter @harolds/web dev",
     "build": "pnpm -r --filter=./packages/* build && pnpm --filter @harolds/web build",
+    "start": "pnpm --filter @harolds/web start",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "prettier --write .",
