@@ -1,28 +1,34 @@
-// SPRINT-14: badges (design.md §7.9). Label type, radius-sm, 4/8 padding.
+// Design v1.1 — badges. Label type, pill radius, 4/10 padding, an optional leading dot.
 // Text always carries the meaning; colour never carries it alone.
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const VARIANTS = {
-  soldOut: "bg-paper-sunk text-ink-muted",
-  paid: "bg-brand-tint text-open",
-  refunded: "bg-paper-sunk text-ink-muted",
-  failed: "bg-brand-tint text-danger",
-  neu: "bg-surface text-brand",
-  warn: "bg-paper-sunk text-warn",
+  open: "badge-open",
+  warn: "badge-warn",
+  danger: "badge-danger",
+  neutral: "badge-neutral",
+  /** Order states, mapped onto the four the design draws. */
+  soldOut: "badge-neutral",
+  paid: "badge-open",
+  refunded: "badge-neutral",
+  failed: "badge-danger",
+  neu: "badge-neutral",
 } as const;
 
 export type BadgeVariant = keyof typeof VARIANTS;
 
 export function Badge({
   className,
-  variant = "soldOut",
+  variant = "neutral",
+  dot = false,
+  children,
   ...props
-}: React.HTMLAttributes<HTMLSpanElement> & { variant?: BadgeVariant }) {
+}: React.HTMLAttributes<HTMLSpanElement> & { variant?: BadgeVariant; dot?: boolean }) {
   return (
-    <span
-      className={cn("t-label inline-flex items-center rounded-sm px-2 py-1", VARIANTS[variant], className)}
-      {...props}
-    />
+    <span className={cn("badge", VARIANTS[variant], className)} {...props}>
+      {dot ? <span className="dot" aria-hidden="true" /> : null}
+      {children}
+    </span>
   );
 }

@@ -51,6 +51,22 @@ export function AdminApp() {
   );
 }
 
+/**
+ * Design v1.1 badges. Colour never carries the meaning on its own — the status word is always
+ * printed — so the four tones only reinforce what the text already says.
+ */
+function StatusBadge({ status }: { status: string }) {
+  const variant =
+    status === "READY" || status === "PAID"
+      ? "badge-open"
+      : status === "REFUNDED" || status === "CANCELLED"
+        ? "badge-danger"
+        : status === "PICKED_UP" || status === "COMPLETED"
+          ? "badge-neutral"
+          : "badge-warn";
+  return <span className={`badge ${variant}`}>{status.replace(/_/g, " ").toLowerCase()}</span>;
+}
+
 function useFlash(): [Flash, (f: Flash) => void] {
   const [flash, setFlash] = useState<Flash>(null);
   return [flash, setFlash];
@@ -158,6 +174,14 @@ function MenuView() {
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [filters, setFilters] = useState({ categoryId: "", isSoldOut: "", isUnverifiedPrice: "", q: "" });
   const [flash, setFlash] = useFlash();
+  // The storefront's "Most ordered" band, in display order.
+  //
+  // Held SEPARATELY from `items` and loaded from the curation endpoint, not from the table rows.
+  // The table is filtered — by category, by sold-out, by search — but PUT /menu/curation replaces
+  // the whole list, so writing only what is on screen would silently drop every curated item the
+  // current filter hides.
+  const [mostOrderedIds, setMostOrderedIds] = useState<string[]>([]);
+  const [curationBusy, setCurationBusy] = useState<string | null>(null);
   const load = useCallback(() => {
     const q = new URLSearchParams();
     if (filters.categoryId) q.set("categoryId", filters.categoryId);
@@ -171,10 +195,49 @@ function MenuView() {
   }, [filters, setFlash]);
   useEffect(() => {
     adminApi<Array<{ id: string; name: string; slug: string }>>("/api/internal/admin/menu/categories").then(setCategories).catch(() => undefined);
+    adminApi<{ mostOrdered: Array<{ id: string }> }>("/api/internal/admin/menu/curation")
+      .then((d) => setMostOrderedIds(d.mostOrdered.map((i) => i.id)))
+      .catch(() => undefined);
   }, []);
   useEffect(() => {
     load();
   }, [load]);
+
+  /**
+   * Add or remove one item from the storefront's "Most ordered" band.
+   *
+   * Adding APPENDS, so the existing display order is never reshuffled by an unrelated edit, and
+   * the new item lands at the end of the band. Removing filters in place. The server rewrites
+   * `mostOrderedSortOrder` from the array's order and records an audit entry.
+   *
+   * The optimistic update is reverted if the write fails — a toggle that flips back is how the
+   * operator learns the storefront did not change.
+   */
+  async function toggleMostOrdered(itemId: string, next: boolean) {
+    const previous = mostOrderedIds;
+    const updated = next ? [...previous, itemId] : previous.filter((id) => id !== itemId);
+    setMostOrderedIds(updated);
+    setCurationBusy(itemId);
+    try {
+      await adminApi("/api/internal/admin/menu/curation", {
+        method: "PUT",
+        body: JSON.stringify({ kind: "mostOrdered", itemIds: updated }),
+      });
+      setFlash({
+        kind: "ok",
+        text: next
+          ? `Added to Most ordered. The section shows ${updated.length} item(s).`
+          : updated.length === 0
+            ? "Removed. The Most ordered section is now empty, so the storefront hides it."
+            : `Removed from Most ordered. The section shows ${updated.length} item(s).`,
+      });
+    } catch (e) {
+      setMostOrderedIds(previous);
+      setFlash({ kind: "err", text: e instanceof Error ? e.message : "Not saved." });
+    } finally {
+      setCurationBusy(null);
+    }
+  }
 
   // §12: skeleton on the first load only. A filter refetch keeps the toolbar in place.
   if (!loaded) return <AdminTableSkeleton rows={10} cols={6} />;
@@ -182,7 +245,11 @@ function MenuView() {
   return (
     <>
       <h1 className="adm-h1">Menu</h1>
-      <p className="adm-lead">Sold-out is one tap. Price edits use dollars and store cents.</p>
+      <p className="adm-lead">
+        Sold-out is one tap. Price edits use dollars and store cents. &ldquo;Most ordered&rdquo; puts
+        an item in the storefront home page&apos;s band of the same name &mdash; it is a hand-picked
+        list, not a sales figure, and an empty list hides the section entirely.
+      </p>
       <FlashBar flash={flash} />
       <details>
         <summary>Categories</summary>
@@ -285,7 +352,7 @@ function MenuView() {
         >
           Clear all sold-out
         </button>
-        <Link className="adm-btn" href="/admin/menu/curation">Curation</Link>
+        <Link className="adm-btn" href="/admin/menu/curation">Featured</Link>
       </div>
       <div className="adm-table-wrap">
         <table className="adm-table">
@@ -296,6 +363,7 @@ function MenuView() {
               <th>Price</th>
               <th>Flags</th>
               <th>Sold out</th>
+              <th>Most ordered</th>
             </tr>
           </thead>
           <tbody>
@@ -329,6 +397,27 @@ function MenuView() {
                     {item.isSoldOut ? "Sold out" : "Available"}
                   </button>
                 </td>
+                <td>
+                  {/* The design's toggle. The column header carries the meaning in words, so the
+                      switch never has to say it in colour alone. */}
+                  <button
+                    type="button"
+                    className="toggle"
+                    aria-pressed={mostOrderedIds.includes(String(item.id))}
+                    aria-label={
+                      mostOrderedIds.includes(String(item.id))
+                        ? `Remove ${String(item.name)} from Most ordered`
+                        : `Add ${String(item.name)} to Most ordered`
+                    }
+                    disabled={curationBusy !== null}
+                    onClick={() =>
+                      void toggleMostOrdered(
+                        String(item.id),
+                        !mostOrderedIds.includes(String(item.id)),
+                      )
+                    }
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -342,27 +431,23 @@ function CurationView() {
   const [items, setItems] = useState<Array<{ id: string; name: string }>>([]);
   const [loaded, setLoaded] = useState(false);
   const [featured, setFeatured] = useState<string[]>([]);
-  const [most, setMost] = useState<string[]>([]);
   const [flash, setFlash] = useFlash();
   useEffect(() => {
     adminApi<Array<{ id: string; name: string }>>("/api/internal/admin/menu/items")
       .then(setItems)
       .catch(() => undefined)
       .finally(() => setLoaded(true));
-    adminApi<{ featured: Array<{ id: string }>; mostOrdered: Array<{ id: string }> }>("/api/internal/admin/menu/curation")
-      .then((d) => {
-        setFeatured(d.featured.map((i) => i.id));
-        setMost(d.mostOrdered.map((i) => i.id));
-      })
+    adminApi<{ featured: Array<{ id: string }> }>("/api/internal/admin/menu/curation")
+      .then((d) => setFeatured(d.featured.map((i) => i.id)))
       .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }));
   }, [setFlash]);
-  async function save(kind: "featured" | "mostOrdered", ids: string[]) {
+  async function save(ids: string[]) {
     try {
       await adminApi("/api/internal/admin/menu/curation", {
         method: "PUT",
-        body: JSON.stringify({ kind, itemIds: ids }),
+        body: JSON.stringify({ kind: "featured", itemIds: ids }),
       });
-      setFlash({ kind: "ok", text: `${kind} list saved.` });
+      setFlash({ kind: "ok", text: "Featured list saved." });
     } catch (e) {
       setFlash({ kind: "err", text: e instanceof Error ? e.message : "Not saved." });
     }
@@ -372,24 +457,34 @@ function CurationView() {
 
   return (
     <>
-      <h1 className="adm-h1">Curation</h1>
-      <p className="adm-lead">Featured and most-ordered are manual lists. Empty lists hide those storefront sections.</p>
+      <h1 className="adm-h1">Featured</h1>
+      <p className="adm-lead">
+        A manual list. An empty list hides the section. Most ordered moved to a toggle on each row
+        of the <Link className="adm-link" href="/admin/menu">Menu</Link> table &mdash; two controls
+        for one list is how the two disagree.
+      </p>
       <FlashBar flash={flash} />
-      <div className="adm-cards">
-        <div className="adm-card">
-          <h2>Featured (top to bottom)</h2>
-          <select multiple size={8} value={featured} onChange={(e) => setFeatured([...e.target.selectedOptions].map((o) => o.value))} style={{ width: "100%", minHeight: "10rem" }}>
-            {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-          </select>
-          <button type="button" className="adm-btn" style={{ marginTop: "0.5rem" }} onClick={() => void save("featured", featured)}>Save featured</button>
-        </div>
-        <div className="adm-card">
-          <h2>Most ordered</h2>
-          <select multiple size={8} value={most} onChange={(e) => setMost([...e.target.selectedOptions].map((o) => o.value))} style={{ width: "100%", minHeight: "10rem" }}>
-            {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-          </select>
-          <button type="button" className="adm-btn" style={{ marginTop: "0.5rem" }} onClick={() => void save("mostOrdered", most)}>Save most ordered</button>
-        </div>
+      <div className="adm-panel" style={{ maxWidth: 560 }}>
+        <h3>Featured (top to bottom)</h3>
+        <select
+          multiple
+          size={8}
+          value={featured}
+          onChange={(e) => setFeatured([...e.target.selectedOptions].map((o) => o.value))}
+          style={{ width: "100%", minHeight: "10rem" }}
+        >
+          {items.map((i) => (
+            <option key={i.id} value={i.id}>{i.name}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="adm-btn"
+          style={{ marginTop: "0.75rem" }}
+          onClick={() => void save(featured)}
+        >
+          Save featured
+        </button>
       </div>
     </>
   );
@@ -1080,10 +1175,14 @@ function OrdersView({ timezone }: { timezone: string }) {
           <tbody>
             {rows.map((o) => (
               <tr key={String(o.id)}>
-                <td><Link className="adm-link" href={`/admin/orders/${String(o.id)}`}>{String(o.orderNumber ?? String(o.id).slice(0, 8))}</Link></td>
+                <td>
+                  <Link className="adm-link" href={`/admin/orders/${String(o.id)}`}>
+                    <span className="chip">{String(o.orderNumber ?? String(o.id).slice(0, 8))}</span>
+                  </Link>
+                </td>
                 <td>{String(o.customerFirstName)} {String(o.customerLastInitial)}.</td>
                 <td>{String(o.customerPhoneRedacted)}</td>
-                <td>{String(o.status)}</td>
+                <td><StatusBadge status={String(o.status)} /></td>
                 <td className="adm-money">{money(Number(o.totalCents))}</td>
                 <td>{formatStoreDateTime(String(o.createdAt), timezone)}</td>
               </tr>
@@ -1110,7 +1209,12 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
   const remaining = Number(order.remainingRefundableCents);
   return (
     <>
-      <h1 className="adm-h1">Order {String(order.orderNumber ?? id.slice(0, 8))}</h1>
+      <div className="adm-top">
+        <h2>
+          Order <span className="chip" style={{ verticalAlign: "middle" }}>{String(order.orderNumber ?? id.slice(0, 8))}</span>
+        </h2>
+        <StatusBadge status={String(order.status)} />
+      </div>
       <FlashBar flash={flash} />
       {confirm ? (
         <ConfirmDialog

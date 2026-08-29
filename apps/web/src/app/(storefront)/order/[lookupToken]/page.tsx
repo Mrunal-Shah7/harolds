@@ -1,20 +1,20 @@
 "use client";
 
-// SPRINT-14: confirmation (design.md §9.4). Ticket chip first at mono-lg, then the pickup
-// estimate, the address with a maps link, the full order with modifiers, and the totals.
+// Design v1.1 — confirmation. Paper band: eyebrow, poster headline, the ticket chip at mono-lg,
+// the three-step timeline, then the ready estimate. Below it the order itself with board leaders
+// in the totals, and a roast band carrying the pickup address.
 // No account prompt, no upsell, no "rate your experience".
 //
-// Public order status — looked up by unguessable lookupToken only, never order number
-// (STOREFRONT-REQUIREMENTS.md #3). Every figure here comes from the server response.
+// Public order status — looked up by unguessable lookupToken only, never order number. Every
+// figure here comes from the server response.
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { PublicOrderStatusResponse, StoreStatus } from "@harolds/types";
 import { getOrderStatus, getStoreStatus, StorefrontApiError } from "@/lib/storefront-api";
 import { formatCents } from "@/lib/money";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ErrorState, Skeleton } from "@/components/ui/feedback";
+import { StorefrontHeader } from "@/components/storefront/header";
+import { ErrorState } from "@/components/ui/feedback";
 import { TicketChip } from "@/components/storefront/ticket-chip";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -26,6 +26,26 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Picked up",
   CANCELLED: "Cancelled",
 };
+
+/** The three points of the timeline, and which one each order status sits on. */
+const STEPS = ["Received", "Preparing", "Ready"] as const;
+
+function stepIndex(status: string): number {
+  switch (status) {
+    case "AWAITING_PAYMENT":
+      return -1;
+    case "PAID":
+    case "PRINTED":
+      return 0;
+    case "IN_PROGRESS":
+      return 1;
+    case "READY":
+    case "COMPLETED":
+      return 2;
+    default:
+      return -1;
+  }
+}
 
 export default function OrderStatusPage() {
   const params = useParams<{ lookupToken: string }>();
@@ -50,9 +70,9 @@ export default function OrderStatusPage() {
       }
     };
     void load();
-    // §9.4 needs the store address and its maps link; the order payload does not carry one and
-    // the contract is frozen, so the address comes from the existing public store-status
-    // endpoint. Fetched once, not on the polling interval.
+    // The confirmation needs the store address and its maps link; the order payload does not
+    // carry one and the contract is frozen, so the address comes from the existing public
+    // store-status endpoint. Fetched once, not on the polling interval.
     void getStoreStatus()
       .then((s) => {
         if (!cancelled) setStore(s);
@@ -67,27 +87,37 @@ export default function OrderStatusPage() {
 
   if (error) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col justify-center px-4">
-        <ErrorState message={error} />
-        <div className="flex justify-center">
-          <Link href="/menu">
-            <Button variant="secondary">Back to the menu</Button>
-          </Link>
-        </div>
+      <div className="sf-page">
+        <StorefrontHeader status={store} />
+        <main>
+          <div className="band b-paper textured">
+            <div className="container confirm-wrap">
+              <ErrorState message={error} />
+              <Link href="/menu" className="btn btn-secondary">
+                Back to the menu
+              </Link>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
 
   if (!order) {
-    // §12: the skeleton occupies the same box the loaded confirmation will.
+    // The skeleton occupies the same box the loaded confirmation will.
     return (
-      <div className="mx-auto min-h-dvh max-w-[560px] px-4 py-10">
-        <div className="flex flex-col items-center gap-3">
-          <Skeleton className="h-[46px] w-40" />
-          <Skeleton className="h-[26px] w-56" />
-          <Skeleton className="h-[22px] w-44" />
-        </div>
-        <Skeleton className="mt-8 h-64 w-full" />
+      <div className="sf-page">
+        <StorefrontHeader status={store} />
+        <main>
+          <div className="band b-paper textured">
+            <div className="container confirm-wrap">
+              <div className="skel" style={{ height: 20, width: 160, margin: "0 auto 16px" }} />
+              <div className="skel" style={{ height: 48, width: 280, margin: "0 auto 32px" }} />
+              <div className="skel" style={{ height: 60, width: 200, margin: "0 auto" }} />
+              <div className="skel" style={{ height: 80, marginTop: 40 }} />
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -98,94 +128,161 @@ export default function OrderStatusPage() {
         .join(", ")
     : null;
 
+  const active = stepIndex(order.status);
+  const cancelled = order.status === "CANCELLED";
+
   return (
-    <div className="mx-auto min-h-dvh max-w-[560px] px-4 pb-16">
-      <div className="flex flex-col items-center gap-4 py-10 text-center">
-        {order.orderNumber ? <TicketChip orderNumber={order.orderNumber} size="lg" /> : null}
+    <div className="sf-page">
+      <StorefrontHeader status={store} />
 
-        <h1 className="t-display-lg text-ink">
-          {order.orderNumber ? `Order ${order.orderNumber} is in` : "Your order is in"}
-        </h1>
+      <main>
+        <div className="band b-paper textured">
+          <div className="container confirm-wrap">
+            <p className="eyebrow">
+              {cancelled ? "Order cancelled" : "Order placed · paid"}
+            </p>
+            <h2 className="poster" style={{ margin: "12px 0 32px" }}>
+              {cancelled ? "This order was cancelled" : "We're on it"}
+            </h2>
 
-        <Badge variant={order.status === "CANCELLED" ? "failed" : "paid"}>
-          {STATUS_LABELS[order.status] ?? order.status}
-        </Badge>
+            {order.orderNumber ? (
+              <TicketChip orderNumber={order.orderNumber} size="lg" />
+            ) : null}
 
-        {order.estimatedReadyAt && (
-          <p className="t-body-lg t-nums text-ink">
-            Ready at about{" "}
-            {new Date(order.estimatedReadyAt).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-            })}
-          </p>
-        )}
-
-        <p className="t-body text-ink-muted">A text message is on its way.</p>
-      </div>
-
-      {address ? (
-        <section className="mb-6 rounded-md border border-line bg-surface p-4">
-          <h2 className="t-label mb-2 text-ink-muted">Pick up at</h2>
-          <a
-            href={`https://maps.google.com/?q=${encodeURIComponent(`${store!.storeName}, ${address}`)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="t-body text-ink underline underline-offset-4"
-          >
-            {address}
-          </a>
-        </section>
-      ) : null}
-
-      <section className="rounded-md border border-line bg-surface">
-        <ul className="divide-y divide-line">
-          {order.lines.map((line, i) => (
-            <li key={i} className="flex justify-between gap-4 px-4 py-3">
-              <div className="min-w-0">
-                <p className="t-body font-semibold text-ink">
-                  {line.quantity} × {line.itemName}
-                </p>
-                {line.selectedModifiers.length > 0 && (
-                  <ul className="mt-0.5">
-                    {line.selectedModifiers.map((m, j) => (
-                      <li key={j} className="t-body-sm text-ink-muted">
-                        {m.optionName}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+            {cancelled ? (
+              <p style={{ marginTop: 32, color: "var(--danger)" }}>
+                {STATUS_LABELS[order.status] ?? order.status}
+              </p>
+            ) : (
+              <div className="timeline">
+                {STEPS.map((label, i) => (
+                  <div
+                    key={label}
+                    className={i < active ? "tstep done" : i === active ? "tstep now" : "tstep"}
+                  >
+                    <span className="pt" aria-hidden="true" />
+                    <span className="lb">{label}</span>
+                  </div>
+                ))}
               </div>
-              <span className="t-body t-nums shrink-0 text-ink">
-                {formatCents(line.lineTotalCents)}
-              </span>
-            </li>
-          ))}
-        </ul>
+            )}
 
-        <div className="space-y-2 border-t border-line bg-paper-sunk px-4 py-3">
-          <Row label="Subtotal" value={formatCents(order.subtotalCents)} />
-          <Row label="Tax" value={formatCents(order.taxCents)} />
-          {order.tipCents > 0 && <Row label="Tip" value={formatCents(order.tipCents)} />}
-          <div className="flex items-baseline justify-between pt-1">
-            <span className="t-display-sm text-ink">Total</span>
-            <span className="t-display-sm t-nums text-ink">{formatCents(order.totalCents)}</span>
+            {order.estimatedReadyAt && !cancelled ? (
+              <p style={{ fontSize: "var(--body-lg)", marginTop: 24 }}>
+                Ready around{" "}
+                <strong className="t-nums" style={{ fontFamily: "var(--font-display)" }}>
+                  {new Date(order.estimatedReadyAt).toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </strong>{" "}
+                — we&apos;ll text you the moment it&apos;s up.
+              </p>
+            ) : null}
+
+            <p style={{ color: "var(--ink-muted)", marginTop: 8 }}>
+              Give your order number at the counter. Receipt sent by text and email.
+            </p>
           </div>
         </div>
-      </section>
 
-      <p className="t-body-sm mt-6 text-center text-ink-muted">
-        Show this page at pickup. Pickup only — no delivery.
-      </p>
-    </div>
-  );
-}
+        <div className="band b-paper" style={{ paddingTop: 0 }}>
+          <div className="container" style={{ maxWidth: 640 }}>
+            <div className="co-card card">
+              <h3>Your order</h3>
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between">
-      <span className="t-body text-ink-muted">{label}</span>
-      <span className="t-body t-nums text-ink">{value}</span>
+              {order.lines.map((line, i) => (
+                <div key={i} style={{ padding: "6px 0" }}>
+                  <div className="leader">
+                    <span>
+                      {line.quantity} × {line.itemName}
+                    </span>
+                    <span className="dots" />
+                    <span className="amt">{formatCents(line.lineTotalCents)}</span>
+                  </div>
+                  {line.selectedModifiers.length > 0 ? (
+                    <p style={{ fontSize: "var(--body-sm)", color: "var(--ink-muted)" }}>
+                      {line.selectedModifiers.map((m) => m.optionName).join(" · ")}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+
+              <div className="totals">
+                <div className="leader">
+                  <span>Subtotal</span>
+                  <span className="dots" />
+                  <span className="amt">{formatCents(order.subtotalCents)}</span>
+                </div>
+                <div className="leader">
+                  <span>Tax</span>
+                  <span className="dots" />
+                  <span className="amt">{formatCents(order.taxCents)}</span>
+                </div>
+                {order.tipCents > 0 ? (
+                  <div className="leader">
+                    <span>Tip</span>
+                    <span className="dots" />
+                    <span className="amt">{formatCents(order.tipCents)}</span>
+                  </div>
+                ) : null}
+                <div className="leader grand">
+                  <span style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>
+                    Charged
+                  </span>
+                  <span className="dots" />
+                  <span className="amt">{formatCents(order.totalCents)}</span>
+                </div>
+              </div>
+
+              <p className="quote-note">
+                Show this page at pickup. Pickup only — no delivery.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="band b-roast" style={{ padding: "48px 0" }}>
+          <div className="container" style={{ textAlign: "center" }}>
+            <p className="eyebrow" style={{ marginBottom: 16 }}>
+              Pick up at
+            </p>
+            {address && store ? (
+              <>
+                <p
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontWeight: 800,
+                    fontSize: "var(--display-lg)",
+                  }}
+                >
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(`${store.storeName}, ${address}`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: "inherit" }}
+                  >
+                    {address}
+                  </a>
+                </p>
+                <p style={{ color: "var(--ink-on-roast-muted)", marginTop: 8 }}>
+                  Come straight to the counter.
+                </p>
+              </>
+            ) : (
+              <p
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 800,
+                  fontSize: "var(--display-lg)",
+                }}
+              >
+                Come straight to the counter.
+              </p>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

@@ -249,7 +249,7 @@ export function SquarePaymentForm({
       {/* §9.3: wallet buttons sit ABOVE the card form. The row's wrapper carries the spacing;
           Square's own mounted elements receive no styling from us at all. */}
       <div className={probeDone && !anyWallet ? "hidden" : "mb-4 space-y-2"}>
-        {anyWallet ? <p className="t-label text-ink-muted">Express checkout</p> : null}
+        {anyWallet ? <p className="eyebrow">Express checkout</p> : null}
         <div id="square-apple-pay" className={probeDone && !wallets.apple ? "hidden" : undefined} />
         <div id="square-google-pay" className={probeDone && !wallets.google ? "hidden" : undefined} />
         <div id="square-cash-app-pay" className={probeDone && !wallets.cashApp ? "hidden" : undefined} />
@@ -257,13 +257,22 @@ export function SquarePaymentForm({
 
       {/* Only the CONTAINER is styled. Its padding and border sit outside the element Square
           mounts into, so the card iframe's own dimensions are untouched. */}
-      <div id="square-card-container" className="min-h-14 rounded-sm border border-line-strong bg-surface p-3" />
+      <div
+        id="square-card-container"
+        style={{
+          minHeight: 56,
+          border: "1px solid var(--line)",
+          borderRadius: "var(--r-md)",
+          background: "var(--surface)",
+          padding: 12,
+        }}
+      />
 
-      {!ready && <p className="t-body-sm mt-2 text-ink-muted">Loading the secure payment form…</p>}
+      {!ready && <p className="help" style={{ marginTop: 8 }}>Loading the secure payment form…</p>}
       {walletNotes.length > 0 && (
         <ul className="mt-2 space-y-1">
           {walletNotes.map((n) => (
-            <li key={n} className="t-body-sm text-ink-muted">
+            <li key={n} className="help">
               {n}
             </li>
           ))}

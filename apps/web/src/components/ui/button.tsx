@@ -1,55 +1,57 @@
-// SPRINT-14: the one button (design.md §7.1). Four variants, four heights, radius pill.
-// Restyled here and never at a call site. The loading state disables, swaps the label for a
-// spinner and a present-tense verb, and does not change width.
+// Design v1.1 — the one button. Four variants, four heights, radius pill, display face.
+// Restyled in globals.css (.btn / .btn-*) and never at a call site. The loading state disables,
+// swaps the label for a spinner and a present-tense verb, and does not change width.
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  [
-    "relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-pill",
-    "t-body font-semibold motion-fast transition-colors",
-    "disabled:pointer-events-none disabled:opacity-50",
-  ].join(" "),
-  {
-    variants: {
-      variant: {
-        primary: "bg-brand text-surface hover:bg-brand-hover",
-        secondary: "border-[1.5px] border-ink bg-transparent text-ink hover:bg-paper-sunk",
-        ghost: "bg-transparent text-ink-muted hover:bg-paper-sunk hover:text-ink",
-        danger: "border-[1.5px] border-danger bg-transparent text-danger hover:bg-brand-tint",
-      },
-      size: {
-        sm: "h-9 px-4",
-        base: "h-11 px-5",
-        lg: "h-13 px-6",
-        kds: "h-16 px-8",
-      },
-    },
-    defaultVariants: {
-      variant: "primary",
-      size: "base",
-    },
-  },
-);
+const VARIANTS = {
+  primary: "btn-primary",
+  secondary: "btn-secondary",
+  ghost: "btn-ghost",
+  danger: "btn-danger",
+  /** The roast-band call to action: full width, poster face, uppercase. */
+  poster: "btn-poster",
+} as const;
 
-export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
-  VariantProps<typeof buttonVariants> & {
-    /** Disables the button and shows the spinner. Width is unchanged. */
-    loading?: boolean;
-    /** Present-tense verb shown while loading — "Paying…", "Adding…". design.md §7.1. */
-    loadingLabel?: string;
-  };
+const SIZES = {
+  sm: "btn-sm",
+  base: "",
+  lg: "btn-lg",
+  kds: "btn-lg",
+} as const;
+
+export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: keyof typeof VARIANTS;
+  size?: keyof typeof SIZES;
+  /** Disables the button and shows the spinner. Width is unchanged. */
+  loading?: boolean;
+  /** Present-tense verb shown while loading — "Paying…", "Adding…". */
+  loadingLabel?: string;
+};
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, loading = false, loadingLabel, children, disabled, ...props }, ref) => {
+  (
+    {
+      className,
+      variant = "primary",
+      size = "base",
+      loading = false,
+      loadingLabel,
+      children,
+      disabled,
+      type = "button",
+      ...props
+    },
+    ref,
+  ) => {
     return (
       <button
         ref={ref}
+        type={type}
         disabled={disabled || loading}
         aria-busy={loading || undefined}
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn("btn", VARIANTS[variant], SIZES[size], "relative", className)}
         {...props}
       >
         {/* The resting label stays in the flow while loading so the width never moves. */}

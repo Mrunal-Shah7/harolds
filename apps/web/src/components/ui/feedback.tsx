@@ -1,36 +1,33 @@
-// SPRINT-14: the five states of design.md §12 as primitives — skeleton, empty, error, offline,
-// partial — plus the separator and the alert. Every list and panel in the storefront composes
-// these rather than inventing its own copy or dimensions.
+// The five loading/empty/error/offline/partial states as primitives, plus the separator and the
+// inline alert. Every list and panel in the storefront composes these rather than inventing its
+// own copy or dimensions. Drawn entirely out of design v1.1's own parts.
 import * as React from "react";
 import { WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 /**
- * §12: a skeleton renders at the EXACT final dimensions. Callers pass the same height the
- * loaded content occupies, so nothing shifts on arrival.
+ * A skeleton renders at the EXACT final dimensions. Callers pass the same height the loaded
+ * content occupies, so nothing shifts on arrival.
  */
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      aria-hidden="true"
-      className={cn("animate-pulse rounded-md bg-paper-sunk", className)}
-      {...props}
-    />
-  );
+  return <div aria-hidden="true" className={cn("skel", className)} {...props} />;
 }
 
-/** The item card's skeleton. Mirrors ItemCard's box model exactly — see item-card.tsx. */
+/** The product card's skeleton. Mirrors the `.pcard` box model exactly — see item-card.tsx. */
 export function ItemCardSkeleton() {
   return (
-    <div className="rounded-md border border-line bg-surface p-4 shadow-card md:p-5">
-      <Skeleton className="aspect-[4/3] w-full" />
-      <Skeleton className="mt-3 h-[26px] w-2/3" />
-      <Skeleton className="mt-2 h-[22px] w-full" />
-      <Skeleton className="mt-1 h-[22px] w-4/5" />
-      <div className="mt-4 flex items-center justify-between">
-        <Skeleton className="h-[22px] w-16" />
-        <Skeleton className="h-9 w-20 rounded-pill" />
+    <div className="pcard card" aria-hidden="true">
+      <div className="img">
+        <span className="skel" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />
+      </div>
+      <div className="body">
+        <div className="skel" style={{ height: 26, width: "66%" }} />
+        <div className="skel" style={{ height: 22 }} />
+        <div className="skel" style={{ height: 22, width: "80%" }} />
+        <div className="foot">
+          <span className="skel" style={{ height: 22, width: 64 }} />
+          <span className="skel" style={{ height: 36, width: 80, borderRadius: 999 }} />
+        </div>
       </div>
     </div>
   );
@@ -40,7 +37,7 @@ export function Separator({ className }: { className?: string }) {
   return <hr className={cn("border-0 border-t border-line", className)} />;
 }
 
-/** §12 Empty: one line saying what would be here, and one action. Never an illustration. */
+/** Empty: one line saying what would be here, and one action. Never an illustration. */
 export function EmptyState({
   message,
   actionLabel,
@@ -51,18 +48,27 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-4 px-4 py-16 text-center">
-      <p className="t-body text-ink-muted">{message}</p>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 16,
+        padding: "64px 16px",
+        textAlign: "center",
+      }}
+    >
+      <p style={{ color: "var(--ink-muted)" }}>{message}</p>
       {actionLabel && onAction ? (
-        <Button variant="secondary" onClick={onAction}>
+        <button type="button" className="btn btn-secondary" onClick={onAction}>
           {actionLabel}
-        </Button>
+        </button>
       ) : null}
     </div>
   );
 }
 
-/** §12 Error: what failed, in plain words, plus a retry that retries. No status codes. */
+/** Error: what failed, in plain words, plus a retry that retries. No status codes. */
 export function ErrorState({
   message,
   onRetry,
@@ -73,38 +79,51 @@ export function ErrorState({
   retryLabel?: string;
 }) {
   return (
-    <div role="alert" className="flex flex-col items-center gap-4 px-4 py-16 text-center">
-      <p className="t-body text-danger">{message}</p>
+    <div
+      role="alert"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 16,
+        padding: "64px 16px",
+        textAlign: "center",
+      }}
+    >
+      <p style={{ color: "var(--danger)" }}>{message}</p>
       {onRetry ? (
-        <Button variant="secondary" onClick={onRetry}>
+        <button type="button" className="btn btn-secondary" onClick={onRetry}>
           {retryLabel}
-        </Button>
+        </button>
       ) : null}
     </div>
   );
 }
 
-/** §12 Offline: a persistent bar. Last known data is retained; writes are disabled. */
+/** Offline: a persistent bar. Last known data is retained; writes are disabled. */
 export function OfflineBar() {
   return (
-    <div
-      role="status"
-      className="t-body-sm flex items-center justify-center gap-2 bg-warn px-4 py-2 text-surface"
-    >
-      <WifiOff className="h-5 w-5" aria-hidden="true" />
+    <div role="status" className="announce">
+      <WifiOff
+        className="h-5 w-5"
+        aria-hidden="true"
+        style={{ display: "inline-block", verticalAlign: "-4px", marginRight: 8 }}
+      />
       You are offline. The menu below is the last version we loaded, and ordering is paused.
     </div>
   );
 }
 
-/** §12 Partial: stale data is labelled stale, with its age. Never silently mixed with fresh. */
+/** Partial: stale data is labelled stale, with its age. Never silently mixed with fresh. */
 export function StaleNotice({ ageLabel }: { ageLabel: string }) {
   return (
-    <p className="t-body-sm text-warn">Showing information from {ageLabel} ago.</p>
+    <p style={{ fontSize: "var(--body-sm)", color: "var(--warn)" }}>
+      Showing information from {ageLabel} ago.
+    </p>
   );
 }
 
-/** shadcn `alert`, restyled once. Inline, never a toast — §16 item 8. */
+/** The inline alert. Inline, never a toast. */
 export function Alert({
   tone = "danger",
   title,
@@ -115,14 +134,34 @@ export function Alert({
   children: React.ReactNode;
 }) {
   const tones = {
-    danger: "border-danger bg-brand-tint text-danger",
-    warn: "border-warn bg-paper-sunk text-warn",
-    info: "border-line-strong bg-paper-sunk text-ink",
+    danger: { borderColor: "var(--danger)", background: "var(--brand-tint)", color: "var(--danger)" },
+    warn: {
+      borderColor: "var(--warn)",
+      background: "rgb(156 84 8 / 0.12)",
+      color: "var(--warn)",
+    },
+    info: {
+      borderColor: "var(--line-strong)",
+      background: "var(--paper-sunk)",
+      color: "var(--ink)",
+    },
   } as const;
   return (
-    <div role="alert" className={cn("rounded-md border p-4", tones[tone])}>
-      {title ? <p className="t-label mb-1">{title}</p> : null}
-      <div className="t-body">{children}</div>
+    <div
+      role="alert"
+      style={{
+        border: "1px solid",
+        borderRadius: "var(--r-md)",
+        padding: 16,
+        ...tones[tone],
+      }}
+    >
+      {title ? (
+        <p className="eyebrow" style={{ color: "inherit", marginBottom: 4 }}>
+          {title}
+        </p>
+      ) : null}
+      <div>{children}</div>
     </div>
   );
 }

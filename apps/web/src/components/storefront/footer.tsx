@@ -1,5 +1,7 @@
-// SPRINT-14: the footer (design.md §9.1). Hours, address, phone. Nothing else.
+// Design v1.1 — the footer. A roast band carrying the wordmark, the store facts and the
+// ordering links, over a roast-deep strip. Hours, address, phone. Nothing else.
 // The address links to maps; the phone is a tel: link.
+import Link from "next/link";
 import type { StoreStatus } from "@harolds/types";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -13,48 +15,71 @@ export function StorefrontFooter({ status }: { status: StoreStatus }) {
     .filter(Boolean)
     .join(", ");
 
+  const hours = [...status.hours].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+
   return (
-    <footer className="mt-10 border-t border-line bg-paper-sunk md:mt-16">
-      <div className="mx-auto grid max-w-[1200px] gap-8 px-4 py-10 md:grid-cols-3 md:py-16">
-        <div>
-          <h2 className="t-label mb-3 text-ink-muted">Hours</h2>
-          <ul>
-            {[...status.hours]
-              .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
-              .map((row) => (
-                <li key={row.dayOfWeek} className="t-body flex justify-between gap-4 text-ink">
-                  <span>{DAYS[row.dayOfWeek]}</span>
-                  <span className="t-nums text-ink-muted">
-                    {row.isClosed || !row.openTime || !row.closeTime
-                      ? "Closed"
-                      : `${row.openTime} – ${row.closeTime}`}
-                  </span>
+    <footer className="sf-footer">
+      <div className="band b-roast" style={{ paddingBottom: 48 }}>
+        <div className="container cols">
+          <div>
+            <div className="wordmark" style={{ color: "var(--ink-on-roast)" }}>
+              Harold&apos;s
+              <small style={{ color: "var(--ink-on-roast-muted)" }}>Chicken · Oak Lawn</small>
+            </div>
+            <p style={{ marginTop: 16, maxWidth: 320, color: "var(--ink-on-roast-muted)" }}>
+              One location. One street. Pickup only, paid online, ready when we text you.
+            </p>
+          </div>
+
+          <div>
+            <h4>Find us</h4>
+            <ul>
+              <li>
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(`${status.storeName}, ${address}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {address}
+                </a>
+              </li>
+              <li>
+                <a href={`tel:${status.contactPhone.replace(/[^\d+]/g, "")}`}>
+                  {status.contactPhone}
+                </a>
+              </li>
+              {hours.map((row) => (
+                <li key={row.dayOfWeek} className="t-nums">
+                  {DAYS[row.dayOfWeek]}{" "}
+                  {row.isClosed || !row.openTime || !row.closeTime
+                    ? "Closed"
+                    : `${row.openTime} – ${row.closeTime}`}
                 </li>
               ))}
-          </ul>
-        </div>
+            </ul>
+          </div>
 
-        <div>
-          <h2 className="t-label mb-3 text-ink-muted">Address</h2>
-          <a
-            href={`https://maps.google.com/?q=${encodeURIComponent(`${status.storeName}, ${address}`)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="t-body text-ink underline underline-offset-4"
-          >
-            {address}
-          </a>
-          <p className="t-body-sm mt-2 text-ink-muted">Oak Lawn · Pickup only</p>
+          <div>
+            <h4>Ordering</h4>
+            <ul>
+              <li>
+                <Link href="/menu">Menu</Link>
+              </li>
+              <li>
+                <Link href="/checkout">Checkout</Link>
+              </li>
+              <li>Pickup only</li>
+            </ul>
+          </div>
         </div>
+      </div>
 
-        <div>
-          <h2 className="t-label mb-3 text-ink-muted">Phone</h2>
-          <a
-            href={`tel:${status.contactPhone.replace(/[^\d+]/g, "")}`}
-            className="t-body t-nums text-ink underline underline-offset-4"
-          >
-            {status.contactPhone}
-          </a>
+      <div className="footer-deep">
+        <div className="container">
+          <span>
+            © {new Date().getFullYear()} {status.storeName}
+          </span>
+          <span>Prices set at the board</span>
         </div>
       </div>
     </footer>

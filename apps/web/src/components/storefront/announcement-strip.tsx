@@ -8,7 +8,6 @@
 // seen again. Expiry is decided by the server: the strip renders `status.announcement` and
 // nothing else, so a lapsed announcement disappears on the next response that omits it.
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
 
 const DISMISS_KEY = "harolds.announcement.dismissed.v1";
 
@@ -35,19 +34,13 @@ export function AnnouncementStrip({ announcement }: { announcement?: string | nu
     }
   };
 
+  // Design v1.1 §announce: one centred line on the flame wash, with a worded dismiss beside it.
   return (
-    <div className="border-y border-gold bg-gold/[0.18]">
-      <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2">
-        <p className="t-body-lg flex-1 text-center text-ink">{announcement}</p>
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Dismiss announcement"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-ink motion-fast transition-colors hover:bg-paper-sunk"
-        >
-          <X className="h-5 w-5" aria-hidden="true" />
-        </button>
-      </div>
+    <div className="announce">
+      {announcement}
+      <button type="button" onClick={dismiss} aria-label="Dismiss announcement">
+        Dismiss
+      </button>
     </div>
   );
 }

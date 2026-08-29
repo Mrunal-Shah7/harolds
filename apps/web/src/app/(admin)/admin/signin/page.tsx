@@ -1,6 +1,8 @@
 "use client";
 
-// SPRINT-8: email/password sign-in for the back office.
+// Email/password sign-in for the back office.
+// Not drawn in the mockup: built from the design's own parts — paper ground, surface card,
+// the poster wordmark, the one field, the one button.
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { adminApi, AdminApiError } from "@/components/admin/admin-api";
@@ -35,15 +37,17 @@ export default function AdminSignInPage() {
           }
         }}
       >
-        <p className="adm-brand-sub" style={{ color: "#9b1c1c" }}>Harold&apos;s Chicken Oak Lawn</p>
-        <h1 className="adm-h1">Back office</h1>
-        <p className="adm-lead">Managers and owners only. Kitchen staff use the kitchen display.</p>
+        <div className="wordmark">
+          Harold&apos;s<small>Back office</small>
+        </div>
+        <h1>Sign in</h1>
+        <p>Managers and owners only. Kitchen staff use the kitchen display.</p>
         {error ? <div className="adm-error">{error}</div> : null}
-        <label className="adm-field">
+        <label className="adm-field" style={{ display: "block" }}>
           Email
           <input name="email" type="email" autoComplete="username" required />
         </label>
-        <label className="adm-field" style={{ marginTop: "0.6rem" }}>
+        <label className="adm-field" style={{ marginTop: "1rem", display: "block" }}>
           Password
           <input name="password" type="password" autoComplete="current-password" required />
         </label>

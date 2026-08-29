@@ -1,12 +1,11 @@
 "use client";
 
-// SPRINT-14: the primitive showcase (Phase 3.3). Every primitive, every variant, every state,
-// in both the light scope and the `.kds` dark scope, on one page.
+// The primitive showcase — design v1.1. Every primitive, every variant, every state, in the
+// light scope, the storefront dark scheme and the `.kds` dark scope, on one page.
 //
 // NOT LINKED FROM ANYWHERE and NOT REACHABLE IN PRODUCTION — the export below returns a 404 in
 // production builds. It exists so that contrast, focus, loading and reduced-motion behaviour are
-// verified once here rather than hunted across screens, and so Sprint 15 has something concrete
-// to build the admin and KDS redesigns against.
+// verified once here rather than hunted across screens.
 import { notFound } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,8 @@ import { Sheet } from "@/components/ui/sheet";
 import { TicketChip } from "@/components/storefront/ticket-chip";
 
 const TYPE_SCALE = [
-  "t-display-xl",
+  "t-poster-xl",
+  "t-poster-lg",
   "t-display-lg",
   "t-display-md",
   "t-display-sm",
@@ -43,15 +43,22 @@ const COLOUR_TOKENS = [
   "paper",
   "paper-sunk",
   "surface",
+  "roast",
+  "roast-deep",
   "ink",
   "ink-muted",
   "ink-faint",
+  "ink-on-roast",
+  "ink-on-roast-muted",
   "line",
   "line-strong",
+  "line-on-roast",
   "brand",
   "brand-hover",
   "brand-tint",
-  "gold",
+  "brand-text",
+  "flame",
+  "flame-deep",
   "open",
   "warn",
   "danger",
@@ -68,12 +75,12 @@ function Showcase() {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
-    <div className="min-h-dvh bg-paper text-ink">
+    <div className="sf-page bg-paper text-ink">
       <div className="mx-auto max-w-[1200px] space-y-16 px-4 py-10">
         <header>
-          <h1 className="t-display-xl">Design system</h1>
+          <h1 className="t-poster-lg">Design system</h1>
           <p className="t-body-lg mt-2 text-ink-muted">
-            Sprint 14 primitives. Not linked, not reachable in production.
+            Design v1.1 primitives. Not linked, not reachable in production.
           </p>
         </header>
 
@@ -108,12 +115,53 @@ function Showcase() {
 
         <Section title="Badges">
           <div className="flex flex-wrap gap-2">
-            <Badge variant="soldOut">Sold out</Badge>
-            <Badge variant="paid">Paid</Badge>
-            <Badge variant="refunded">Refunded</Badge>
-            <Badge variant="failed">Failed</Badge>
-            <Badge variant="neu">New</Badge>
+            <Badge variant="open" dot>
+              Store open
+            </Badge>
             <Badge variant="warn">Unverified price</Badge>
+            <Badge variant="danger">Refunded</Badge>
+            <Badge variant="neutral">Sold out</Badge>
+          </div>
+        </Section>
+
+        <Section title="Bands — the four surfaces">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="band b-paper textured" style={{ padding: 24 }}>
+              <p className="eyebrow">b-paper</p>
+              <p className="poster">Fries under</p>
+            </div>
+            <div className="band b-sunk textured" style={{ padding: 24 }}>
+              <p className="eyebrow">b-sunk</p>
+              <p className="poster">Sauce over</p>
+            </div>
+            <div className="band b-roast" style={{ padding: 24 }}>
+              <p className="eyebrow">b-roast</p>
+              <p className="poster">Fifty years loud</p>
+            </div>
+            <div className="band b-roast-deep" style={{ padding: 24 }}>
+              <p className="eyebrow">b-roast-deep</p>
+              <p className="poster">Priced off the board</p>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Board leaders">
+          <div className="totals" style={{ maxWidth: 360 }}>
+            <div className="leader">
+              <span>Subtotal</span>
+              <span className="dots" />
+              <span className="amt">$28.48</span>
+            </div>
+            <div className="leader">
+              <span>Tax</span>
+              <span className="dots" />
+              <span className="amt">$2.92</span>
+            </div>
+            <div className="leader grand">
+              <span style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>Total</span>
+              <span className="dots" />
+              <span className="amt">$31.40</span>
+            </div>
           </div>
         </Section>
 
@@ -226,9 +274,9 @@ function Showcase() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
-                <AgeBar token="--color-open-on-dark" label="0–5 min · fresh" />
-                <AgeBar token="--color-gold" label="5–12 min · working" />
-                <AgeBar token="--color-danger-on-dark" label="12+ min · late" />
+                <AgeBar token="--color-kds-open" label="0–5 min · fresh" />
+                <AgeBar token="--color-flame" label="5–12 min · working" />
+                <AgeBar token="--color-kds-danger" label="12+ min · late" />
               </div>
               <Button size="kds" className="w-full">
                 Mark ready

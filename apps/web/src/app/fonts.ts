@@ -1,16 +1,28 @@
-// SPRINT-14: self-hosted typefaces (design.md §5.3, §15).
-// All three faces are OFL-licensed, Latin-subset WOFF2, served from this application's own
+// Self-hosted typefaces for design v1.1 (harolds-design-v1_1.html).
+// All four faces are OFL-licensed, Latin-subset WOFF2, served from this application's own
 // origin. No external font origin is contacted and the CSP (packages/config/src/security.ts)
-// is not widened — see docs/SPRINT-14-NOTES.md.
+// is not widened.
+//
+// v1.1 ships FOUR faces with four jobs, shared by every surface — storefront, admin, kitchen:
+//   Alfa Slab One  poster    headlines, wordmark, section titles
+//   Baloo 2        display   component type: buttons, card titles, prices, board buttons
+//   Inter          body      running text, form controls, table cells
+//   JetBrains Mono utility   order numbers, the ticket chip, timers, clocks
 import localFont from "next/font/local";
 
-/** Display — Bricolage Grotesque 700/800. design.md §17 item 2, resolved in Phase 1.4. */
+/** Poster — Alfa Slab One 400. The only weight the family has. */
+export const posterFont = localFont({
+  src: [{ path: "./fonts/alfaslabone-400.woff2", weight: "400", style: "normal" }],
+  variable: "--font-alfa",
+  display: "swap",
+  preload: true,
+  fallback: ["Georgia", "serif"],
+});
+
+/** Display — Baloo 2, variable weight axis. The design uses 600/700/800. */
 export const displayFont = localFont({
-  src: [
-    { path: "./fonts/bricolage-700.woff2", weight: "700", style: "normal" },
-    { path: "./fonts/bricolage-800.woff2", weight: "800", style: "normal" },
-  ],
-  variable: "--font-bricolage",
+  src: [{ path: "./fonts/baloo2-var.woff2", weight: "400 800", style: "normal" }],
+  variable: "--font-baloo",
   display: "swap",
   preload: true,
   fallback: ["system-ui", "sans-serif"],
@@ -41,5 +53,5 @@ export const monoFont = localFont({
   fallback: ["ui-monospace", "monospace"],
 });
 
-/** Applied to <html> so every route group resolves the same three faces. */
-export const fontVariables = `${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`;
+/** Applied to <html> so every route group resolves the same four faces. */
+export const fontVariables = `${posterFont.variable} ${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`;

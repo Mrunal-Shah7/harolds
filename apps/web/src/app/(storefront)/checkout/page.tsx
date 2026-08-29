@@ -1,26 +1,22 @@
 "use client";
 
-// SPRINT-14: checkout (design.md §9.3). Single column, max 560.
+// Design v1.1 — checkout. A paper band holding the two-column `.co-grid`: contact and tip cards
+// on the left, the order summary card on the right with board leaders in the totals, the quote
+// note, the payment chips and the pay button.
 //
 // WHAT DID NOT CHANGE, DELIBERATELY:
-//   - The field set and the required set. design.md §7.10 claims phone is the only required
-//     field; this form has required first name, last name, phone and email since Sprint 5.
-//     Critical rule 5 forbids changing a validation rule, so the CODE stays and design.md is
-//     amended. `canSubmitForm` below is the pre-Sprint-14 expression, untouched.
+//   - The field set and the required set. This form has required first name, last name, phone
+//     and email since Sprint 5; `canSubmitForm` below is that same expression, untouched.
 //   - The default tip selection. `tip` starts undefined, which renders "No tip" selected. The
 //     store config carries `defaultTipPresetIndex` and this form has never read it; honouring it
 //     now would change what customers pay while appearing to change how it looks.
+//   - PAYMENT_FAILED still offers a retry disabled for 15 seconds with a visible countdown. An
+//     instant retry against an unknown payment state is how double charges happen.
 //
-// WHAT CHANGED BY INSTRUCTION (Phase 7.4, design.md §9.3):
-//   - PAYMENT_FAILED now offers a retry that is disabled for 15 seconds with a visible
-//     countdown, instead of no retry at all. An instant retry against an unknown payment state is
-//     how double charges happen.
-//   - The "Other" tip option is surfaced. It sends `{type:"amount"}`, which the frozen 1.3.0
-//     contract already carries and packages/pricing/src/parse-cart.ts already validates.
+// Every money figure on this page comes from the server quote. The item rows carry no money at
+// all, because the quote reports totals and not per-line amounts.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
 import type { CartValidationReason, QuoteResult, StoreStatus } from "@harolds/types";
 import { useCart } from "@/lib/cart-context";
 import { getQuote, getStoreStatus, createOrder, StorefrontApiError } from "@/lib/storefront-api";
@@ -33,11 +29,9 @@ import {
   writeLockoutDeadline,
 } from "@/lib/retry-lockout";
 import { formatCents } from "@/lib/money";
-import { Button } from "@/components/ui/button";
-import { Field, Input, Label } from "@/components/ui/field";
-import { Alert, EmptyState, Skeleton } from "@/components/ui/feedback";
+import { StorefrontHeader } from "@/components/storefront/header";
+import { Alert, EmptyState } from "@/components/ui/feedback";
 import { SquarePaymentForm, requestTokenize } from "@/components/storefront/square-payment-form";
-import { cn } from "@/lib/utils";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -85,8 +79,8 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length, tip]);
 
-  // SPRINT-16: the lockout is a persisted DEADLINE, so it survives the reload that used to clear
-  // it. One ticker derives the remaining seconds from that deadline on every tick and on mount.
+  // The lockout is a persisted DEADLINE, so it survives the reload that used to clear it. One
+  // ticker derives the remaining seconds from that deadline on every tick and on mount.
   useEffect(() => {
     const tick = () => {
       const remaining = remainingLockoutSeconds(readLockoutDeadline(), Date.now());
@@ -120,7 +114,7 @@ export default function CheckoutPage() {
     setSubmitError({ message, retryable: true });
   }, []);
 
-  // Unchanged from before Sprint 14. Same fields, same required set, same expression.
+  // Unchanged. Same fields, same required set, same expression.
   const canSubmitForm =
     firstName.trim() && lastName.trim() && phone.trim() && email.trim() && quote?.orderable;
 
@@ -136,9 +130,9 @@ export default function CheckoutPage() {
         email: email.trim(),
         smsConsent,
       };
-      // SPRINT-16: derived, not minted. The same cart + contact + session nonce always derives
-      // the same key, so a reload after an ambiguous outcome replays the existing order instead
-      // of creating a second chargeable one. Any change to the cart derives a different key.
+      // Derived, not minted. The same cart + contact + session nonce always derives the same
+      // key, so a reload after an ambiguous outcome replays the existing order instead of
+      // creating a second chargeable one. Any change to the cart derives a different key.
       const idempotencyKey = await deriveIdempotencyKey(getSessionNonce(), cart, customer);
       const order = await createOrder({
         cart,
@@ -146,9 +140,9 @@ export default function CheckoutPage() {
         paymentToken: token,
         idempotencyKey,
       });
-      // SPRINT-16: the deadline belongs to THIS order. Without this, a customer who hit an
-      // ambiguous outcome, waited, paid, then started a new cart in the same tab would land on
-      // checkout with a live countdown for an order that already succeeded.
+      // The deadline belongs to THIS order. Without this, a customer who hit an ambiguous
+      // outcome, waited, paid, then started a new cart in the same tab would land on checkout
+      // with a live countdown for an order that already succeeded.
       clearLockoutDeadline();
       clear();
       router.push(`/order/${order.lookupToken}`);
@@ -156,10 +150,9 @@ export default function CheckoutPage() {
       if (err instanceof StorefrontApiError) {
         if (err.code === "PAYMENT_DECLINED") {
           // A decline is DEFINITE: the processor confirmed no money moved. Retrying with another
-          // card must therefore be a fresh order, exactly as before Sprint 16 — otherwise the
-          // stable key resolves to this dead order and checkout.ts replays the cached decline
-          // forever, trapping the customer. The nonce rotates ONLY here, never on the ambiguous
-          // PAYMENT_FAILED path.
+          // card must therefore be a fresh order — otherwise the stable key resolves to this
+          // dead order and checkout.ts replays the cached decline forever, trapping the
+          // customer. The nonce rotates ONLY here, never on the ambiguous PAYMENT_FAILED path.
           rotateSessionNonce();
           setSubmitError({
             message: "That card was declined. Try a different card.",
@@ -167,9 +160,8 @@ export default function CheckoutPage() {
           });
         } else if (err.code === "PAYMENT_FAILED") {
           setSubmitError({
-            // SPRINT-16 Phase 5: PAYMENT_FAILED is emitted ONLY on the ambiguous class
-            // (transport failure / timeout), where the system cannot know whether money moved.
-            // The old copy asserted "Nothing has been charged" on exactly that path.
+            // PAYMENT_FAILED is emitted ONLY on the ambiguous class (transport failure /
+            // timeout), where the system cannot know whether money moved.
             message:
               "We couldn't confirm that payment. Don't try again just yet — check your texts in a minute, or call the store.",
             retryable: true,
@@ -205,12 +197,19 @@ export default function CheckoutPage() {
 
   if (lines.length === 0) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col justify-center px-4">
-        <EmptyState
-          message="Your cart is empty."
-          actionLabel="Back to the menu"
-          onAction={() => router.push("/menu")}
-        />
+      <div className="sf-page">
+        <StorefrontHeader status={status} />
+        <main>
+          <div className="band b-paper textured">
+            <div className="container">
+              <EmptyState
+                message="Your cart is empty."
+                actionLabel="Back to the menu"
+                onAction={() => router.push("/menu")}
+              />
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -218,259 +217,287 @@ export default function CheckoutPage() {
   const payDisabled = !canSubmitForm || submitting || quoteLoading || lockoutSeconds > 0;
 
   return (
-    <div className="mx-auto min-h-dvh max-w-[560px] px-4 pb-16">
-      <div className="py-4">
-        <Link
-          href="/menu"
-          className="t-body inline-flex items-center gap-1 font-semibold text-ink-muted hover:text-ink"
-        >
-          <ChevronLeft className="h-5 w-5" aria-hidden="true" /> Menu
-        </Link>
-      </div>
+    <div className="sf-page">
+      <StorefrontHeader status={status} />
 
-      <h1 className="t-display-lg mb-6 text-ink">Checkout</h1>
+      <main>
+        <div className="band b-paper textured" style={{ paddingTop: 40 }}>
+          <div className="container">
+            <h2 className="poster" style={{ marginBottom: 32 }}>
+              Checkout
+            </h2>
 
-      {availabilityReasons.length > 0 && (
-        <div className="mb-4">
-          <Alert tone="danger" title="Some items just became unavailable">
-            <ul className="list-disc pl-5">
-              {availabilityReasons.map((r, i) => (
-                <li key={i}>{r.message}</li>
-              ))}
-            </ul>
-          </Alert>
-        </div>
-      )}
-      {fixableReasons.length > 0 && (
-        <div className="mb-4">
-          <Alert tone="warn" title="Please fix">
-            <ul className="list-disc pl-5">
-              {fixableReasons.map((r, i) => (
-                <li key={i}>{r.message}</li>
-              ))}
-            </ul>
-          </Alert>
-        </div>
-      )}
-
-      {/* §9.3 order summary. Every figure comes from the server quote — the line rows carry no
-          money at all, because the quote reports totals and not per-line amounts, and computing
-          them here is what this sprint removes. */}
-      <section className="mb-6 rounded-md border border-line bg-surface">
-        <ul className="divide-y divide-line">
-          {lines.map((line) => (
-            <li key={line.key} className="px-4 py-3">
-              <p className="t-body font-semibold text-ink">
-                {line.quantity} × {line.item.name}
-              </p>
-              {line.optionLabels.length > 0 && (
-                <p className="t-body-sm mt-0.5 text-ink-muted">{line.optionLabels.join(", ")}</p>
-              )}
-              {line.customerNote && (
-                <p className="t-body-sm mt-0.5 text-ink-muted">Note: {line.customerNote}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-
-        <div className="border-t border-line bg-paper-sunk px-4 py-3">
-          {quoteLoading ? (
-            // §12: the skeleton matches the loaded block's dimensions exactly.
-            <div className="space-y-2">
-              <Skeleton className="h-[22px] w-full" />
-              <Skeleton className="h-[22px] w-full" />
-              <Skeleton className="h-[22px] w-full" />
-            </div>
-          ) : quote ? (
-            <div className="space-y-2">
-              <TotalRow label="Subtotal" value={formatCents(quote.subtotalCents)} />
-              <TotalRow label="Tax" value={formatCents(quote.taxCents)} />
-              {quote.tip.tipCents > 0 && (
-                <TotalRow label="Tip" value={formatCents(quote.tip.tipCents)} />
-              )}
-              <div className="flex items-baseline justify-between pt-1">
-                <span className="t-display-sm text-ink">Total</span>
-                <span className="t-display-sm t-nums text-ink">{formatCents(quote.totalCents)}</span>
+            {availabilityReasons.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <Alert tone="danger" title="Some items just became unavailable">
+                  <ul style={{ paddingLeft: 20, listStyle: "disc" }}>
+                    {availabilityReasons.map((r, i) => (
+                      <li key={i}>{r.message}</li>
+                    ))}
+                  </ul>
+                </Alert>
               </div>
-              {!quote.orderable && (
-                <p className="t-body mt-2 text-danger">
-                  {quote.blockingReasons.includes("STORE_CLOSED")
-                    ? "The store is closed, so this order can't be placed right now."
-                    : "The store isn't taking orders right now."}
+            )}
+            {fixableReasons.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <Alert tone="warn" title="Please fix">
+                  <ul style={{ paddingLeft: 20, listStyle: "disc" }}>
+                    {fixableReasons.map((r, i) => (
+                      <li key={i}>{r.message}</li>
+                    ))}
+                  </ul>
+                </Alert>
+              </div>
+            )}
+
+            <div className="co-grid">
+              <div>
+                <div className="co-card card" style={{ marginBottom: 24 }}>
+                  <h3>Who&apos;s picking up</h3>
+
+                  <div className="field">
+                    <label htmlFor="first-name">First name</label>
+                    <input
+                      id="first-name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      autoComplete="given-name"
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="last-name">Last name</label>
+                    <input
+                      id="last-name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      autoComplete="family-name"
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="phone">Mobile number</label>
+                    <input
+                      id="phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="(708) 555-1234"
+                    />
+                    <p className="help">We text this number when your order is ready.</p>
+                  </div>
+
+                  <div className="field" style={{ marginBottom: 0 }}>
+                    <label htmlFor="email">Email</label>
+                    <input
+                      id="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                    />
+                    <p className="help">Receipt only. No marketing, no account.</p>
+                  </div>
+
+                  <label className="mrow" style={{ marginTop: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={smsConsent}
+                      onChange={(e) => setSmsConsent(e.target.checked)}
+                    />
+                    <span className="nm">
+                      Text me when my order is ready. Message and data rates may apply.
+                    </span>
+                  </label>
+                </div>
+
+                {/* Presets are configuration, not code. "No tip" carries the same visual weight
+                    as every other option. */}
+                {status?.tippingEnabled && tipPresets.length > 0 ? (
+                  <div className="co-card card" style={{ marginBottom: 24 }}>
+                    <h3>Tip the kitchen</h3>
+                    <div className="tips" role="group" aria-label="Tip amount">
+                      <button
+                        type="button"
+                        className="tip"
+                        aria-pressed={!tip}
+                        onClick={() => {
+                          setCustomTip("");
+                          setTip(undefined);
+                        }}
+                      >
+                        No tip
+                      </button>
+                      {tipPresets.map((bps, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className="tip"
+                          aria-pressed={tip?.type === "preset" && tip.presetIndex === i}
+                          onClick={() => {
+                            setCustomTip("");
+                            setTip({ type: "preset", presetIndex: i });
+                          }}
+                        >
+                          {(bps / 100).toFixed(0)}%
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="tip"
+                        aria-pressed={tip?.type === "amount"}
+                        onClick={() => setTip({ type: "amount", amountCents: toCents(customTip) })}
+                      >
+                        Other
+                      </button>
+                    </div>
+
+                    {tip?.type === "amount" ? (
+                      <div className="field" style={{ marginTop: 16, marginBottom: 0 }}>
+                        <label htmlFor="custom-tip">Tip amount</label>
+                        <input
+                          id="custom-tip"
+                          inputMode="decimal"
+                          className="t-nums"
+                          value={customTip}
+                          onChange={(e) => setCustomTip(e.target.value)}
+                          onBlur={() => setTip({ type: "amount", amountCents: toCents(customTip) })}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="co-card card">
+                  <h3>Payment</h3>
+                  <SquarePaymentForm
+                    onTokenReady={handleTokenReady}
+                    onError={handleTokenError}
+                    disabled={!quote?.orderable}
+                    displayTotalCents={quote?.totalCents}
+                  />
+                </div>
+              </div>
+
+              <div className="co-card card">
+                <h3>Your order</h3>
+
+                {lines.map((line) => (
+                  <div key={line.key} style={{ padding: "6px 0" }}>
+                    <p>
+                      {line.item.name} ×{line.quantity}
+                    </p>
+                    {line.optionLabels.length > 0 ? (
+                      <p style={{ fontSize: "var(--body-sm)", color: "var(--ink-muted)" }}>
+                        {line.optionLabels.join(" · ")}
+                      </p>
+                    ) : null}
+                    {line.customerNote ? (
+                      <p style={{ fontSize: "var(--body-sm)", color: "var(--ink-muted)" }}>
+                        Note: {line.customerNote}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+
+                <div className="totals">
+                  {quoteLoading ? (
+                    <>
+                      <div className="skel" style={{ height: 22, marginBottom: 10 }} />
+                      <div className="skel" style={{ height: 22, marginBottom: 10 }} />
+                      <div className="skel" style={{ height: 30 }} />
+                    </>
+                  ) : quote ? (
+                    <>
+                      <div className="leader">
+                        <span>Subtotal</span>
+                        <span className="dots" />
+                        <span className="amt">{formatCents(quote.subtotalCents)}</span>
+                      </div>
+                      <div className="leader">
+                        <span>Tax</span>
+                        <span className="dots" />
+                        <span className="amt">{formatCents(quote.taxCents)}</span>
+                      </div>
+                      {quote.tip.tipCents > 0 ? (
+                        <div className="leader">
+                          <span>Tip</span>
+                          <span className="dots" />
+                          <span className="amt">{formatCents(quote.tip.tipCents)}</span>
+                        </div>
+                      ) : null}
+                      <div className="leader grand">
+                        <span style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>
+                          Total
+                        </span>
+                        <span className="dots" />
+                        <span className="amt">{formatCents(quote.totalCents)}</span>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+
+                {quote && !quote.orderable ? (
+                  <p style={{ marginTop: 12, color: "var(--danger)" }}>
+                    {quote.blockingReasons.includes("STORE_CLOSED")
+                      ? "The store is closed, so this order can't be placed right now."
+                      : "The store isn't taking orders right now."}
+                  </p>
+                ) : null}
+
+                <p className="quote-note">
+                  Quoted by the store just now — every figure above, tip included, comes from the
+                  server.
                 </p>
-              )}
+
+                <div className="paywith">
+                  <span className="paychip">Card</span>
+                  <span className="paychip">Apple&nbsp;Pay</span>
+                  <span className="paychip">Google&nbsp;Pay</span>
+                  <span className="paychip">Cash&nbsp;App</span>
+                </div>
+
+                {/* The payment outcome announces through a polite live region. */}
+                <div aria-live="polite" aria-atomic="true">
+                  {submitError ? (
+                    <div style={{ marginBottom: 16 }}>
+                      <Alert tone="danger">
+                        {submitError.message}
+                        {lockoutSeconds > 0 ? (
+                          <span className="t-nums" style={{ display: "block", paddingTop: 4 }}>
+                            You can try again in {lockoutSeconds} second
+                            {lockoutSeconds === 1 ? "" : "s"}.
+                          </span>
+                        ) : null}
+                      </Alert>
+                    </div>
+                  ) : null}
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ width: "100%", height: 52 }}
+                  disabled={payDisabled}
+                  aria-busy={submitting || undefined}
+                  onClick={handlePayClick}
+                >
+                  {submitting
+                    ? "Paying…"
+                    : quote
+                      ? `Pay ${formatCents(quote.totalCents)}`
+                      : "Pay"}
+                </button>
+              </div>
             </div>
-          ) : null}
-        </div>
-      </section>
-
-      {/* §9.3 tip selector. Presets are configuration, not code. "No tip" carries the same
-          visual weight as every other option. */}
-      {status?.tippingEnabled && tipPresets.length > 0 && (
-        <section className="mb-6">
-          <h2 className="t-label mb-2 text-ink-muted">Add a tip</h2>
-          <div className="flex flex-wrap gap-2">
-            {tipPresets.map((bps, i) => (
-              <TipPill
-                key={i}
-                selected={tip?.type === "preset" && tip.presetIndex === i}
-                onClick={() => {
-                  setCustomTip("");
-                  setTip({ type: "preset", presetIndex: i });
-                }}
-              >
-                {(bps / 100).toFixed(0)}%
-              </TipPill>
-            ))}
-            <TipPill
-              selected={tip?.type === "amount"}
-              onClick={() => setTip({ type: "amount", amountCents: toCents(customTip) })}
-            >
-              Other
-            </TipPill>
-            <TipPill
-              selected={!tip}
-              onClick={() => {
-                setCustomTip("");
-                setTip(undefined);
-              }}
-            >
-              No tip
-            </TipPill>
           </div>
-
-          {tip?.type === "amount" && (
-            <div className="mt-3">
-              <Label htmlFor="custom-tip" className="mb-1">
-                Tip amount
-              </Label>
-              <Input
-                id="custom-tip"
-                inputMode="decimal"
-                value={customTip}
-                onChange={(e) => setCustomTip(e.target.value)}
-                onBlur={() => setTip({ type: "amount", amountCents: toCents(customTip) })}
-                placeholder="0.00"
-                className="t-nums"
-              />
-            </div>
-          )}
-        </section>
-      )}
-
-      <section className="mb-6 space-y-4">
-        <h2 className="t-label text-ink-muted">Your info</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="First name" htmlFor="first-name">
-            <Input id="first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          </Field>
-          <Field label="Last name" htmlFor="last-name">
-            <Input id="last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-          </Field>
         </div>
-        <Field label="Mobile number" htmlFor="phone" hint="We text you when the order is ready.">
-          <Input
-            id="phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="(708) 555-1234"
-          />
-        </Field>
-        <Field label="Email" htmlFor="email">
-          <Input
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            autoComplete="email"
-          />
-        </Field>
-        <label className="t-body flex items-start gap-3 text-ink-muted">
-          <input
-            type="checkbox"
-            checked={smsConsent}
-            onChange={(e) => setSmsConsent(e.target.checked)}
-            className="mt-1 h-5 w-5 accent-brand"
-          />
-          Text me when my order is ready. Message and data rates may apply.
-        </label>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="t-label mb-2 text-ink-muted">Payment</h2>
-        <SquarePaymentForm
-          onTokenReady={handleTokenReady}
-          onError={handleTokenError}
-          disabled={!quote?.orderable}
-          displayTotalCents={quote?.totalCents}
-        />
-      </section>
-
-      {/* §14: the payment outcome announces through a polite live region. */}
-      <div aria-live="polite" aria-atomic="true">
-        {submitError && (
-          <div className="mb-4">
-            <Alert tone="danger">
-              {submitError.message}
-              {lockoutSeconds > 0 ? (
-                <span className="t-nums block pt-1">
-                  You can try again in {lockoutSeconds} second{lockoutSeconds === 1 ? "" : "s"}.
-                </span>
-              ) : null}
-            </Alert>
-          </div>
-        )}
-      </div>
-
-      <Button
-        size="lg"
-        className="w-full"
-        disabled={payDisabled}
-        loading={submitting}
-        loadingLabel="Paying…"
-        onClick={handlePayClick}
-      >
-        {quote ? `Pay ${formatCents(quote.totalCents)}` : "Pay"}
-      </Button>
+      </main>
     </div>
-  );
-}
-
-function TotalRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between">
-      <span className="t-body text-ink-muted">{label}</span>
-      <span className="t-body t-nums text-ink">{value}</span>
-    </div>
-  );
-}
-
-function TipPill({
-  selected,
-  onClick,
-  children,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={cn(
-        "t-body h-11 rounded-pill border px-5 font-semibold motion-fast transition-colors",
-        selected
-          ? "border-brand bg-brand text-surface"
-          : "border-line-strong text-ink hover:bg-paper-sunk",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

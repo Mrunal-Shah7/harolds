@@ -1,350 +1,451 @@
-/* SPRINT-6: kitchen display — industrial expo-window board, not the storefront palette */
+/* =============================================================================
+   KITCHEN SCOPE — design v1.1, ported from harolds-design-v1_1.html.
+
+   A dark surface, not a theme: the --kds-* tokens are their own set and share
+   nothing with the storefront's dark scheme. Modifiers carry full weight and the
+   elapsed minutes are printed, because this is read at two metres in a bright
+   kitchen.
+
+   The mockup draws the board, the audio-unlock panel and the offline bar. The
+   PIN sign-in is not drawn; it is built here out of the same parts — kds-card
+   surfaces, the chip face for digits, the .kbtn action button.
+   ============================================================================= */
+
 .kds-root {
+  background: var(--kds-bg);
+  color: var(--kds-ink);
   min-height: 100dvh;
-  background: #12100c;
-  color: #f4ecd8;
-  font-family: var(--font-kds-mono), ui-monospace, monospace;
+  font-family: var(--font-sans);
+  font-size: var(--body);
+  line-height: 1.5;
   -webkit-user-select: none;
   user-select: none;
   touch-action: manipulation;
 }
 
+.kds-root *,
+.kds-root *::before,
+.kds-root *::after {
+  box-sizing: border-box;
+}
+
 .kds-app {
+  position: relative;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
 
+/* ---------- top bar ---------- */
+.kds-top {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--kds-line-strong);
+  flex-wrap: wrap;
+}
+.kds-top .wm {
+  font-family: var(--font-poster);
+  font-size: 1.25rem;
+  color: var(--kds-ink);
+  text-transform: uppercase;
+}
+.kds-top .clock {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--mono-lg);
+  font-variant-numeric: tabular-nums;
+}
+.kds-top .net {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--body);
+  color: var(--kds-ink-muted);
+}
+.kds-top .net .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--kds-open);
+  flex: none;
+}
+.kds-top .net[data-degraded="true"] .dot {
+  background: var(--kds-danger);
+}
+.kds-top .who {
+  font-size: var(--body);
+  color: var(--kds-ink-muted);
+}
+.kds-top .health {
+  font-size: var(--body);
+  color: var(--kds-ink-muted);
+}
+.kds-top .health[data-stuck="true"] {
+  color: var(--flame);
+}
+
+.kds-topbtn {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--kds-line-strong);
+  background: transparent;
+  color: var(--kds-ink-muted);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--body);
+}
+.kds-topbtn:hover {
+  color: var(--kds-ink);
+}
+
+/* A ticket that has just landed reads as new for eight seconds. */
+.kcard--new {
+  border-color: var(--flame);
+}
+
+/* ---------- board ---------- */
+.kds-grid {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  align-content: start;
+  flex: 1;
+}
+
+.kcard {
+  position: relative;
+  background: var(--kds-card);
+  border: 1px solid var(--kds-line-strong);
+  border-radius: var(--r-md);
+  padding: 20px 20px 20px 26px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.kcard .agebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: var(--kds-open);
+}
+.kcard.age-warn .agebar {
+  background: var(--flame);
+}
+.kcard.age-late .agebar {
+  background: var(--kds-danger);
+}
+@keyframes latepulse {
+  0%,
+  100% {
+    border-color: var(--kds-line-strong);
+  }
+  50% {
+    border-color: var(--kds-danger);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .kcard.age-late {
+    animation: latepulse 2s var(--ease) infinite;
+  }
+}
+.kcard .head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kcard .chip {
+  background: var(--kds-card-raised);
+  color: var(--kds-ink);
+  font-size: var(--mono-lg);
+  padding: 12px 20px;
+}
+.kcard .elapsed {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--mono-lg);
+  font-variant-numeric: tabular-nums;
+}
+.kcard.age-warn .elapsed {
+  color: var(--flame);
+}
+.kcard.age-late .elapsed {
+  color: var(--kds-danger);
+}
+.kcard .who {
+  font-size: var(--body-lg);
+  color: var(--kds-ink-muted);
+}
+.kcard .lines {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.kline .qn {
+  display: flex;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--display-md);
+  line-height: 1.15;
+}
+.kline .qn .q {
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+}
+.kline .mods {
+  padding-left: 46px;
+  font-size: var(--body-lg);
+  color: var(--kds-ink);
+  font-weight: 500;
+  list-style: none;
+  margin: 0;
+}
+.knote {
+  border: 1px solid var(--flame);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  font-size: var(--body-lg);
+}
+.knote .lb {
+  display: block;
+  font-size: var(--label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--flame);
+  margin-bottom: 2px;
+}
+
+.kbtn {
+  margin-top: auto;
+  height: 64px;
+  width: 100%;
+  border-radius: var(--r-pill);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--display-sm);
+  transition:
+    background var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+.kbtn:active {
+  transform: scale(0.98);
+}
+.kbtn:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.kbtn-start {
+  background: var(--kds-card-raised);
+  color: var(--kds-ink);
+  border: 1.5px solid var(--kds-line-strong);
+}
+.kbtn-ready {
+  background: var(--kds-open);
+  color: #fff;
+}
+.kbtn-picked {
+  background: transparent;
+  color: var(--kds-ink-muted);
+  border: 1.5px solid var(--kds-line);
+}
+/* The cancel affordance is not on the mockup card; it takes the picked-up button's
+   quiet outline in the danger colour so it can never be hit by mistake. */
+.kbtn-cancel {
+  height: 44px;
+  background: transparent;
+  color: var(--kds-danger);
+  border: 1.5px solid var(--kds-line);
+  margin-top: 0;
+  font-size: var(--body);
+}
+
+.kds-empty {
+  grid-column: 1 / -1;
+  color: var(--kds-ink-muted);
+  font-size: var(--body-lg);
+  padding: 48px 0;
+  text-align: center;
+}
+
+/* ---------- offline bar and audio unlock ---------- */
+.kds-offline {
+  display: none;
+  background: rgb(156 84 8 / 0.25);
+  color: var(--flame);
+  border-bottom: 1px solid var(--flame-deep);
+  padding: 10px 24px;
+  font-weight: 600;
+}
+.kds-offline.on {
+  display: block;
+}
+
+.kds-unlock {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgb(20 17 16 / 0.92);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.kds-unlock.on {
+  display: flex;
+}
+.kds-unlock .panel {
+  background: var(--kds-card-raised);
+  border: 1px solid var(--kds-line-strong);
+  border-radius: var(--r-lg);
+  padding: 40px;
+  max-width: 520px;
+  text-align: center;
+}
+.kds-unlock h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--display-lg);
+}
+.kds-unlock p {
+  color: var(--kds-ink-muted);
+  margin: 12px 0 28px;
+  font-size: var(--body-lg);
+}
+
+/* ---------- sign-in ----------
+   Not drawn in the mockup. Built from the board's own parts. */
 .kds-signin {
   flex: 1;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 1.5rem;
-  background:
-    radial-gradient(1200px 500px at 50% -10%, #3a2a12 0%, transparent 55%),
-    repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(245, 197, 24, 0.04) 32px);
+  padding: 24px;
 }
-
 .kds-signin-card {
-  width: min(420px, 100%);
-  background: #1a1712;
-  border: 2px solid #f5c518;
-  box-shadow: 8px 8px 0 #000;
-  padding: 1.5rem 1.25rem 1.75rem;
+  width: min(460px, 100%);
+  background: var(--kds-card);
+  border: 1px solid var(--kds-line-strong);
+  border-radius: var(--r-lg);
+  padding: 32px 28px;
 }
-
 .kds-kicker {
-  font-size: 0.7rem;
-  letter-spacing: 0.28em;
+  font-family: var(--font-mono);
+  font-size: var(--label);
+  letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: #f5c518;
-  margin: 0 0 0.35rem;
+  color: var(--kds-ink-muted);
+  margin-bottom: 6px;
 }
-
 .kds-title {
-  font-family: var(--font-kds-display), Impact, sans-serif;
-  font-size: clamp(2.2rem, 8vw, 3.4rem);
-  line-height: 0.9;
-  margin: 0 0 0.35rem;
-  letter-spacing: 0.02em;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: var(--poster-lg);
+  line-height: 1.05;
   text-transform: uppercase;
+  margin-bottom: 8px;
 }
-
 .kds-sub {
-  margin: 0 0 1.25rem;
-  color: #cbbd9a;
-  font-size: 0.85rem;
+  color: var(--kds-ink-muted);
+  font-size: var(--body-lg);
+  margin-bottom: 24px;
 }
 
 .kds-roster {
   display: grid;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  margin-bottom: 24px;
 }
-
-.kds-roster button,
-.kds-pad button,
-.kds-btn {
-  font-family: inherit;
-  border: 0;
-  cursor: pointer;
-}
-
 .kds-roster button {
-  background: #2a2418;
-  color: #f4ecd8;
-  text-align: left;
-  padding: 0.85rem 1rem;
-  font-size: 1.05rem;
-  border: 1px solid #4a3f2a;
+  height: 56px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--kds-line-strong);
+  background: var(--kds-card-raised);
+  color: var(--kds-ink);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--display-sm);
 }
-
-.kds-roster button[data-selected="true"] {
-  background: #f5c518;
-  color: #12100c;
-  border-color: #f5c518;
-  font-weight: 600;
+.kds-roster button[aria-pressed="true"] {
+  background: var(--kds-open);
+  border-color: var(--kds-open);
+  color: #fff;
 }
 
 .kds-pin {
-  min-height: 2.4rem;
-  letter-spacing: 0.45em;
-  font-size: 1.6rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--mono-lg);
+  letter-spacing: 0.5em;
   text-align: center;
-  margin: 0 0 0.75rem;
-  color: #f5c518;
+  min-height: 40px;
+  margin-bottom: 16px;
 }
-
 .kds-pad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.45rem;
+  gap: 10px;
 }
-
 .kds-pad button {
-  background: #2f291c;
-  color: #f4ecd8;
-  font-size: 1.45rem;
-  padding: 0.85rem 0;
-  border: 1px solid #56492f;
+  height: 64px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--kds-line-strong);
+  background: var(--kds-card-raised);
+  color: var(--kds-ink);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--mono-lg);
 }
-
 .kds-pad button:active {
-  background: #f5c518;
-  color: #12100c;
+  transform: scale(0.98);
 }
-
-.kds-pad .kds-pad-wide {
-  grid-column: span 2;
-}
-
+.kds-lockout,
 .kds-error {
-  color: #ff6b4a;
-  min-height: 1.4rem;
-  margin: 0.75rem 0 0;
-  font-size: 0.9rem;
+  color: var(--kds-danger);
+  font-size: var(--body-lg);
+  margin-top: 16px;
+  min-height: 26px;
 }
 
-.kds-lockout {
-  background: #3a140e;
-  color: #ffb4a2;
-  padding: 0.75rem;
-  margin-top: 0.75rem;
-  border: 1px solid #ff6b4a;
-}
-
-.kds-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.65rem 1rem;
-  background: #0b0a07;
-  border-bottom: 3px solid #f5c518;
-  flex-wrap: wrap;
-}
-
-.kds-brand {
-  font-family: var(--font-kds-display), Impact, sans-serif;
-  font-size: 1.35rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.kds-health,
-.kds-conn,
-.kds-who {
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  color: #cbbd9a;
-}
-
-.kds-health[data-stuck="true"],
-.kds-conn[data-degraded="true"] {
-  color: #ff6b4a;
-}
-
-.kds-header .kds-btn {
-  margin-left: auto;
-  background: transparent;
-  color: #cbbd9a;
-  border: 1px solid #4a3f2a;
-  padding: 0.4rem 0.7rem;
-  font-size: 0.75rem;
-}
-
-.kds-board {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.65rem;
-  padding: 0.75rem;
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .kds-board {
-    grid-template-columns: 1fr;
-  }
-}
-
-.kds-col h2 {
-  margin: 0 0 0.5rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: #f5c518;
-}
-
-.kds-col {
-  min-height: 40vh;
-  background: rgba(0, 0, 0, 0.25);
-  padding: 0.6rem;
-  border: 1px solid #2a2418;
-}
-
-.kds-empty {
-  color: #6d634f;
-  font-size: 0.8rem;
-  padding: 1rem 0.25rem;
-}
-
-.kds-card {
-  background: #efe6c9;
-  color: #1a140c;
-  margin-bottom: 0.65rem;
-  padding: 0.7rem 0.75rem 0.8rem;
-  clip-path: polygon(0 8px, 8px 0, 16px 8px, 24px 0, 32px 8px, 40px 0, 48px 8px, 56px 0, 64px 8px, 72px 0, 80px 8px, 88px 0, 96px 8px, 104px 0, 112px 8px, 120px 0, calc(100% - 0px) 0, 100% 100%, 0 100%);
-  box-shadow: 0 6px 0 #000;
-  animation: none;
-}
-
-.kds-card--new {
-  outline: 3px solid #f5c518;
-  animation: kds-pop 0.45s ease-out;
-}
-
-.kds-card--screen {
-  background: #ffcc33;
-}
-
-.kds-card--sound {
-  background: #ff4d2e;
-  color: #fff8e8;
-  animation: kds-pulse 1.1s ease-in-out infinite;
-}
-
-.kds-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.kds-num {
-  font-family: var(--font-kds-display), Impact, sans-serif;
-  font-size: 2rem;
-  line-height: 0.9;
-  letter-spacing: 0.02em;
-}
-
-.kds-elapsed {
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-
-.kds-name {
-  font-size: 0.95rem;
-  margin: 0.15rem 0 0.45rem;
-  text-transform: uppercase;
-}
-
-.kds-line {
-  font-size: 0.92rem;
-  margin: 0.15rem 0;
-}
-
-.kds-mods {
-  margin: 0;
-  padding-left: 1.1rem;
-  font-size: 0.8rem;
-}
-
-.kds-note {
-  margin: 0.25rem 0 0;
-  font-size: 0.8rem;
-  font-style: italic;
-}
-
-.kds-actions {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.4rem;
-  margin-top: 0.7rem;
-}
-
-.kds-go {
-  background: #12100c;
-  color: #f5c518;
-  font-size: 1.05rem;
-  padding: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-family: var(--font-kds-display), Impact, sans-serif;
-}
-
-.kds-cancel {
-  background: transparent;
-  color: inherit;
-  border: 1px solid currentColor !important;
-  padding: 0.7rem 0.65rem;
-  font-size: 0.75rem;
-  opacity: 0.75;
-}
-
+/* ---------- cancel confirmation ---------- */
 .kds-confirm {
   position: fixed;
   inset: 0;
-  background: rgba(8, 6, 4, 0.72);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  z-index: 20;
+  z-index: var(--z-overlay);
+  background: rgb(20 17 16 / 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
 }
-
 .kds-confirm-card {
-  background: #1a1712;
-  border: 2px solid #ff6b4a;
-  padding: 1.25rem;
-  width: min(360px, 100%);
-}
-
-.kds-stale-banner {
-  background: #3a2a12;
-  color: #f5c518;
+  background: var(--kds-card-raised);
+  border: 1px solid var(--kds-line-strong);
+  border-radius: var(--r-lg);
+  padding: 40px;
+  max-width: 520px;
   text-align: center;
-  padding: 0.35rem;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
-
-@keyframes kds-pop {
-  from {
-    transform: translateY(-8px) scale(0.98);
-    opacity: 0.2;
-  }
-  to {
-    transform: none;
-    opacity: 1;
-  }
+.kds-confirm-card .kds-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
 }
-
-@keyframes kds-pulse {
-  0%,
-  100% {
-    filter: brightness(1);
-  }
-  50% {
-    filter: brightness(1.18);
-  }
+.kds-confirm-card .kbtn {
+  margin-top: 0;
 }

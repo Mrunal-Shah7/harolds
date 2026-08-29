@@ -18,12 +18,14 @@ import { AdminNavSkeleton, AdminViewSkeleton } from "@/components/admin/AdminSke
 
 export type SessionUser = { id: string; email: string; displayName: string; role: string };
 
+// Design v1.1 numbers the rail. The mockup draws four entries; this back office has eight, so
+// the numbering simply continues — no new visual language, just more of the same rows.
 const NAV = [
   { href: "/admin", label: "Dashboard", ownerOnly: false },
+  { href: "/admin/orders", label: "Orders", ownerOnly: false },
   { href: "/admin/menu", label: "Menu", ownerOnly: false },
   { href: "/admin/modifiers", label: "Modifiers", ownerOnly: false },
   { href: "/admin/store", label: "Store", ownerOnly: false },
-  { href: "/admin/orders", label: "Orders", ownerOnly: false },
   { href: "/admin/reports", label: "Reports", ownerOnly: false },
   { href: "/admin/jobs", label: "Jobs", ownerOnly: false },
   { href: "/admin/staff", label: "Staff", ownerOnly: true },
@@ -81,8 +83,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   if (bootError) {
     return (
-      <div className="adm-main">
-        <div className="adm-error">{bootError}</div>
+      <div className="adm-frame">
+        <div className="adm-shell">
+          <main className="adm-main" style={{ gridColumn: "1 / -1" }}>
+            <div className="adm-error">{bootError}</div>
+          </main>
+        </div>
       </div>
     );
   }
@@ -91,55 +97,65 @@ export function AdminShell({ children }: { children: ReactNode }) {
   // layout the operator is about to use is already in place while the session resolves.
   if (!user) {
     return (
-      <div className="adm-app">
-        <AdminNavSkeleton />
-        <main className="adm-main">
-          <AdminViewSkeleton />
-        </main>
+      <div className="adm-frame">
+        <div className="adm-shell">
+          <AdminNavSkeleton />
+          <main className="adm-main">
+            <AdminViewSkeleton />
+          </main>
+        </div>
       </div>
     );
   }
 
   return (
     <AdminSessionContext.Provider value={{ user, timezone }}>
-      <div className="adm-app">
-        <nav className="adm-nav">
-          <p className="adm-brand">Harold&apos;s</p>
-          <p className="adm-brand-sub">Oak Lawn back office</p>
-          {NAV.filter((n) => !n.ownerOnly || user.role === "OWNER").map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className={
-                pathname === n.href || (n.href !== "/admin" && pathname.startsWith(n.href))
-                  ? "is-active"
-                  : ""
-              }
-            >
-              {n.label}
-            </Link>
-          ))}
-          <div className="adm-nav-user">
-            <strong>{user.displayName}</strong>
-            {user.role.toLowerCase()}
-            <div>
-              <button
-                type="button"
-                className="adm-btn adm-btn-ghost adm-btn-onDark"
-                onClick={async () => {
-                  await adminApi("/api/internal/admin/auth/signout", { method: "POST" });
-                  router.replace("/admin/signin");
-                }}
-              >
-                Sign out
-              </button>
+      <div className="adm-frame">
+        <div className="adm-shell">
+          <aside className="adm-side">
+            <div className="wordmark">
+              Harold&apos;s<small>Back office</small>
             </div>
-          </div>
-        </nav>
+            <nav className="adm-nav" aria-label="Admin">
+              {NAV.filter((n) => !n.ownerOnly || user.role === "OWNER").map((n, i) => {
+                const active =
+                  pathname === n.href || (n.href !== "/admin" && pathname.startsWith(n.href));
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    className={active ? "active" : ""}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <span className="ic">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="tx">{n.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
 
-        {/* Only this swaps on navigation. The nav above is owned by the layout and never
-            unmounts. */}
-        <main className="adm-main">{children}</main>
+            <div className="adm-nav-user">
+              <strong>{user.displayName}</strong>
+              {user.role.toLowerCase()}
+              <div>
+                <button
+                  type="button"
+                  className="adm-btn adm-btn-ghost"
+                  onClick={async () => {
+                    await adminApi("/api/internal/admin/auth/signout", { method: "POST" });
+                    router.replace("/admin/signin");
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          {/* Only this swaps on navigation. The rail above is owned by the layout and never
+              unmounts. */}
+          <main className="adm-main">{children}</main>
+        </div>
       </div>
     </AdminSessionContext.Provider>
   );

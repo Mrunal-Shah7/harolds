@@ -1,9 +1,25 @@
-/* SPRINT-8: admin back-office — dense ledger, office laptop and phone behind the counter */
+/* =============================================================================
+   ADMIN SCOPE — design v1.1, ported from harolds-design-v1_1.html.
+
+   The design draws five admin screens (Orders, Order detail, Menu, Reports,
+   Settings). This file carries those rules verbatim, and then extends the SAME
+   primitives — table.adm, .adm-panel, .kpi, .badge, .btn, .toggle, .dev-card —
+   to the screens the mockup does not draw (Dashboard, Modifiers, Store, Jobs,
+   Staff, the item and group editors, sign-in). Nothing invents a new visual
+   language; the extra screens are drawn out of the design's own parts.
+
+   Colour, radius, elevation and the four faces come from globals.css. Admin
+   stays light — the storefront dark scheme is scoped to .sf-root and the KDS
+   scope shares no token with either.
+   ============================================================================= */
+
 .adm-root {
+  background: var(--paper);
+  color: var(--ink);
   min-height: 100dvh;
-  background: #efe6d4;
-  color: #1a140c;
-  font-family: var(--font-adm-sans), "IBM Plex Sans", ui-sans-serif, sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--body);
+  line-height: 1.5;
 }
 
 .adm-root *,
@@ -12,381 +28,745 @@
   box-sizing: border-box;
 }
 
-.adm-app {
+/* ---------- shell ---------- */
+.adm-frame {
+  padding: 24px 16px;
   min-height: 100dvh;
-  display: grid;
-  grid-template-columns: 13.5rem 1fr;
 }
 
-.adm-nav {
-  background: #1a140c;
-  color: #f3ead8;
-  padding: 1rem 0.75rem 1.5rem;
+.adm-shell,
+.adm-app {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  max-width: var(--container);
+  margin: 0 auto;
+  min-height: calc(100dvh - 48px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+@media (max-width: 1023px) {
+  .adm-shell,
+  .adm-app {
+    grid-template-columns: 64px 1fr;
+  }
+}
+
+.adm-side {
+  background: var(--paper-sunk);
+  border-right: 1px solid var(--line);
+  padding: 20px 0;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  border-right: 4px solid #9b1c1c;
 }
-
-.adm-brand {
-  font-family: var(--font-adm-display), Georgia, serif;
-  font-size: 1.35rem;
-  line-height: 1.05;
-  margin: 0 0.4rem 0.15rem;
-}
-
-.adm-brand-sub {
-  font-size: 0.65rem;
-  letter-spacing: 0.16em;
+.adm-side .wordmark {
+  font-family: var(--font-poster);
+  color: var(--brand-text);
   text-transform: uppercase;
-  color: #d4b45a;
-  margin: 0 0.4rem 1rem;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  padding: 0 20px 20px;
+  font-size: 1.1rem;
+}
+.adm-side .wordmark small {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  color: var(--ink-muted);
+  margin-top: 2px;
 }
 
 .adm-nav a {
-  color: #f3ead8;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  color: var(--ink-muted);
   text-decoration: none;
-  padding: 0.45rem 0.55rem;
-  border-radius: 2px;
-  font-size: 0.88rem;
+  font-weight: 500;
+  font-size: var(--body);
+  border-left: 3px solid transparent;
+  cursor: pointer;
 }
-
-.adm-nav a:hover,
+.adm-nav a:hover {
+  color: var(--ink);
+}
+.adm-nav a.active,
 .adm-nav a.is-active {
-  background: #9b1c1c;
+  background: var(--brand-tint);
+  color: var(--ink);
+  border-left-color: var(--brand);
+  font-weight: 600;
+}
+.adm-nav .ic {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  width: 20px;
+  color: var(--ink-faint);
+  flex: none;
+}
+@media (max-width: 1023px) {
+  .adm-side .wordmark small,
+  .adm-nav .tx {
+    display: none;
+  }
 }
 
+/* The signed-in operator, pinned to the foot of the rail. */
 .adm-nav-user {
   margin-top: auto;
-  padding: 0.75rem 0.55rem 0;
-  font-size: 0.75rem;
-  color: #cbbba0;
+  padding: 20px 20px 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
 }
-
 .adm-nav-user strong {
   display: block;
-  color: #f3ead8;
-  font-size: 0.85rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--body);
+  color: var(--ink);
+}
+.adm-nav-user > div {
+  margin-top: 10px;
+}
+@media (max-width: 1023px) {
+  .adm-nav-user strong,
+  .adm-nav-user {
+    font-size: 0;
+  }
+  .adm-nav-user > div {
+    font-size: var(--body-sm);
+  }
 }
 
 .adm-main {
-  padding: 1rem 1.25rem 2.5rem;
-  min-width: 0;
-}
-
-.adm-h1 {
-  font-family: var(--font-adm-display), Georgia, serif;
-  font-size: 1.7rem;
-  margin: 0 0 0.25rem;
-}
-
-.adm-lead {
-  margin: 0 0 1rem;
-  color: #5c5346;
-  font-size: 0.9rem;
-}
-
-.adm-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: end;
-  margin-bottom: 0.75rem;
-}
-
-.adm-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #5c5346;
-}
-
-.adm-field input,
-.adm-field select,
-.adm-field textarea {
-  font: inherit;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: #1a140c;
-  background: #fffdf7;
-  border: 1px solid #c9bda8;
-  padding: 0.4rem 0.5rem;
-  min-width: 8rem;
-}
-
-.adm-field textarea {
-  min-height: 4.5rem;
-}
-
-.adm-btn {
-  font: inherit;
-  font-weight: 600;
-  background: #1a140c;
-  color: #f3ead8;
-  border: 0;
-  padding: 0.45rem 0.75rem;
-  cursor: pointer;
-}
-
-.adm-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.adm-btn-ghost {
-  background: transparent;
-  color: #1a140c;
-  border: 1px solid #1a140c;
-}
-
-.adm-btn-danger {
-  background: #9b1c1c;
-  color: #fff;
-}
-
-.adm-btn-warn {
-  background: #c45c12;
-  color: #fff;
-}
-
-.adm-table-wrap {
+  padding: 24px 28px;
   overflow: auto;
-  border: 1px solid #c9bda8;
-  background: #fffdf7;
 }
 
+.adm-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.adm-top h2,
+.adm-h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--display-lg);
+  line-height: 1.15;
+}
+.adm-top .right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* The unmocked screens open with a heading and a line of context. Same rhythm as
+   .adm-top, one row down. */
+.adm-h1 {
+  margin-bottom: 4px;
+}
+.adm-lead {
+  color: var(--ink-muted);
+  margin-bottom: 20px;
+  max-width: 68ch;
+}
+.adm-main h2:not(.adm-top h2) {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--display-sm);
+  margin: 28px 0 12px;
+}
+
+/* ---------- tables ---------- */
+table.adm,
 .adm-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--body-sm);
+}
+table.adm th,
+.adm-table th {
+  font-size: var(--label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+table.adm td,
+.adm-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+table.adm tbody tr:nth-child(even),
+.adm-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--paper-sunk) 40%, var(--surface));
+}
+table.adm tbody tr,
+.adm-table tbody tr {
+  cursor: pointer;
+}
+table.adm tbody tr:hover,
+.adm-table tbody tr:hover {
+  background: var(--paper-sunk);
+}
+table.adm .num,
+.adm-table .num,
+.adm-money {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+table.adm th.num,
+.adm-table th.num {
+  text-align: right;
+}
+.adm .chip {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+.adm-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.adm-table-wrap table tbody tr:last-child td {
+  border-bottom: none;
 }
 
-.adm-table th,
-.adm-table td {
-  text-align: left;
-  padding: 0.4rem 0.55rem;
-  border-bottom: 1px solid #e4d9c4;
+.adm-link {
+  color: var(--brand-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+.adm-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- banners and flashes ---------- */
+.adm-banner,
+.adm-warn {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgb(156 84 8 / 0.12);
+  border: 1px solid var(--warn);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  color: var(--warn);
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+.adm-error {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: var(--brand-tint);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  color: var(--danger);
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+.adm-ok {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgb(43 117 66 / 0.12);
+  border: 1px solid var(--open);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  color: var(--open);
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+.adm-muted {
+  color: var(--ink-muted);
+}
+.adm-dead {
+  color: var(--ink-faint);
+}
+
+/* ---------- order detail ---------- */
+.adm-detail-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .adm-detail-grid {
+    grid-template-columns: 1.4fr 1fr;
+  }
+}
+.adm-panel,
+.adm-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 20px;
+  background: var(--surface);
+}
+.adm-panel h3,
+.adm-card h2,
+.adm-card h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--display-sm);
+  margin-bottom: 12px;
+}
+.adm-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.adm-line:last-child {
+  border-bottom: none;
+}
+.adm-line .mods {
+  display: block;
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+}
+.adm-line .num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.adm-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.adm-events li {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: var(--body-sm);
+}
+.adm-events .t {
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
   white-space: nowrap;
 }
 
-.adm-table th {
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
+/* ---------- reports ---------- */
+.kpis,
+.adm-cards {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 24px;
+}
+@media (min-width: 1024px) {
+  .kpis,
+  .adm-cards {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.kpi {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px 20px;
+}
+.kpi .lb {
+  font-size: var(--label);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #5c5346;
-  background: #f6efe1;
-  position: sticky;
-  top: 0;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.kpi .v {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--display-lg);
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
+}
+.kpi .d {
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
 }
 
-.adm-money {
-  font-family: var(--font-adm-mono), ui-monospace, monospace;
+/* A dashboard/report card built the legacy way still reads as a KPI tile. */
+.adm-cards .adm-card {
+  padding: 16px 20px;
+}
+.adm-cards .adm-card h2,
+.adm-cards .adm-card h3 {
+  font-family: var(--font-sans);
+  font-size: var(--label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+.adm-stat {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--display-lg);
   font-variant-numeric: tabular-nums;
 }
 
-.adm-badge {
-  display: inline-block;
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 0.1rem 0.35rem;
-  border: 1px solid currentColor;
+/* ---------- settings and devices ---------- */
+.toggle {
+  width: 44px;
+  height: 26px;
+  border-radius: var(--r-pill);
+  background: var(--line-strong);
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background var(--t-fast) var(--ease);
+  flex: none;
+}
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left var(--t-fast) var(--ease);
+}
+.toggle:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.toggle[aria-pressed="true"] {
+  background: var(--open);
+}
+.toggle[aria-pressed="true"]::after {
+  left: 21px;
 }
 
-.adm-badge-hot {
-  color: #9b1c1c;
-  background: #f8d9d4;
+.dev-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+.dev-card .nm {
+  font-weight: 600;
+}
+.dev-card .meta {
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+.dev-card .right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.adm-badge-ok {
-  color: #1d6b3a;
-  background: #d8f0e0;
-}
-
-.adm-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.adm-card {
-  background: #fffdf7;
-  border: 1px solid #c9bda8;
-  padding: 0.85rem 0.9rem;
-}
-
-.adm-card h2 {
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  margin: 0 0 0.4rem;
-  color: #5c5346;
-}
-
-.adm-stat {
-  font-family: var(--font-adm-mono), ui-monospace, monospace;
-  font-size: 1.6rem;
-  line-height: 1;
-}
-
-.adm-dead {
-  background: #9b1c1c;
-  color: #fff;
-  border-color: #6e1010;
-}
-
-.adm-dead h2 {
-  color: #ffd0c8;
-}
-
-.adm-error {
-  background: #f8d9d4;
-  border: 1px solid #9b1c1c;
-  color: #6e1010;
-  padding: 0.6rem 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.adm-ok {
-  background: #d8f0e0;
-  border: 1px solid #1d6b3a;
-  color: #14532d;
-  padding: 0.6rem 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.adm-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.65rem;
-  background: #fffdf7;
-  border: 1px solid #c9bda8;
-  padding: 0.9rem;
-  margin-bottom: 1rem;
-}
-
+/* ---------- forms ---------- */
+.adm-form,
 .adm-form-wide {
-  grid-column: 1 / -1;
+  display: grid;
+  gap: 16px;
+  max-width: 560px;
+  margin-bottom: 24px;
+}
+.adm-form-wide {
+  max-width: none;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.adm-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.adm-field {
+  display: block;
+  font-size: var(--label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.adm-field input,
+.adm-field select,
+.adm-field textarea,
+.adm-form input,
+.adm-form select,
+.adm-form textarea {
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 0 14px;
+  font-family: var(--font-sans);
+  font-size: var(--body);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+  background: var(--surface);
+}
+.adm-field textarea,
+.adm-form textarea {
+  height: auto;
+  min-height: 88px;
+  padding: 12px 14px;
+  resize: vertical;
+}
+.adm-field input[type="checkbox"],
+.adm-form input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brand);
+  display: inline-block;
+}
+.adm-field input::placeholder,
+.adm-form input::placeholder {
+  color: var(--ink-faint);
 }
 
-.adm-warn {
-  grid-column: 1 / -1;
-  background: #f7e3c4;
-  border: 1px solid #c45c12;
-  padding: 0.55rem 0.7rem;
-  font-size: 0.88rem;
+/* ---------- buttons ----------
+   The legacy .adm-btn names are the design's .btn, so a call site keeps working and
+   still renders the one button. */
+.adm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--body);
+  height: 36px;
+  padding: 0 16px;
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+.adm-btn:active {
+  transform: scale(0.98);
+}
+.adm-btn:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.adm-btn:hover {
+  background: var(--wash);
+}
+.adm-btn-ghost {
+  border-color: transparent;
+  color: var(--ink-muted);
+}
+.adm-btn-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.adm-btn-danger:hover {
+  background: var(--brand-tint);
+}
+.adm-btn-warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.adm-btn-warn:hover {
+  background: rgb(156 84 8 / 0.12);
+}
+/* The rail is paper-sunk now, not dark — the on-dark variant is the ghost button. */
+.adm-btn-onDark {
+  border-color: transparent;
+  color: var(--ink-muted);
 }
 
+/* ---------- badges ---------- */
+.adm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border-radius: var(--r-pill);
+  padding: 4px 10px;
+  background: var(--paper-sunk);
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+.adm-badge-hot {
+  background: rgb(156 84 8 / 0.12);
+  color: var(--warn);
+}
+.adm-badge-ok {
+  background: rgb(43 117 66 / 0.12);
+  color: var(--open);
+}
+
+/* A card reporting a state that needs attention takes the danger rule, not a new colour. */
+.adm-card.adm-dead {
+  border-color: var(--danger);
+}
+.adm-card.adm-dead .adm-stat {
+  color: var(--danger);
+}
+
+/* The chip inside a table cell is a link target; it must not pick up link decoration. */
+.adm-link .chip {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* ---------- confirm dialog ---------- */
 .adm-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(26, 20, 12, 0.55);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  z-index: 40;
+  z-index: var(--z-overlay);
+  background: rgb(36 22 17 / 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.adm-dialog,
+.confirm-dialog {
+  background: var(--surface);
+  width: 100%;
+  max-width: 440px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--ev-overlay);
+  padding: 28px;
+}
+.confirm-dialog .inner {
+  padding: 0;
+}
+.adm-dialog h2,
+.adm-dialog h3,
+.confirm-dialog h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--display-md);
+}
+.adm-dialog p,
+.confirm-dialog p {
+  color: var(--ink-muted);
+  margin: 12px 0 24px;
+}
+.adm-dialog p strong,
+.confirm-dialog p strong {
+  color: var(--ink);
+}
+.adm-dialog .row,
+.confirm-dialog .row,
+.adm-dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
 }
 
-.adm-dialog {
-  width: min(28rem, 100%);
-  background: #fffdf7;
-  border: 3px solid #9b1c1c;
-  padding: 1rem 1.1rem;
-}
-
-.adm-dialog h2 {
-  margin: 0 0 0.5rem;
-  font-family: var(--font-adm-display), Georgia, serif;
-}
-
+/* ---------- sign-in ----------
+   Not in the mockup. Built from the design's own parts: paper band, surface card,
+   the poster wordmark, the one field, the one button. */
 .adm-signin {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 1.25rem;
-  background:
-    repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(155, 28, 28, 0.05) 28px),
-    #efe6d4;
+  padding: 24px;
+  background: var(--paper);
 }
-
 .adm-signin-card {
-  width: min(26rem, 100%);
-  background: #fffdf7;
-  border: 3px solid #1a140c;
-  box-shadow: 8px 8px 0 #9b1c1c;
-  padding: 1.4rem 1.25rem 1.5rem;
+  width: min(420px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--ev-card);
+  padding: 32px 28px;
 }
-
-.adm-link {
-  color: #9b1c1c;
-  font-weight: 600;
+.adm-signin-card .wordmark {
+  font-family: var(--font-poster);
+  font-size: 1.5rem;
+  color: var(--brand-text);
+  text-transform: uppercase;
+  line-height: 1;
+  margin-bottom: 24px;
 }
-
-.adm-muted {
-  color: #5c5346;
-  font-size: 0.85rem;
-}
-
-@media (max-width: 800px) {
-  .adm-app {
-    grid-template-columns: 1fr;
-  }
-  .adm-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    border-right: 0;
-    border-bottom: 4px solid #9b1c1c;
-    gap: 0.25rem;
-  }
-  .adm-brand,
-  .adm-brand-sub {
-    width: 100%;
-  }
-  .adm-nav-user {
-    margin-top: 0;
-    width: 100%;
-  }
-}
-
-/* SPRINT-17: loading skeletons (design.md §12) and the sign-out button on the dark nav.
-   These stay in the admin palette because admin.css is not retokenised until Sprint 15. */
-.adm-skel {
+.adm-signin-card .wordmark small {
   display: block;
-  background: #ded2ba;
-  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+.adm-signin-card h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--display-md);
+  margin-bottom: 8px;
+}
+.adm-signin-card p {
+  color: var(--ink-muted);
+  margin-bottom: 20px;
+}
+.adm-signin-card .adm-btn {
+  width: 100%;
+  height: 44px;
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  font-size: var(--display-sm);
+}
+.adm-signin-card .adm-btn:hover {
+  background: var(--brand-hover);
 }
 
-.adm-nav .adm-skel {
-  background: #3a2f22;
-}
-
+/* ---------- skeletons ---------- */
+.adm-skel,
+.adm-skel-block,
 .adm-skel-navrow {
-  display: block;
-  padding: 0.45rem 0.55rem;
+  background: var(--paper-sunk);
+  border-radius: var(--r-sm);
 }
-
 .adm-skel-block {
-  height: 18rem;
-  background: #f6efe1;
-  border: 1px solid #c9bda8;
+  height: 44px;
+  margin-bottom: 12px;
+  border-radius: var(--r-md);
 }
-
-.adm-btn-onDark {
-  margin-top: 0.6rem;
-  color: #f3ead8;
-  border-color: #f3ead8;
+.adm-skel-navrow {
+  height: 20px;
+  margin: 12px 20px;
 }
-
 @media (prefers-reduced-motion: no-preference) {
   .adm-skel,
-  .adm-skel-block {
-    animation: adm-skel-pulse 1.4s ease-in-out infinite;
+  .adm-skel-block,
+  .adm-skel-navrow {
+    animation: adm-skel-pulse 1.6s var(--ease) infinite;
   }
   @keyframes adm-skel-pulse {
     0%,

@@ -1,7 +1,11 @@
-// SPRINT-6: kitchen display PWA — PIN pad, order board, poll, alerts, offline retain.
+// Kitchen display PWA — PIN pad, order board, poll, alerts, offline retain.
+// Design v1.1: the board is one auto-filling grid of cards on the dark KDS surface, each card
+// carrying the ticket chip, the printed elapsed time, full-weight modifiers and its own next
+// action. The queue, the transitions, the escalation thresholds and the audio rules are
+// unchanged — only the presentation is the design's.
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KitchenQueueOrder, KitchenQueueResponse, KitchenStaffPublic } from "@harolds/types";
 import { KitchenErrorCode } from "@harolds/types";
 import {
@@ -58,6 +62,10 @@ export function KitchenApp() {
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The design draws an explicit audio-unlock panel over the board. Android will not play the
+  // chime until the page has been touched once, so the board says so rather than staying
+  // silently broken.
+  const [audioUnlocked, setAudioUnlocked] = useState(true);
   const prevIds = useRef<string[] | null>(null);
   const pollMs = queue?.pollIntervalMs ?? 3000;
   const screenMs = queue?.unackScreenMs ?? 60_000;
@@ -75,6 +83,10 @@ export function KitchenApp() {
     const ok = await unlockKitchenAudio();
     if (ok) writeAudioUnlocked();
   }, []);
+
+  useEffect(() => {
+    setAudioUnlocked(readAudioUnlocked());
+  }, [view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,7 +289,10 @@ export function KitchenApp() {
   if (view === "boot") {
     return (
       <div className="kds-signin">
-        <p className="kds-kicker">Harold&apos;s Oak Lawn</p>
+        <div className="kds-signin-card">
+          <p className="kds-kicker">Harold&apos;s Oak Lawn</p>
+          <h1 className="kds-title">Kitchen</h1>
+        </div>
       </div>
     );
   }
@@ -294,7 +309,7 @@ export function KitchenApp() {
               <button
                 key={s.id}
                 type="button"
-                data-selected={selectedUserId === s.id}
+                aria-pressed={selectedUserId === s.id}
                 onPointerDown={() => void unlockAudio()}
                 onClick={() => {
                   setSelectedUserId(s.id);
@@ -341,25 +356,36 @@ export function KitchenApp() {
     );
   }
 
-  const start = queue?.orders.filter((o) => o.status === "PAID" || o.status === "PRINTED") ?? [];
-  const cooking = queue?.orders.filter((o) => o.status === "IN_PROGRESS") ?? [];
-  const ready = queue?.orders.filter((o) => o.status === "READY") ?? [];
+  // Design v1.1 draws the board as ONE auto-filling grid of cards, ordered by age, each card
+  // carrying its own next action — not as status columns. The queue, the transitions and the
+  // escalation rules are unchanged; only the arrangement is the design's.
+  const orders = queue?.orders ?? [];
+
+  const clock = new Date(nowMs).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 
   return (
     <div className="kds-app">
-      {degraded ? <div className="kds-stale-banner">Connection lost — showing last tickets</div> : null}
-      <header className="kds-header">
-        <div className="kds-brand">Expo</div>
-        <div className="kds-health" data-stuck={health.stuck}>
+      <div className={degraded ? "kds-offline on" : "kds-offline"}>
+        Connection lost · showing the tickets we already have — new orders appear when it&apos;s
+        back.
+      </div>
+
+      <div className="kds-top">
+        <span className="wm">Harold&apos;s — Kitchen</span>
+        <span className="net" data-degraded={degraded}>
+          <span className="dot" aria-hidden="true" />
+          {degraded ? "Offline" : "Connected"}
+        </span>
+        <span className="health" data-stuck={health.stuck}>
           {health.text}
-        </div>
-        <div className="kds-conn" data-degraded={degraded}>
-          {degraded ? "DEGRADED" : "LIVE"}
-        </div>
-        <div className="kds-who">{staffName}</div>
+        </span>
+        <span className="who">{staffName}</span>
         <button
           type="button"
-          className="kds-btn"
+          className="kds-topbtn"
           onClick={async () => {
             if (token) {
               try {
@@ -373,64 +399,72 @@ export function KitchenApp() {
         >
           Sign out
         </button>
-      </header>
-      <div className="kds-board">
-        <Column title="Start" orders={start} empty="Nothing waiting">
-          {(order) => (
-            <Ticket
-              key={order.id}
-              order={order}
-              nowMs={nowMs}
-              screenMs={screenMs}
-              soundMs={soundMs}
-              isNew={newIds.has(order.id)}
-              busy={busyId === order.id}
-              onAdvance={() => void advance(order)}
-              onCancel={() => setCancelId(order.id)}
-            />
-          )}
-        </Column>
-        <Column title="Cooking" orders={cooking} empty="Nothing on the board">
-          {(order) => (
-            <Ticket
-              key={order.id}
-              order={order}
-              nowMs={nowMs}
-              screenMs={screenMs}
-              soundMs={soundMs}
-              isNew={newIds.has(order.id)}
-              busy={busyId === order.id}
-              onAdvance={() => void advance(order)}
-              onCancel={() => setCancelId(order.id)}
-            />
-          )}
-        </Column>
-        <Column title="Pickup" orders={ready} empty="No bags waiting">
-          {(order) => (
-            <Ticket
-              key={order.id}
-              order={order}
-              nowMs={nowMs}
-              screenMs={screenMs}
-              soundMs={soundMs}
-              isNew={newIds.has(order.id)}
-              busy={busyId === order.id}
-              onAdvance={() => void advance(order)}
-            />
-          )}
-        </Column>
+        <span className="clock">{clock}</span>
       </div>
+
+      <div className="kds-grid">
+        {orders.length === 0 ? (
+          <p className="kds-empty">Nothing on the board.</p>
+        ) : (
+          orders.map((order) => (
+            <Ticket
+              key={order.id}
+              order={order}
+              nowMs={nowMs}
+              screenMs={screenMs}
+              soundMs={soundMs}
+              isNew={newIds.has(order.id)}
+              busy={busyId === order.id}
+              onAdvance={() => void advance(order)}
+              onCancel={order.status === "READY" ? undefined : () => setCancelId(order.id)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* The chime cannot play until the board has been touched once. Until then the board says
+          so, in its own words, rather than staying silently broken. */}
+      <div className={audioUnlocked ? "kds-unlock" : "kds-unlock on"}>
+        <div className="panel">
+          <h3>Turn the sound on</h3>
+          <p>
+            Android needs one tap before the new-order chime can play. This board stays silent
+            until then.
+          </p>
+          <button
+            type="button"
+            className="kbtn kbtn-ready"
+            style={{ maxWidth: 320, margin: "0 auto" }}
+            onClick={async () => {
+              await unlockAudio();
+              setAudioUnlocked(readAudioUnlocked());
+            }}
+          >
+            Enable the chime
+          </button>
+        </div>
+      </div>
+
       {cancelId ? (
         <div className="kds-confirm">
           <div className="kds-confirm-card">
             <p className="kds-kicker">Cancel order</p>
-            <p className="kds-sub">This cannot be undone from the kitchen display.</p>
+            <h3 className="kds-title" style={{ fontSize: "var(--display-lg)" }}>
+              Cancel this order?
+            </h3>
+            <p className="kds-sub" style={{ marginBottom: 0 }}>
+              This cannot be undone from the kitchen display.
+            </p>
             <div className="kds-actions">
-              <button type="button" className="kds-go" onClick={() => void confirmCancel()}>
-                Cancel order
+              <button type="button" className="kbtn kbtn-picked" onClick={() => setCancelId(null)}>
+                Keep it
               </button>
-              <button type="button" className="kds-cancel" onClick={() => setCancelId(null)}>
-                Back
+              <button
+                type="button"
+                className="kbtn kbtn-ready"
+                onClick={() => void confirmCancel()}
+              >
+                Cancel the order
               </button>
             </div>
           </div>
@@ -440,25 +474,16 @@ export function KitchenApp() {
   );
 }
 
-function Column({
-  title,
-  orders,
-  empty,
-  children,
-}: {
-  title: string;
-  orders: KitchenQueueOrder[];
-  empty: string;
-  children: (order: KitchenQueueOrder) => ReactNode;
-}) {
-  return (
-    <section className="kds-col">
-      <h2>
-        {title} · {orders.length}
-      </h2>
-      {orders.length === 0 ? <p className="kds-empty">{empty}</p> : orders.map(children)}
-    </section>
-  );
+/** The action button's shape follows the status, exactly as the design draws the three states. */
+function actionClass(status: string): string {
+  switch (status) {
+    case "IN_PROGRESS":
+      return "kbtn kbtn-ready";
+    case "READY":
+      return "kbtn kbtn-picked";
+    default:
+      return "kbtn kbtn-start";
+  }
 }
 
 function Ticket({
@@ -489,55 +514,76 @@ function Ticket({
   });
   const action = nextActionLabel(order.status);
   const cls = [
-    "kds-card",
-    isNew ? "kds-card--new" : "",
-    level === "screen" ? "kds-card--screen" : "",
-    level === "sound" ? "kds-card--sound" : "",
+    "kcard",
+    isNew ? "kcard--new" : "",
+    level === "screen" ? "age-warn" : "",
+    level === "sound" ? "age-late" : "",
   ]
     .filter(Boolean)
     .join(" ");
+
   return (
     <article className={cls}>
-      <div className="kds-card-top">
-        <div className="kds-num">{order.orderNumber ?? "—"}</div>
-        <div className="kds-elapsed">{formatElapsed(order.paidAt, nowMs)}</div>
+      <span className="agebar" aria-hidden="true" />
+
+      <div className="head">
+        <span className="chip">{order.orderNumber ?? "—"}</span>
+        <span className="elapsed">{formatElapsed(order.paidAt, nowMs)}</span>
       </div>
-      <div className="kds-name">
+
+      <p className="who">
         {order.customerFirstName} {order.customerLastInitial}.
-      </div>
-      {order.lines.map((line, i) => (
-        <div key={`${order.id}-${i}`}>
-          <p className="kds-line">
-            {line.quantity} × {line.boardLabel || line.itemName}
-          </p>
-          {line.selectedModifiers.length > 0 ? (
-            <ul className="kds-mods">
-              {line.selectedModifiers.map((m) => (
-                <li key={`${m.groupName}-${m.optionName}`}>
-                  {m.optionName}
-                  {m.groupName ? ` (${m.groupName})` : ""}
+      </p>
+
+      <div className="lines">
+        {order.lines.map((line, i) => (
+          <div className="kline" key={`${order.id}-${i}`}>
+            <p className="qn">
+              <span className="q">{line.quantity}×</span>
+              <span>{line.boardLabel || line.itemName}</span>
+            </p>
+            {line.selectedModifiers.length > 0 ? (
+              <ul className="mods">
+                <li>
+                  {line.selectedModifiers
+                    .map((m) => (m.groupName ? `${m.optionName} (${m.groupName})` : m.optionName))
+                    .join(" · ")}
                 </li>
-              ))}
-            </ul>
-          ) : null}
-          {line.customerNote ? <p className="kds-note">NOTE: {line.customerNote}</p> : null}
-        </div>
-      ))}
-      {order.customerNote ? <p className="kds-note">ORDER: {order.customerNote}</p> : null}
-      <div className="kds-actions">
-        {action ? (
-          <button type="button" className="kds-go" disabled={busy} onClick={onAdvance}>
-            {busy ? "…" : action}
-          </button>
-        ) : (
-          <span />
-        )}
-        {onCancel ? (
-          <button type="button" className="kds-cancel" disabled={busy} onClick={onCancel}>
-            Cancel
-          </button>
-        ) : null}
+              </ul>
+            ) : null}
+            {line.customerNote ? (
+              <div className="knote">
+                <span className="lb">Item note</span>
+                {line.customerNote}
+              </div>
+            ) : null}
+          </div>
+        ))}
       </div>
+
+      {order.customerNote ? (
+        <div className="knote">
+          <span className="lb">Customer note</span>
+          {order.customerNote}
+        </div>
+      ) : null}
+
+      {action ? (
+        <button
+          type="button"
+          className={actionClass(order.status)}
+          disabled={busy}
+          onClick={onAdvance}
+        >
+          {busy ? "…" : action}
+        </button>
+      ) : null}
+
+      {onCancel ? (
+        <button type="button" className="kbtn kbtn-cancel" disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+      ) : null}
     </article>
   );
 }

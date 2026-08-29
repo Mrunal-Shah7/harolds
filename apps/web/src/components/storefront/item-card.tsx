@@ -1,14 +1,14 @@
 "use client";
 
-// SPRINT-14: the item card (design.md §7.2), rebuilt to the specified anatomy.
+// Design v1.1 — the product card. A surface card whose 4:3 frame carries either the photograph
+// or the paper-sunk initial tile, then name, two-line description, modifier hint, and a foot
+// holding the price in ink beside the secondary "Add +".
 //
 // The two reused slots are the substance of the adaptation from the reference site:
-//   - the badge slot carries SOLD OUT, not a dietary marker;
+//   - the corner badge carries SOLD OUT (or NEW), not a dietary marker;
 //   - the third line carries a MODIFIER HINT, not a calorie count.
 // Those are the facts our items actually hold.
 import type { MenuItemSummary, MenuItemWithModifiers } from "@harolds/types";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { MenuImage } from "@/components/storefront/menu-image";
 import { formatCents } from "@/lib/money";
 
@@ -23,7 +23,7 @@ export function ItemCard({
   onOpen: (item: MenuItemSummary) => void;
   /**
    * Adds directly. Only wired when the item has NO required modifier groups — adding a default
-   * sauce silently is how the wrong food gets made (§7.2).
+   * sauce silently is how the wrong food gets made.
    */
   onQuickAdd?: (item: MenuItemSummary) => void;
   priority?: boolean;
@@ -31,79 +31,95 @@ export function ItemCard({
   const soldOut = item.isSoldOut;
   const hint = modifierHint(item);
 
-  const body = (
+  const frame = (
+    <div className="img">
+      <MenuImage
+        name={item.name}
+        derivatives={item.imageDerivatives}
+        imageUrl={item.imageUrl}
+        priority={priority}
+      />
+      {soldOut ? <span className="corner-badge">Sold out</span> : null}
+    </div>
+  );
+
+  const copy = (
     <>
-      <div className={soldOut ? "opacity-45" : undefined}>
-        <MenuImage
-          name={item.name}
-          derivatives={item.imageDerivatives}
-          imageUrl={item.imageUrl}
-          priority={priority}
-        />
-      </div>
-
-      <div className="mt-3 flex items-start justify-between gap-3">
-        <h3 className="t-display-md text-ink">{item.name}</h3>
-        {soldOut ? <Badge variant="soldOut">Sold out</Badge> : null}
-      </div>
-
-      {item.description ? (
-        <p className="t-body mt-1 line-clamp-2 text-ink-muted">{item.description}</p>
-      ) : null}
-
-      {hint ? <p className="t-body-sm mt-1 text-ink-faint">{hint}</p> : null}
+      <h3>{item.name}</h3>
+      {item.description ? <p className="desc">{item.description}</p> : null}
+      {hint ? <p className="hint">{hint}</p> : null}
     </>
   );
 
   if (soldOut) {
-    // §7.2: not tappable, but it stays in the grid — someone looking for a thing that isn't
-    // there should find out rather than wonder.
+    // Not tappable, but it stays in the grid — someone looking for a thing that isn't there
+    // should find out rather than wonder.
     return (
-      <div className="rounded-md border border-line bg-surface p-4 shadow-card md:p-5">
-        {body}
-        <div className="mt-4 flex items-center justify-between">
-          <p className="t-display-sm t-nums text-ink">{formatCents(item.basePriceCents)}</p>
-          <span className="t-body font-semibold text-ink-faint">Unavailable</span>
+      <div className="pcard card soldout">
+        {frame}
+        <div className="body">
+          {copy}
+          <div className="foot">
+            <span className="price">{formatCents(item.basePriceCents)}</span>
+            <span className="unavail">Unavailable</span>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    // The outer element is VISUAL ONLY — no click handler. §7.2's "whole card is the tap
-    // target" is satisfied by the button below, which wraps the image, name and description and
-    // is reachable by pointer and keyboard alike. A click handler on the div would be dead to
-    // the keyboard and would double-fire on every mouse click as the button's event bubbles.
-    <div className="motion-base group rounded-md border border-line bg-surface p-4 shadow-card transition-shadow hover:-translate-y-0.5 hover:shadow-raised md:p-5">
+    // The outer element is VISUAL ONLY — no click handler. "The whole card is the tap target"
+    // is satisfied by the button below, which wraps the image, name and description and is
+    // reachable by pointer and keyboard alike. A click handler on the div would be dead to the
+    // keyboard and would double-fire on every mouse click as the button's event bubbles.
+    <div className="pcard card">
       <button
         type="button"
         onClick={() => onOpen(item)}
-        className="block w-full text-left"
+        style={{ display: "block", width: "100%", textAlign: "left", padding: 0 }}
         aria-label={`${item.name}, ${formatCents(item.basePriceCents)}. Open item options`}
       >
-        {body}
+        {frame}
       </button>
 
-      <div className="mt-4 flex items-center justify-between">
-        <p className="t-display-sm t-nums text-ink">{formatCents(item.basePriceCents)}</p>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            if (onQuickAdd) onQuickAdd(item);
-            else onOpen(item);
+      <div className="body">
+        <button
+          type="button"
+          onClick={() => onOpen(item)}
+          style={{
+            display: "block",
+            width: "100%",
+            textAlign: "left",
+            padding: 0,
+            font: "inherit",
+            color: "inherit",
           }}
-          aria-label={onQuickAdd ? `Add ${item.name} to cart` : `Choose options for ${item.name}`}
         >
-          Add +
-        </Button>
+          {copy}
+        </button>
+
+        <div className="foot">
+          <span className="price">{formatCents(item.basePriceCents)}</span>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              if (onQuickAdd) onQuickAdd(item);
+              else onOpen(item);
+            }}
+            aria-label={onQuickAdd ? `Add ${item.name} to cart` : `Choose options for ${item.name}`}
+          >
+            Add +
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
 /**
- * §7.2 third line — the slot the reference site spends on a calorie count. The full-menu payload
+ * The third line — the slot the reference site spends on a calorie count. The full-menu payload
  * nests `modifierGroups` on each item (MenuItemWithModifiers), so the hint is real data, not a
  * guess, and no contract field was added for it.
  */
@@ -114,7 +130,7 @@ function modifierHint(item: MenuItemSummary): string | null {
   return required ? required.prompt : "Choose your options";
 }
 
-/** §7.2: direct add is permitted only when nothing is required. Exported for the menu page. */
+/** Direct add is permitted only when nothing is required. Exported for the menu page. */
 export function hasRequiredGroups(item: MenuItemSummary): boolean {
   const groups = (item as MenuItemWithModifiers).modifierGroups;
   return Boolean(groups?.some((g) => g.isRequired));

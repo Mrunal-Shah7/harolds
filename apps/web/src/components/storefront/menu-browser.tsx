@@ -1,6 +1,8 @@
 "use client";
 
-// SPRINT-14: the menu browser (design.md §9.2, §7.3).
+// Design v1.1 — the menu. Sticky tabs on a surface band, a paper intro band, one section per
+// category, and a roast band at the foot carrying the review-your-order call to action.
+//
 // Scroll-spy sets the active tab; tapping a tab scrolls to the section WITH THE STICKY OFFSET
 // ACCOUNTED FOR, so the section header is never hidden under the tab bar.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -14,7 +16,7 @@ import { ItemModal } from "@/components/storefront/item-modal";
 import { CartSheet } from "@/components/storefront/cart-sheet";
 import { CartBar } from "@/components/storefront/cart-bar";
 import { CartAnnouncer } from "@/components/storefront/cart-announcer";
-import { EmptyState, ErrorState, ItemCardSkeleton } from "@/components/ui/feedback";
+import { EmptyState, ErrorState } from "@/components/ui/feedback";
 import { useCart } from "@/lib/cart-context";
 
 import {
@@ -26,7 +28,7 @@ import {
 } from "@/components/storefront/sticky-metrics";
 
 export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: StoreStatus | null }) {
-  const { addLine } = useCart();
+  const { addLine, totalItems } = useCart();
   const [selected, setSelected] = useState<MenuItemSummary | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -75,28 +77,24 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
 
   if (!menu || !status) {
     return (
-      <div className="min-h-dvh">
+      <div className="sf-page">
         <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} />
-        {/* §12 Loading/Error share the same box so nothing shifts between them. */}
-        <div className="mx-auto max-w-[1200px] px-4 py-10">
+        <main>
           <ErrorState
             message="We couldn't load the menu. Try again."
             onRetry={() => window.location.reload()}
           />
-          <div className="sr-only">
-            <ItemCardSkeleton />
-          </div>
-        </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh pb-24 md:pb-0">
+    <div className="sf-page">
       <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} />
       <AnnouncementStrip announcement={status.announcement} />
 
-      <main className="mx-auto max-w-[1200px] px-4">
+      <main>
         <CategoryTabs
           categories={categories.map((c) => ({ id: c.id, name: c.name }))}
           activeId={activeId}
@@ -105,37 +103,58 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
           topDesktop={TABS_TOP_DESKTOP}
         />
 
+        <div className="band b-paper textured" style={{ paddingTop: 32, paddingBottom: 24 }}>
+          <div className="container">
+            <h2 className="poster">Our menu</h2>
+            <p style={{ color: "var(--ink-muted)", marginTop: 8 }}>
+              Every dinner comes with fries under, sauce over, and white bread on top — unless you
+              say otherwise.
+            </p>
+          </div>
+        </div>
+
         {categories.length === 0 ? (
           <EmptyState message="The menu isn't available right now. Please check back soon." />
         ) : (
-          categories.map((category) => (
+          categories.map((category, index) => (
             <section
               key={category.id}
               id={`cat-${category.id}`}
               ref={(el) => {
                 sectionRefs.current[category.id] = el;
               }}
-              className="py-10 md:py-16"
+              className="menu-section"
+              style={index === categories.length - 1 ? { paddingBottom: 48 } : undefined}
             >
-              <h2 className="t-display-lg text-ink">{category.name}</h2>
-              {category.description ? (
-                <p className="t-body mt-1 text-ink-muted">{category.description}</p>
-              ) : null}
+              <div className="container">
+                <h2>{category.name}</h2>
+                {category.description ? <p className="sub">{category.description}</p> : null}
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 md:gap-5 lg:grid-cols-3">
-                {category.items.map((item, i) => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    priority={i === 0 && category.id === categories[0]?.id}
-                    onOpen={setSelected}
-                    onQuickAdd={hasRequiredGroups(item) ? undefined : quickAdd}
-                  />
-                ))}
+                <div className="grid-products">
+                  {category.items.map((item, i) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      priority={i === 0 && category.id === categories[0]?.id}
+                      onOpen={setSelected}
+                      onQuickAdd={hasRequiredGroups(item) ? undefined : quickAdd}
+                    />
+                  ))}
+                </div>
               </div>
             </section>
           ))
         )}
+
+        <section className="band b-roast" style={{ padding: "48px 0" }}>
+          <div className="container" style={{ textAlign: "center" }}>
+            <button type="button" className="btn btn-poster" onClick={() => setCartOpen(true)}>
+              {totalItems > 0
+                ? `Review your order · ${totalItems} ${totalItems === 1 ? "item" : "items"}`
+                : "Review your order"}
+            </button>
+          </div>
+        </section>
       </main>
 
       <StorefrontFooter status={status} />

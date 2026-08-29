@@ -1,6 +1,12 @@
 "use client";
 
-// SPRINT-14: home (design.md §9.1). Hero, category rail, most-ordered, footer.
+// Design v1.1 — home. Band rhythm: paper hero, sunk category rail, paper most-ordered,
+// roast call to action, roast footer. At least one roast band per page.
+//
+// The hero is three stacked poster lines with ONE brand-red accent line — red is spent once,
+// in type, rather than on a component. No carousel: the reference site's rotating hero is
+// backed by a promotions system that does not exist here, and a carousel of one slide — or of
+// slides that lie — is worse than a headline.
 import { useState } from "react";
 import Link from "next/link";
 import type { FullMenu, MenuItemSummary, StoreStatus } from "@harolds/types";
@@ -14,7 +20,6 @@ import { CartSheet } from "@/components/storefront/cart-sheet";
 import { CartBar } from "@/components/storefront/cart-bar";
 import { CartAnnouncer } from "@/components/storefront/cart-announcer";
 import { ErrorState } from "@/components/ui/feedback";
-import { Button } from "@/components/ui/button";
 import { storeStatusLabel } from "@/components/storefront/store-status-pill";
 import { useCart } from "@/lib/cart-context";
 
@@ -31,20 +36,23 @@ export function HomeView({
   const [selected, setSelected] = useState<MenuItemSummary | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
 
-  // §12 Error: what failed, in plain words, plus a retry that retries. No status codes.
+  // Error: what failed, in plain words, plus a retry that retries. No status codes.
   if (!menu || !status) {
     return (
-      <div className="min-h-dvh">
+      <div className="sf-page">
         <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} />
-        <ErrorState
-          message="We couldn't load the menu. Try again."
-          onRetry={() => window.location.reload()}
-        />
+        <main>
+          <ErrorState
+            message="We couldn't load the menu. Try again."
+            onRetry={() => window.location.reload()}
+          />
+        </main>
       </div>
     );
   }
 
   const categories = menu.categories.filter((c) => c.items.length > 0);
+  const itemCount = categories.reduce((n, c) => n + c.items.length, 0);
   const closed = !status.isOpen || !status.acceptingOrders;
   const { label: statusLabel } = storeStatusLabel(status);
 
@@ -59,71 +67,93 @@ export function HomeView({
   };
 
   return (
-    <div className="min-h-dvh pb-24 md:pb-0">
+    <div className="sf-page">
       <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} />
       <AnnouncementStrip announcement={status.announcement} />
 
-      <main className="mx-auto max-w-[1200px] px-4">
-        {/* §9.1 static hero. */}
-        <section className="grid items-center gap-6 py-10 md:grid-cols-2 md:gap-10 md:py-16">
-          <div className="order-2 md:order-1">
-            <h1 className="t-display-xl text-ink">
-              Order pickup
-              <br />
-              from Oak Lawn
-            </h1>
-            <p className="t-body-lg mt-3 text-ink-muted">
-              Ready in about {status.prepMinutes} minutes.
+      <main>
+        <section className="band b-paper textured hero">
+          <div className="container">
+            <p className="eyebrow">
+              {status.city}, {status.state} · Pickup only
             </p>
-            <div className="mt-6">
-              <Link href="/menu">
-                <Button size="lg">See the menu</Button>
-              </Link>
+            <h1 style={{ marginTop: 12 }}>
+              Fries under.
+              <br />
+              Sauce over.
+              <br />
+              <span className="accent">Fifty years loud.</span>
+            </h1>
+            <p>
+              Fried to order, the way the South Side has eaten it — order ahead, skip the line,
+              pick it up hot.
+            </p>
+            <Link href="/menu" className="btn btn-primary btn-lg">
+              Order pickup
+            </Link>
+            <div className="hero-meta">
+              <span className="badge badge-neutral">Guest checkout</span>
+              <span className="badge badge-neutral">Paid online</span>
+              <span className="badge badge-neutral">Card · Apple Pay · Google Pay · Cash App</span>
             </div>
-            {/* §9.1: browsing stays available when closed; only checkout is blocked, and it is
-                blocked at the point of blocking with an explanation. */}
-            {closed ? <p className="t-body mt-3 text-danger">{statusLabel}</p> : null}
-          </div>
-
-          <div className="order-1 rounded-lg bg-paper-sunk md:order-2">
-            <div
-              className="flex aspect-[4/3] w-full items-center justify-center"
-              aria-hidden="true"
-            >
-              <span className="t-display-lg text-ink-faint opacity-40">Harold&apos;s</span>
-            </div>
+            {/* Browsing stays available when closed; only checkout is blocked, and it is blocked
+                at the point of blocking with an explanation. */}
+            {closed ? (
+              <p style={{ marginTop: 20, color: "var(--danger)" }}>{statusLabel}</p>
+            ) : null}
           </div>
         </section>
 
         {categories.length > 0 ? (
-          <section className="py-10 md:py-16">
-            <div className="mb-5 flex items-baseline justify-between gap-4">
-              <h2 className="t-display-lg text-ink">Our menu</h2>
-              <Link href="/menu" className="t-body font-semibold text-brand underline-offset-4 hover:underline">
-                See all
-              </Link>
+          <section
+            className="band b-sunk textured"
+            style={{ paddingTop: 40, paddingBottom: 40 }}
+          >
+            <div className="container">
+              <p className="eyebrow" style={{ marginBottom: 16 }}>
+                Straight to a section
+              </p>
+              <CategoryRail categories={categories.map((c) => ({ id: c.id, name: c.name }))} />
             </div>
-            <CategoryRail categories={categories.map((c) => ({ id: c.id, name: c.name }))} />
           </section>
         ) : null}
 
-        {/* §9.1: hidden ENTIRELY when the curated list is empty. */}
+        {/* Hidden ENTIRELY when the curated list is empty. */}
         {mostOrdered.length > 0 ? (
-          <section className="py-10 md:py-16">
-            <h2 className="t-display-lg mb-5 text-ink">Most ordered</h2>
-            <div className="grid gap-3 sm:grid-cols-2 md:gap-5 lg:grid-cols-3">
-              {mostOrdered.map((item, i) => (
-                <ItemCard
-                  key={item.id}
-                  item={item}
-                  priority={i === 0}
-                  onOpen={setSelected}
-                  onQuickAdd={hasRequiredGroups(item) ? undefined : quickAdd}
-                />
-              ))}
+          <section className="band b-paper textured">
+            <div className="container">
+              <h2 className="poster">Most ordered</h2>
+              <p style={{ color: "var(--ink-muted)", marginTop: 8 }}>
+                What the neighborhood keeps coming back for.
+              </p>
+              <div className="grid-products">
+                {mostOrdered.map((item, i) => (
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    priority={i === 0}
+                    onOpen={setSelected}
+                    onQuickAdd={hasRequiredGroups(item) ? undefined : quickAdd}
+                  />
+                ))}
+              </div>
             </div>
           </section>
         ) : null}
+
+        <section className="band b-roast">
+          <div className="container" style={{ textAlign: "center" }}>
+            <p className="eyebrow">
+              {itemCount} items · priced off the board
+            </p>
+            <h2 className="poster" style={{ margin: "12px 0 32px" }}>
+              The whole board is here
+            </h2>
+            <Link href="/menu" className="btn btn-poster">
+              See the full menu
+            </Link>
+          </div>
+        </section>
       </main>
 
       <StorefrontFooter status={status} />

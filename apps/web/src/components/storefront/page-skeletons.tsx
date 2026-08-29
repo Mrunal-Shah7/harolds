@@ -1,90 +1,102 @@
-// SPRINT-17: storefront route-level skeletons (design.md §12).
+// Storefront route-level skeletons.
 //
-// Home and menu are server components that await the menu and store-status fetches, so before
-// this there was no loading state at all — the route simply did not render. These are consumed by
+// Home and menu are server components that await the menu and store-status fetches, so without
+// these there is no loading state at all — the route simply does not render. They are consumed by
 // Next `loading.tsx` files, which stream the skeleton immediately and swap in the page when the
 // data lands.
 //
-// §16.7: a skeleton's dimensions must match the loaded content. Each block below mirrors the real
-// component it stands in for — the header's 64/72 height and its sub-row, the hero's 4:3 panel,
-// the category rail's 96px tiles, the item grid's breakpoints — so nothing shifts on arrival.
-import { ItemCardSkeleton, Skeleton } from "@/components/ui/feedback";
+// A skeleton's dimensions must match the loaded content. Each block below mirrors the design v1.1
+// component it stands in for — the header's 64px row and its mobile sub-row, the hero's poster
+// lines, the category rail's 88px circles, the product grid's breakpoints — so nothing shifts on
+// arrival. Every block is a `.skel` on sunk paper; no new shapes are introduced here.
+import { ItemCardSkeleton } from "@/components/ui/feedback";
+
+function Bar({ style }: { style?: React.CSSProperties }) {
+  return <div className="skel" style={style} aria-hidden="true" />;
+}
 
 /** The sticky header, at its real height. The wordmark is static so it renders for real. */
 function HeaderSkeleton() {
   return (
-    <header className="sticky top-0 z-sticky-header bg-surface">
-      <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between gap-4 px-4 md:h-18">
-        <span className="t-display-md shrink-0 text-brand">
-          <span className="uppercase tracking-[-0.02em]">Harold&apos;s</span>
-        </span>
-        <div className="hidden min-w-0 flex-1 justify-center md:flex">
-          <Skeleton className="h-11 w-64 rounded-pill" />
+    <header className="sf-header">
+      <div className="container">
+        <div className="wordmark">
+          Harold&apos;s<small>Chicken · Oak Lawn</small>
         </div>
-        <Skeleton className="hidden h-11 w-28 rounded-pill md:block" />
-        <Skeleton className="h-11 w-11 rounded-pill" />
+        <Bar style={{ height: 40, width: 240, borderRadius: 999 }} />
+        <Bar style={{ height: 44, width: 104, borderRadius: 999, marginLeft: "auto" }} />
+        <Bar style={{ height: 44, width: 110, borderRadius: 999 }} />
       </div>
-      <div className="flex items-center justify-center gap-2 px-4 pb-2 md:hidden">
-        <Skeleton className="h-11 w-56 rounded-pill" />
-        <Skeleton className="h-11 w-24 rounded-pill" />
+      <div className="subrow">
+        <Bar style={{ height: 36, width: 220, borderRadius: 999 }} />
       </div>
     </header>
   );
 }
 
-/** Matches StorefrontFooter's three-column grid. */
+/** Matches StorefrontFooter's roast band and its three columns. */
 function FooterSkeleton() {
   return (
-    <div className="mt-10 border-t border-line bg-paper-sunk md:mt-16">
-      <div className="mx-auto grid max-w-[1200px] gap-8 px-4 py-10 md:grid-cols-3 md:py-16">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i}>
-            <Skeleton className="mb-3 h-4 w-20" />
-            <Skeleton className="mb-2 h-[22px] w-full" />
-            <Skeleton className="h-[22px] w-2/3" />
-          </div>
-        ))}
+    <footer className="sf-footer">
+      <div className="band b-roast" style={{ paddingBottom: 48 }}>
+        <div className="container cols">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i}>
+              <Bar style={{ height: 16, width: 96, marginBottom: 12, opacity: 0.25 }} />
+              <Bar style={{ height: 22, marginBottom: 8, opacity: 0.25 }} />
+              <Bar style={{ height: 22, width: "66%", opacity: 0.25 }} />
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+      <div className="footer-deep">
+        <div className="container">
+          <span>Loading…</span>
+        </div>
+      </div>
+    </footer>
   );
 }
 
-/** design.md §9.1 — hero, category rail, most-ordered. */
+/** Home — hero, category rail, most-ordered, roast call to action. */
 export function HomeSkeleton() {
   return (
-    <div className="min-h-dvh pb-24 md:pb-0" role="status" aria-label="Loading the menu">
+    <div className="sf-page" role="status" aria-label="Loading the menu">
       <HeaderSkeleton />
-      <main className="mx-auto max-w-[1200px] px-4">
-        <section className="grid items-center gap-6 py-10 md:grid-cols-2 md:gap-10 md:py-16">
-          <div className="order-2 md:order-1">
-            <Skeleton className="h-[38px] w-4/5 md:h-[46px]" />
-            <Skeleton className="mt-2 h-[38px] w-3/5 md:h-[46px]" />
-            <Skeleton className="mt-3 h-[26px] w-1/2" />
-            <Skeleton className="mt-6 h-13 w-40 rounded-pill" />
-          </div>
-          <div className="order-1 md:order-2">
-            <Skeleton className="aspect-[4/3] w-full rounded-lg" />
-          </div>
-        </section>
-
-        <section className="py-10 md:py-16">
-          <Skeleton className="mb-5 h-[30px] w-48 md:h-[36px]" />
-          <div className="flex gap-3 overflow-hidden md:gap-5">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex w-24 shrink-0 flex-col items-center gap-2">
-                <Skeleton className="h-24 w-24 rounded-pill" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-            ))}
+      <main>
+        <section className="band b-paper textured">
+          <div className="container">
+            <Bar style={{ height: 16, width: 200, marginBottom: 20 }} />
+            <Bar style={{ height: 56, width: "70%", marginBottom: 10 }} />
+            <Bar style={{ height: 56, width: "55%", marginBottom: 10 }} />
+            <Bar style={{ height: 56, width: "62%" }} />
+            <Bar style={{ height: 26, width: "45%", margin: "24px 0 32px" }} />
+            <Bar style={{ height: 52, width: 200, borderRadius: 999 }} />
           </div>
         </section>
 
-        <section className="py-10 md:py-16">
-          <Skeleton className="mb-5 h-[30px] w-56 md:h-[36px]" />
-          <div className="grid gap-3 sm:grid-cols-2 md:gap-5 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <ItemCardSkeleton key={i} />
-            ))}
+        <section className="band b-sunk textured" style={{ paddingTop: 40, paddingBottom: 40 }}>
+          <div className="container">
+            <Bar style={{ height: 16, width: 180, marginBottom: 16 }} />
+            <div className="cat-rail">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="cat-tile">
+                  <Bar style={{ height: 88, width: 88, borderRadius: "50%", margin: "0 auto 10px" }} />
+                  <Bar style={{ height: 14, width: 64, margin: "0 auto" }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="band b-paper textured">
+          <div className="container">
+            <Bar style={{ height: 36, width: 280 }} />
+            <div className="grid-products">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <ItemCardSkeleton key={i} />
+              ))}
+            </div>
           </div>
         </section>
       </main>
@@ -93,27 +105,39 @@ export function HomeSkeleton() {
   );
 }
 
-/** design.md §9.2 — sticky tabs then one section per category. */
+/** Menu — sticky tabs then one section per category. */
 export function MenuSkeleton() {
   return (
-    <div className="min-h-dvh pb-24 md:pb-0" role="status" aria-label="Loading the menu">
+    <div className="sf-page" role="status" aria-label="Loading the menu">
       <HeaderSkeleton />
-      <main className="mx-auto max-w-[1200px] px-4">
-        <div className="-mx-4 border-b border-line px-4">
-          <div className="flex h-12 items-center gap-6 overflow-hidden">
+      <main>
+        <div className="sticky-tabs">
+          <div className="row">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-[22px] w-24 shrink-0" />
+              <div key={i} style={{ padding: "14px 16px" }}>
+                <Bar style={{ height: 22, width: 88 }} />
+              </div>
             ))}
           </div>
         </div>
+
+        <div className="band b-paper textured" style={{ paddingTop: 32, paddingBottom: 24 }}>
+          <div className="container">
+            <Bar style={{ height: 40, width: 260, marginBottom: 12 }} />
+            <Bar style={{ height: 22, width: "60%" }} />
+          </div>
+        </div>
+
         {Array.from({ length: 2 }).map((_, section) => (
-          <section key={section} className="py-10 md:py-16">
-            <Skeleton className="h-[30px] w-64 md:h-[36px]" />
-            <Skeleton className="mt-1 h-[22px] w-80" />
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 md:gap-5 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <ItemCardSkeleton key={i} />
-              ))}
+          <section key={section} className="menu-section">
+            <div className="container">
+              <Bar style={{ height: 30, width: 200, marginBottom: 8 }} />
+              <Bar style={{ height: 22, width: 320 }} />
+              <div className="grid-products">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <ItemCardSkeleton key={i} />
+                ))}
+              </div>
             </div>
           </section>
         ))}
@@ -123,57 +147,76 @@ export function MenuSkeleton() {
   );
 }
 
-/** design.md §9.3 — single column, max 560. */
+/** Checkout — the two-column grid, at its real shape. */
 export function CheckoutSkeleton() {
   return (
-    <div className="mx-auto min-h-dvh max-w-[560px] px-4 pb-16" role="status" aria-label="Loading checkout">
-      <div className="py-4">
-        <Skeleton className="h-[22px] w-20" />
-      </div>
-      <Skeleton className="mb-6 h-[30px] w-48 md:h-[36px]" />
-      <div className="mb-6 rounded-md border border-line bg-surface">
-        <div className="space-y-3 px-4 py-3">
-          <Skeleton className="h-[22px] w-3/4" />
-          <Skeleton className="h-[22px] w-2/3" />
-        </div>
-        <div className="space-y-2 border-t border-line bg-paper-sunk px-4 py-3">
-          <Skeleton className="h-[22px] w-full" />
-          <Skeleton className="h-[22px] w-full" />
-          <Skeleton className="h-[22px] w-full" />
-        </div>
-      </div>
-      <Skeleton className="mb-2 h-4 w-24" />
-      <div className="mb-6 flex flex-wrap gap-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-11 w-20 rounded-pill" />
-        ))}
-      </div>
-      <div className="mb-6 space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i}>
-            <Skeleton className="mb-1 h-4 w-28" />
-            <Skeleton className="h-11 w-full rounded-sm" />
+    <div className="sf-page" role="status" aria-label="Loading checkout">
+      <HeaderSkeleton />
+      <main>
+        <div className="band b-paper textured" style={{ paddingTop: 40 }}>
+          <div className="container">
+            <Bar style={{ height: 40, width: 240, marginBottom: 32 }} />
+            <div className="co-grid">
+              <div>
+                <div className="co-card card" style={{ marginBottom: 24 }}>
+                  <Bar style={{ height: 26, width: 200, marginBottom: 20 }} />
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} style={{ marginBottom: 16 }}>
+                      <Bar style={{ height: 14, width: 110, marginBottom: 6 }} />
+                      <Bar style={{ height: 44 }} />
+                    </div>
+                  ))}
+                </div>
+                <div className="co-card card">
+                  <Bar style={{ height: 26, width: 180, marginBottom: 16 }} />
+                  <div className="tips">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Bar key={i} style={{ height: 44, width: 84, borderRadius: 999 }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="co-card card">
+                <Bar style={{ height: 26, width: 160, marginBottom: 16 }} />
+                <Bar style={{ height: 22, marginBottom: 8 }} />
+                <Bar style={{ height: 22, width: "70%", marginBottom: 16 }} />
+                <div className="totals">
+                  <Bar style={{ height: 22, marginBottom: 10 }} />
+                  <Bar style={{ height: 22, marginBottom: 10 }} />
+                  <Bar style={{ height: 30 }} />
+                </div>
+                <Bar style={{ height: 52, borderRadius: 999, marginTop: 24 }} />
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
-      <Skeleton className="h-14 w-full rounded-sm" />
-      <Skeleton className="mt-6 h-13 w-full rounded-pill" />
+        </div>
+      </main>
     </div>
   );
 }
 
-/** design.md §9.4 — ticket chip, then the order. */
+/** Confirmation — the chip, the timeline, then the order. */
 export function OrderSkeleton() {
   return (
-    <div className="mx-auto min-h-dvh max-w-[560px] px-4 pb-16" role="status" aria-label="Loading your order">
-      <div className="flex flex-col items-center gap-4 py-10">
-        <Skeleton className="h-[46px] w-40 rounded-sm" />
-        <Skeleton className="h-[30px] w-64 md:h-[36px]" />
-        <Skeleton className="h-6 w-28 rounded-sm" />
-        <Skeleton className="h-[26px] w-48" />
-      </div>
-      <Skeleton className="mb-6 h-24 w-full rounded-md" />
-      <Skeleton className="h-64 w-full rounded-md" />
+    <div className="sf-page" role="status" aria-label="Loading your order">
+      <HeaderSkeleton />
+      <main>
+        <div className="band b-paper textured">
+          <div className="container confirm-wrap">
+            <Bar style={{ height: 16, width: 160, margin: "0 auto 16px" }} />
+            <Bar style={{ height: 44, width: 280, margin: "0 auto 32px" }} />
+            <Bar style={{ height: 60, width: 200, margin: "0 auto" }} />
+            <Bar style={{ height: 40, margin: "40px 0 8px" }} />
+            <Bar style={{ height: 26, width: "70%", margin: "24px auto 0" }} />
+          </div>
+        </div>
+        <div className="band b-paper" style={{ paddingTop: 0 }}>
+          <div className="container" style={{ maxWidth: 640 }}>
+            <Bar style={{ height: 240, borderRadius: "var(--r-md)" }} />
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

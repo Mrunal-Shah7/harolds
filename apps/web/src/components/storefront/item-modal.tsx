@@ -1,30 +1,28 @@
 "use client";
 
-// SPRINT-14: the item modal (design.md §7.6).
+// Design v1.1 — the item modal. A 4:3 frame, name and description, then one `.mgroup` per
+// modifier group with its rule stated under the heading, the kitchen note, and a sticky foot
+// carrying the quantity stepper beside the primary add button.
 //
 // Most menu items still have provisional or absent modifier bindings — accepted at cutover — so
 // the zero-group case is the COMMON case and is treated as a first-class layout, not a fallback.
 //
-// The footer price is computed in the browser and that is correct: §7.6 requires "Add to cart ·
-// $14.99 … updates live" from menu data. §7.7's prohibition is on the CART and CHECKOUT totals,
-// which must come from the server quote. The two are different figures with different sources.
+// The footer price is computed in the browser and that is correct: the modal's "Add to cart ·
+// $14.99" updates live from menu data. The prohibition is on the CART and CHECKOUT totals, which
+// must come from the server quote. The two are different figures with different sources.
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Plus } from "lucide-react";
 import type { MenuItemDetail, MenuItemSummary, MenuModifierGroup } from "@harolds/types";
 import { Dialog } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label, Textarea } from "@/components/ui/field";
-import { ErrorState, Skeleton } from "@/components/ui/feedback";
+import { ErrorState } from "@/components/ui/feedback";
 import { MenuImage } from "@/components/storefront/menu-image";
 import { formatCents } from "@/lib/money";
 import { useCart } from "@/lib/cart-context";
 import { getMenuItem } from "@/lib/storefront-api";
-import { cn } from "@/lib/utils";
 
-/** §7.6: every group states its rule in the header. */
+/** Every group states its rule under the heading. */
 function groupRule(group: MenuModifierGroup): string {
   if (!group.isRequired && group.minSelect === 0) {
-    return group.maxSelect === 1 ? "Optional" : `Optional · up to ${group.maxSelect}`;
+    return group.maxSelect === 1 ? "Optional" : `Optional · choose up to ${group.maxSelect}`;
   }
   return group.maxSelect === 1 ? "Choose 1" : `Choose up to ${group.maxSelect}`;
 }
@@ -37,8 +35,8 @@ export function ItemModal({ item, onClose }: { item: MenuItemSummary | null; onC
   const [quantity, setQuantity] = useState(1);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [note, setNote] = useState("");
-  // §7.6: the rule turns red only after a first attempt to submit, never on open. A form that is
-  // red before it has been touched teaches people to ignore red.
+  // The rule turns red only after a first attempt to submit, never on open. A form that is red
+  // before it has been touched teaches people to ignore red.
   const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
@@ -117,27 +115,24 @@ export function ItemModal({ item, onClose }: { item: MenuItemSummary | null; onC
     <Dialog open={Boolean(item)} onClose={onClose} labelledBy="item-modal-title">
       {!item ? null : (
         <>
-          <div className="flex-1 overflow-y-auto">
-            <div className="px-4 pb-5 pt-4 md:px-5">
-              <MenuImage
-                name={item.name}
-                derivatives={item.imageDerivatives}
-                imageUrl={item.imageUrl}
-                priority
-              />
-              <h2 id="item-modal-title" className="t-display-md mt-4 pr-12 text-ink">
-                {item.name}
-              </h2>
-              {item.description ? (
-                <p className="t-body mt-1 text-ink-muted">{item.description}</p>
-              ) : null}
-            </div>
+          <div className="img">
+            <MenuImage
+              name={item.name}
+              derivatives={item.imageDerivatives}
+              imageUrl={item.imageUrl}
+              priority
+            />
+          </div>
+
+          <div className="inner">
+            <h3 id="item-modal-title">{item.name}</h3>
+            {item.description ? <p className="desc">{item.description}</p> : null}
 
             {loading ? (
-              <div className="space-y-3 border-t border-line px-4 py-5 md:px-5">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
+              <div className="mgroup">
+                <div className="skel" style={{ height: 20, width: 120, marginBottom: 12 }} />
+                <div className="skel" style={{ height: 44, marginBottom: 8 }} />
+                <div className="skel" style={{ height: 44 }} />
               </div>
             ) : null}
 
@@ -145,135 +140,118 @@ export function ItemModal({ item, onClose }: { item: MenuItemSummary | null; onC
               <ErrorState message={loadError} onRetry={() => item && setDetail(null)} />
             ) : null}
 
-            {detail && !loading ? (
-              <div className="space-y-6 border-t border-line px-4 py-5 md:px-5">
-                {groups.map((group) => {
+            {detail && !loading
+              ? groups.map((group) => {
                   const unsatisfied =
                     group.isRequired && (selected[group.id]?.length ?? 0) < group.minSelect;
                   return (
-                    <fieldset key={group.id}>
-                      <legend className="mb-2 flex w-full items-baseline justify-between gap-3">
-                        <span className="t-label text-ink">{group.prompt}</span>
-                        <span
-                          className={cn(
-                            "t-body-sm",
-                            attempted && unsatisfied ? "text-danger" : "text-ink-muted",
-                          )}
-                        >
-                          {groupRule(group)}
-                        </span>
+                    <fieldset className="mgroup" key={group.id}>
+                      <legend>
+                        <h4>{group.prompt}</h4>
                       </legend>
+                      <p
+                        className="rule"
+                        style={
+                          attempted && unsatisfied ? { color: "var(--danger)" } : undefined
+                        }
+                      >
+                        {groupRule(group)}
+                      </p>
 
-                      <div className="space-y-2">
-                        {group.options.map((opt) => {
-                          const checked = (selected[group.id] ?? []).includes(opt.id);
-                          return (
-                            <label
-                              key={opt.id}
-                              className={cn(
-                                "flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-sm border px-3 py-2 motion-fast transition-colors",
-                                opt.isSoldOut
-                                  ? "cursor-not-allowed border-line bg-paper-sunk text-ink-faint"
-                                  : checked
-                                    ? "border-brand bg-brand-tint"
-                                    : "border-line-strong hover:bg-paper-sunk",
-                              )}
-                            >
-                              <span className="t-body flex items-center gap-3 text-ink">
-                                <input
-                                  type={group.maxSelect === 1 ? "radio" : "checkbox"}
-                                  name={group.id}
-                                  checked={checked}
-                                  disabled={opt.isSoldOut}
-                                  onChange={() => toggleOption(group, opt.id)}
-                                  className="h-4 w-4 accent-brand"
-                                />
-                                {opt.name}
-                                {opt.isSoldOut ? (
-                                  <span className="t-body-sm text-ink-faint">Sold out</span>
-                                ) : null}
+                      {group.options.map((opt) => {
+                        const checked = (selected[group.id] ?? []).includes(opt.id);
+                        return (
+                          <label
+                            key={opt.id}
+                            className={opt.isSoldOut ? "mrow disabled" : "mrow"}
+                          >
+                            <input
+                              type={group.maxSelect === 1 ? "radio" : "checkbox"}
+                              name={group.id}
+                              checked={checked}
+                              disabled={opt.isSoldOut}
+                              onChange={() => toggleOption(group, opt.id)}
+                            />
+                            <span className="nm">
+                              {opt.name}
+                              {opt.isSoldOut ? " · Sold out" : ""}
+                            </span>
+                            {/* Priced modifiers show their surcharge on the right. */}
+                            {opt.priceDeltaCents !== 0 ? (
+                              <span className="pr">
+                                {opt.priceDeltaCents > 0 ? "+" : ""}
+                                {formatCents(opt.priceDeltaCents)}
                               </span>
-                              {/* §7.6: priced modifiers show their surcharge on the right. */}
-                              {opt.priceDeltaCents !== 0 ? (
-                                <span className="t-body t-nums text-ink-muted">
-                                  {opt.priceDeltaCents > 0 ? "+" : ""}
-                                  {formatCents(opt.priceDeltaCents)}
-                                </span>
-                              ) : null}
-                            </label>
-                          );
-                        })}
-                      </div>
+                            ) : null}
+                          </label>
+                        );
+                      })}
                     </fieldset>
                   );
-                })}
+                })
+              : null}
 
-                <div>
-                  <Label htmlFor="item-note" className="mb-1">
-                    Special instructions
-                  </Label>
-                  <Textarea
-                    id="item-note"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value.slice(0, 200))}
-                    maxLength={200}
-                    rows={2}
-                    placeholder="Optional, for example extra crispy"
-                  />
-                </div>
+            {detail && !loading ? (
+              <div className="mgroup">
+                <h4>Note for the kitchen</h4>
+                <p className="rule">Optional</p>
+                <textarea
+                  id="item-note"
+                  className="note-field"
+                  aria-label="Note for the kitchen"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value.slice(0, 200))}
+                  maxLength={200}
+                  placeholder="Fried hard, salt &amp; pepper…"
+                />
               </div>
             ) : null}
           </div>
 
           {detail && !loading ? (
-            <div className="border-t border-line bg-surface px-4 py-4 md:px-5">
-              <div className="mb-3 flex items-center justify-center gap-4">
-                <StepperButton label="Decrease quantity" onClick={() => setQuantity((q) => Math.max(1, q - 1))}>
-                  <Minus className="h-4 w-4" aria-hidden="true" />
-                </StepperButton>
-                <span className="t-display-sm t-nums w-8 text-center text-ink">{quantity}</span>
-                <StepperButton label="Increase quantity" onClick={() => setQuantity((q) => Math.min(50, q + 1))}>
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                </StepperButton>
+            <div className="modal-foot">
+              <div className="qty" aria-label="Quantity">
+                <button
+                  type="button"
+                  aria-label="Decrease quantity"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                >
+                  −
+                </button>
+                <span className="n">{quantity}</span>
+                <button
+                  type="button"
+                  aria-label="Increase quantity"
+                  onClick={() => setQuantity((q) => Math.min(50, q + 1))}
+                >
+                  +
+                </button>
               </div>
-              <Button
-                size="lg"
-                className="w-full"
+              <button
+                type="button"
+                className="btn btn-primary"
                 disabled={attempted && missingRequired.length > 0}
                 onClick={handleAdd}
               >
                 Add to cart · {formatCents(unitPriceCents * quantity)}
-              </Button>
-              {attempted && firstMissing ? (
-                <p className="t-body-sm mt-2 text-center text-danger">
-                  {firstMissing.prompt}: {groupRule(firstMissing).toLowerCase()}.
-                </p>
-              ) : null}
+              </button>
             </div>
+          ) : null}
+
+          {attempted && firstMissing ? (
+            <p
+              style={{
+                padding: "0 24px 16px",
+                textAlign: "center",
+                fontSize: "var(--body-sm)",
+                color: "var(--danger)",
+              }}
+            >
+              {firstMissing.prompt}: {groupRule(firstMissing).toLowerCase()}.
+            </p>
           ) : null}
         </>
       )}
     </Dialog>
-  );
-}
-
-function StepperButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className="flex h-11 w-11 items-center justify-center rounded-pill border border-line-strong text-ink motion-fast transition-colors hover:bg-paper-sunk"
-    >
-      {children}
-    </button>
   );
 }

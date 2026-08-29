@@ -1,22 +1,10 @@
-// SPRINT-6: kitchen display route-group layout — PWA shell, expo typography, wake-friendly viewport.
+// Kitchen display route-group layout — PWA shell, wake-friendly viewport.
+// Design v1.1: all three surfaces share the same four self-hosted faces, loaded once on <html>
+// by the root layout. The KDS-only Google faces are gone — no external font origin is contacted
+// and the CSP is untouched.
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { Anton, IBM_Plex_Mono } from "next/font/google";
 import "./kitchen.css";
-
-const anton = Anton({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-kds-display",
-  display: "swap",
-});
-
-const plexMono = IBM_Plex_Mono({
-  weight: ["400", "600"],
-  subsets: ["latin"],
-  variable: "--font-kds-mono",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Kitchen — Harold's Chicken Oak Lawn",
@@ -35,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0a07",
+  themeColor: "#141110",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -47,10 +35,8 @@ export default function KitchenLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
-  // SPRINT-14: `kds` applies the §5.2 dark token scope at the route-group root, so a shared
-  // primitive rendered on the board can never resolve a light-surface token. The board's own
-  // presentation still comes from kitchen.css and is redesigned in Sprint 15.
-  return (
-    <div className={`kds kds-root ${anton.variable} ${plexMono.variable}`}>{children}</div>
-  );
+  // `kds` applies the dark token scope at the route-group root, so a shared primitive rendered
+  // on the board can never resolve a light-surface token. The board's own presentation comes
+  // from kitchen.css.
+  return <div className="kds kds-root">{children}</div>;
 }
