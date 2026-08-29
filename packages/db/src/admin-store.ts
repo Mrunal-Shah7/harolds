@@ -38,6 +38,11 @@ export type StoreConfigPatch = {
   defaultTipPresetIndex?: number;
   acceptingOrders?: boolean;
   notAcceptingMessage?: string | null;
+  closedMessage?: string | null;
+  prepEstimatePhrase?: string | null;
+  announcementText?: string | null;
+  announcementStartsAt?: string | Date | null;
+  announcementEndsAt?: string | Date | null;
   managerAlertPhone?: string | null;
   managerAlertEmail?: string | null;
 };
@@ -64,11 +69,36 @@ export async function updateStoreConfig(patch: StoreConfigPatch, actor: { userId
       throw new AdminValidationError("Tip presets must be non-negative integers in basis points.");
     }
   }
+  if (patch.announcementText !== undefined && patch.announcementText !== null) {
+    if (typeof patch.announcementText !== "string") {
+      throw new AdminValidationError("Announcement must be plain text.");
+    }
+    if (patch.announcementText.length > 280) {
+      throw new AdminValidationError("Announcement must be at most 280 characters.");
+    }
+  }
+  if (patch.closedMessage !== undefined && patch.closedMessage !== null && patch.closedMessage.length > 280) {
+    throw new AdminValidationError("Closed message must be at most 280 characters.");
+  }
+  if (patch.notAcceptingMessage !== undefined && patch.notAcceptingMessage !== null && patch.notAcceptingMessage.length > 280) {
+    throw new AdminValidationError("Paused message must be at most 280 characters.");
+  }
+  if (patch.prepEstimatePhrase !== undefined && patch.prepEstimatePhrase !== null && patch.prepEstimatePhrase.length > 120) {
+    throw new AdminValidationError("Prep estimate phrase must be at most 120 characters.");
+  }
+
+  const data: Record<string, unknown> = { ...patch };
+  if (typeof patch.announcementStartsAt === "string") {
+    data.announcementStartsAt = patch.announcementStartsAt ? new Date(patch.announcementStartsAt) : null;
+  }
+  if (typeof patch.announcementEndsAt === "string") {
+    data.announcementEndsAt = patch.announcementEndsAt ? new Date(patch.announcementEndsAt) : null;
+  }
 
   const before = await prisma.storeConfig.findUniqueOrThrow({ where: { id: "default" } });
   const row = await prisma.storeConfig.update({
     where: { id: "default" },
-    data: patch,
+    data: data as Parameters<typeof prisma.storeConfig.update>[0]["data"],
   });
   invalidateAllPublicCaches();
 
@@ -79,6 +109,10 @@ export async function updateStoreConfig(patch: StoreConfigPatch, actor: { userId
     entityType: "StoreConfig",
     entityId: "default",
     summary: `Updated store config: ${changed.join(", ") || "no-op"}`,
+    details: {
+      before: Object.fromEntries(changed.map((k) => [k, before[k as keyof typeof before]])),
+      after: Object.fromEntries(changed.map((k) => [k, (row as Record<string, unknown>)[k as string]])),
+    },
   });
   return row;
 }

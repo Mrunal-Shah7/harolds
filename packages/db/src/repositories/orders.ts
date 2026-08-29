@@ -1,7 +1,7 @@
 // SPRINT-4: order persistence — pending-order creation, payment-result transitions, and lookup.
 // Authoritative repricing (QuoteResult) plus checkout keys go in; a Prisma Order row comes out.
 // This file does NOT talk to Square — it only records outcomes the caller already determined.
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { QuoteResult, SelectedModifierSnapshot } from "@harolds/types";
 import { OrderStatus, PaymentStatus, PrintTarget, PrintJobStatus, JobType, JobStatus } from "@harolds/types";
 import { prisma } from "../client";
@@ -61,10 +61,18 @@ function tipRateBpsFromQuote(quote: QuoteResult): number | null {
  * function itself will throw (unique constraint violation) on a duplicate key.
  */
 export async function createPendingOrder(args: CreatePendingOrderArgs): Promise<OrderWithLines> {
+  return createPendingOrderWith(prisma, args);
+}
+
+/** The shared insert, usable on the global client or inside a transaction (SPRINT-16). */
+async function createPendingOrderWith(
+  client: Prisma.TransactionClient | typeof prisma,
+  args: CreatePendingOrderArgs,
+): Promise<OrderWithLines> {
   const { quote, customer } = args;
   const lookupToken = args.lookupToken ?? generateLookupToken();
 
-  return prisma.order.create({
+  return client.order.create({
     data: {
       orderNumber: null,
       orderSequence: null,
@@ -111,6 +119,89 @@ export async function createPendingOrder(args: CreatePendingOrderArgs): Promise<
       },
     },
     include: { lines: true },
+  });
+}
+
+/* ---------------------------------------------------------------------------
+ * SPRINT-16: the server-side duplicate-order guard.
+ *
+ * The derived idempotency key (apps/web/src/lib/order-key.ts) stops the reload double charge, but
+ * it is client-side and therefore advisory: a cleared browser, a second tab, or a different
+ * device defeats it. This is the guarantee.
+ *
+ * Before creating an order we look for a recent one from the same phone with the same
+ * server-computed cart signature, and return it instead of creating a second. The lookup and the
+ * insert run in ONE transaction behind a Postgres advisory lock keyed on (phone, signature), so
+ * two simultaneous submissions cannot both pass the lookup.
+ * ------------------------------------------------------------------------- */
+
+/** Payment states a duplicate match may be in. */
+const GUARD_MATCHABLE_PAYMENT_STATUSES = [
+  // Money may have moved and we do not yet know: the exact case worth collapsing.
+  PaymentStatus.UNKNOWN,
+  // In flight.
+  PaymentStatus.PENDING,
+  // Already captured: the customer should be shown the order they already paid for.
+  PaymentStatus.CAPTURED,
+] as const;
+
+/*
+ * PaymentStatus.FAILED is DELIBERATELY not matchable. A decline is definite — the processor
+ * confirmed no money moved — and the customer is explicitly retrying past it, usually with a
+ * different card. Collapsing that retry onto the declined order would replay the cached decline
+ * and trap them on a dead order they can never pay.
+ *
+ * Cancelled and refunded orders are excluded for the same reason: they are terminal, and a
+ * customer ordering again after one is not duplicating anything.
+ */
+
+export type DuplicateGuardOutcome =
+  | { kind: "created"; order: OrderWithLines }
+  | { kind: "existing"; order: OrderWithLines; matchedAgeMs: number };
+
+/** Two 32-bit ints for pg_advisory_xact_lock(int4, int4), derived from the guard's identity. */
+function advisoryLockKeys(phoneE164: string, cartFingerprint: string): [number, number] {
+  const digest = createHash("sha256").update(`${phoneE164}|${cartFingerprint}`).digest();
+  return [digest.readInt32BE(0), digest.readInt32BE(4)];
+}
+
+/**
+ * Create a pending order, unless an equivalent one was created moments ago — in which case
+ * return that one and charge nothing new.
+ */
+export async function createPendingOrderGuarded(
+  args: CreatePendingOrderArgs & { guardWindowMs: number },
+): Promise<DuplicateGuardOutcome> {
+  const { guardWindowMs, ...createArgs } = args;
+  const [lockA, lockB] = advisoryLockKeys(createArgs.customer.phoneE164, createArgs.cartFingerprint);
+
+  return prisma.$transaction(async (tx) => {
+    // Serialises concurrent submissions for this (phone, cart). Released with the transaction.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockA}::int4, ${lockB}::int4)`;
+
+    const since = new Date(Date.now() - guardWindowMs);
+    const existing = await tx.order.findFirst({
+      where: {
+        customerPhone: createArgs.customer.phoneE164,
+        cartFingerprint: createArgs.cartFingerprint,
+        createdAt: { gte: since },
+        paymentStatus: { in: [...GUARD_MATCHABLE_PAYMENT_STATUSES] },
+        status: { notIn: [OrderStatus.CANCELLED] },
+        refundedCents: { lte: 0 },
+      },
+      orderBy: { createdAt: "desc" },
+      include: { lines: true },
+    });
+
+    if (existing) {
+      return {
+        kind: "existing" as const,
+        order: existing,
+        matchedAgeMs: Date.now() - existing.createdAt.getTime(),
+      };
+    }
+
+    return { kind: "created" as const, order: await createPendingOrderWith(tx, createArgs) };
   });
 }
 

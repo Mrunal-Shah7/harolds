@@ -101,9 +101,30 @@ describe("parseEnv production provider requirements", () => {
         EMAIL_API_KEY: "re_x",
         EMAIL_FROM_ADDRESS: "orders@example.com",
         PRINTER_SDP_SHARED_SECRET: "a".repeat(32),
+        NEXT_PUBLIC_SQUARE_APPLICATION_ID: "sandbox-app",
+        NEXT_PUBLIC_SQUARE_LOCATION_ID: "LTEST",
+        NEXT_PUBLIC_SQUARE_ENVIRONMENT: "sandbox",
       }),
     );
     assert.equal(env.NODE_ENV, "production");
+  });
+
+  it("refuses production start when public Square identifiers are missing", () => {
+    assert.throws(
+      () =>
+        parseEnv(
+          baseEnv({
+            NODE_ENV: "production",
+            TWILIO_ACCOUNT_SID: "ACxx",
+            TWILIO_AUTH_TOKEN: "tok",
+            TWILIO_FROM_NUMBER: "+17085550000",
+            EMAIL_API_KEY: "re_x",
+            EMAIL_FROM_ADDRESS: "orders@example.com",
+            PRINTER_SDP_SHARED_SECRET: "a".repeat(32),
+          }),
+        ),
+      /NEXT_PUBLIC_SQUARE_APPLICATION_ID/,
+    );
   });
 
   it("skips production provider guards when compiling (next build sets NEXT_PHASE)", () => {

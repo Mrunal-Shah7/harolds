@@ -323,6 +323,16 @@ export async function updateItem(
       entityType: "MenuItem",
       entityId: id,
       summary: `Price ${current.basePriceCents} → ${patch.basePriceCents} cents on ${row.name}`,
+      details: {
+        before: {
+          basePriceCents: current.basePriceCents,
+          isUnverifiedPrice: current.isUnverifiedPrice,
+        },
+        after: {
+          basePriceCents: row.basePriceCents,
+          isUnverifiedPrice: row.isUnverifiedPrice,
+        },
+      },
     });
   } else {
     await recordAdminAudit({
@@ -331,6 +341,10 @@ export async function updateItem(
       entityType: "MenuItem",
       entityId: id,
       summary: `Updated item ${row.name}`,
+      details: {
+        before: { imageUrl: current.imageUrl, isActive: current.isActive },
+        after: { imageUrl: row.imageUrl, isActive: row.isActive },
+      },
     });
   }
   return row;
@@ -664,5 +678,48 @@ export async function replaceGroupBindings(
     entityType: "ModifierGroup",
     entityId: groupId,
     summary: `Set ${bindings.length} item(s) offering this group`,
+  });
+}
+
+/** SPRINT-12: write a coherent set of sortOrder values in one transaction. */
+export async function reorderEntities(
+  kind: "categories" | "items" | "modifierGroups" | "modifierOptions",
+  orderedIds: string[],
+  userId: string,
+): Promise<void> {
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+    throw new AdminValidationError("orderedIds must be a non-empty array.");
+  }
+  if (new Set(orderedIds).size !== orderedIds.length) {
+    throw new AdminValidationError("orderedIds must be unique.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (kind === "categories") {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.category.update({ where: { id: orderedIds[i]! }, data: { sortOrder: i } });
+      }
+    } else if (kind === "items") {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.menuItem.update({ where: { id: orderedIds[i]! }, data: { sortOrder: i } });
+      }
+    } else if (kind === "modifierGroups") {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.modifierGroup.update({ where: { id: orderedIds[i]! }, data: { sortOrder: i } });
+      }
+    } else {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.modifierOption.update({ where: { id: orderedIds[i]! }, data: { sortOrder: i } });
+      }
+    }
+  });
+  invalidateMenuCache();
+  await recordAdminAudit({
+    userId,
+    action: "REORDER",
+    entityType: kind,
+    entityId: null,
+    summary: `Reordered ${orderedIds.length} ${kind}`,
+    details: { after: { orderedIds } },
   });
 }

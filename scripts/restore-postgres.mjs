@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 // SPRINT-9: restore a custom-format dump into a SEPARATE database. Never the live one.
+// SPRINT-13: optional fourth argument restores an images backup directory into IMAGE_UPLOAD_DIR
+// (or into RESTORE_IMAGE_DIR when set) so photograph bytes accompany the dump.
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, cpSync, mkdirSync, rmSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const dumpFile = process.argv[2];
 const targetDb = process.argv[3];
+const imagesBackupDir = process.argv[4];
 if (!dumpFile || !targetDb) {
-  console.error("Usage: node --env-file=.env scripts/restore-postgres.mjs <dump-file> <target-database>");
+  console.error(
+    "Usage: node --env-file=.env scripts/restore-postgres.mjs <dump-file> <target-database> [images-backup-dir]",
+  );
   process.exit(1);
 }
 if (/^harolds$/i.test(targetDb)) {
@@ -58,3 +64,24 @@ const restoreUrl = `postgresql://${parsed.username}:${parsed.password}@${host}:$
 const started = Date.now();
 await run(bin("pg_restore"), ["--no-owner", "--dbname", restoreUrl, dumpFile]);
 console.log(`restored ${dumpFile} into ${targetDb} in ${Date.now() - started}ms`);
+
+if (imagesBackupDir) {
+  if (!existsSync(imagesBackupDir)) {
+    console.error(`images backup dir not found: ${imagesBackupDir}`);
+    process.exit(1);
+  }
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const targetImages =
+    process.env.RESTORE_IMAGE_DIR ||
+    process.env.IMAGE_UPLOAD_DIR ||
+    path.join(root, "data", "uploads");
+  const resolved = path.resolve(targetImages);
+  mkdirSync(path.dirname(resolved), { recursive: true });
+  if (existsSync(resolved)) {
+    // Replace contents so a restore does not leave orphan hashes from a prior drill.
+    rmSync(resolved, { recursive: true, force: true });
+  }
+  mkdirSync(resolved, { recursive: true });
+  cpSync(imagesBackupDir, resolved, { recursive: true });
+  console.log(`restored images from ${imagesBackupDir} into ${resolved}`);
+}

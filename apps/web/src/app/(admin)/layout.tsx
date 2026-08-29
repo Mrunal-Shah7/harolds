@@ -3,6 +3,9 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
 import "./admin.css";
+// SPRINT-17: the shell (session + sidebar) lives in the LAYOUT so a route change inside the
+// group never unmounts it. Only <main> swaps.
+import { AdminShell } from "@/components/admin/AdminShell";
 
 const display = Source_Serif_4({
   weight: ["600", "700"],
@@ -37,5 +40,9 @@ export const viewport: Viewport = {
 };
 
 export default function AdminLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <div className={`adm-root ${display.variable} ${sans.variable} ${mono.variable}`}>{children}</div>;
+  return (
+    <div className={`adm-root ${display.variable} ${sans.variable} ${mono.variable}`}>
+      <AdminShell>{children}</AdminShell>
+    </div>
+  );
 }

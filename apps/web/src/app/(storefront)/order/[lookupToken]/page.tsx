@@ -1,15 +1,21 @@
 "use client";
 
+// SPRINT-14: confirmation (design.md §9.4). Ticket chip first at mono-lg, then the pickup
+// estimate, the address with a maps link, the full order with modifiers, and the totals.
+// No account prompt, no upsell, no "rate your experience".
+//
 // Public order status — looked up by unguessable lookupToken only, never order number
-// (STOREFRONT-REQUIREMENTS.md #3).
+// (STOREFRONT-REQUIREMENTS.md #3). Every figure here comes from the server response.
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import type { PublicOrderStatusResponse } from "@harolds/types";
-import { getOrderStatus, StorefrontApiError } from "@/lib/storefront-api";
+import type { PublicOrderStatusResponse, StoreStatus } from "@harolds/types";
+import { getOrderStatus, getStoreStatus, StorefrontApiError } from "@/lib/storefront-api";
 import { formatCents } from "@/lib/money";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ErrorState, Skeleton } from "@/components/ui/feedback";
+import { TicketChip } from "@/components/storefront/ticket-chip";
 
 const STATUS_LABELS: Record<string, string> = {
   AWAITING_PAYMENT: "Awaiting payment",
@@ -24,6 +30,7 @@ const STATUS_LABELS: Record<string, string> = {
 export default function OrderStatusPage() {
   const params = useParams<{ lookupToken: string }>();
   const [order, setOrder] = useState<PublicOrderStatusResponse | null>(null);
+  const [store, setStore] = useState<StoreStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,13 +43,21 @@ export default function OrderStatusPage() {
         if (!cancelled) {
           setError(
             err instanceof StorefrontApiError
-              ? "We couldn't find that order. Double-check your link."
-              : "Something went wrong loading your order.",
+              ? "We couldn't find that order. Check your link."
+              : "We couldn't load your order. Try again.",
           );
         }
       }
     };
     void load();
+    // §9.4 needs the store address and its maps link; the order payload does not carry one and
+    // the contract is frozen, so the address comes from the existing public store-status
+    // endpoint. Fetched once, not on the polling interval.
+    void getStoreStatus()
+      .then((s) => {
+        if (!cancelled) setStore(s);
+      })
+      .catch(() => undefined);
     const interval = setInterval(load, 15000);
     return () => {
       cancelled = true;
@@ -52,94 +67,125 @@ export default function OrderStatusPage() {
 
   if (error) {
     return (
-      <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center">
-        <p className="text-lg font-semibold text-destructive">{error}</p>
-        <Link href="/">
-          <Button className="mt-4">Back to menu</Button>
-        </Link>
+      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col justify-center px-4">
+        <ErrorState message={error} />
+        <div className="flex justify-center">
+          <Link href="/menu">
+            <Button variant="secondary">Back to the menu</Button>
+          </Link>
+        </div>
       </div>
     );
   }
 
   if (!order) {
+    // §12: the skeleton occupies the same box the loaded confirmation will.
     return (
-      <div className="mx-auto flex min-h-screen max-w-md items-center justify-center px-6 text-center text-muted-foreground">
-        Loading your order…
+      <div className="mx-auto min-h-dvh max-w-[560px] px-4 py-10">
+        <div className="flex flex-col items-center gap-3">
+          <Skeleton className="h-[46px] w-40" />
+          <Skeleton className="h-[26px] w-56" />
+          <Skeleton className="h-[22px] w-44" />
+        </div>
+        <Skeleton className="mt-8 h-64 w-full" />
       </div>
     );
   }
 
+  const address = store
+    ? [store.addressLine1, store.addressLine2, `${store.city}, ${store.state} ${store.postalCode}`]
+        .filter(Boolean)
+        .join(", ")
+    : null;
+
   return (
-    <div className="mx-auto min-h-screen max-w-lg px-4 pb-12">
-      <div className="flex flex-col items-center py-10 text-center">
-        <CheckCircle2 className="h-14 w-14 text-primary" />
-        <h1 className="mt-4 text-2xl font-bold">Thanks, {order.firstName}!</h1>
-        {order.orderNumber && (
-          <p className="mt-1 text-muted-foreground">Order {order.orderNumber}</p>
-        )}
-        <p className="mt-3 rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-accent-foreground">
+    <div className="mx-auto min-h-dvh max-w-[560px] px-4 pb-16">
+      <div className="flex flex-col items-center gap-4 py-10 text-center">
+        {order.orderNumber ? <TicketChip orderNumber={order.orderNumber} size="lg" /> : null}
+
+        <h1 className="t-display-lg text-ink">
+          {order.orderNumber ? `Order ${order.orderNumber} is in` : "Your order is in"}
+        </h1>
+
+        <Badge variant={order.status === "CANCELLED" ? "failed" : "paid"}>
           {STATUS_LABELS[order.status] ?? order.status}
-        </p>
+        </Badge>
+
         {order.estimatedReadyAt && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            Estimated ready:{" "}
+          <p className="t-body-lg t-nums text-ink">
+            Ready at about{" "}
             {new Date(order.estimatedReadyAt).toLocaleTimeString("en-US", {
               hour: "numeric",
               minute: "2-digit",
             })}
           </p>
         )}
+
+        <p className="t-body text-ink-muted">A text message is on its way.</p>
       </div>
 
-      <section className="rounded-xl border border-border">
-        <ul className="divide-y divide-border">
+      {address ? (
+        <section className="mb-6 rounded-md border border-line bg-surface p-4">
+          <h2 className="t-label mb-2 text-ink-muted">Pick up at</h2>
+          <a
+            href={`https://maps.google.com/?q=${encodeURIComponent(`${store!.storeName}, ${address}`)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="t-body text-ink underline underline-offset-4"
+          >
+            {address}
+          </a>
+        </section>
+      ) : null}
+
+      <section className="rounded-md border border-line bg-surface">
+        <ul className="divide-y divide-line">
           {order.lines.map((line, i) => (
-            <li key={i} className="flex justify-between px-4 py-3 text-sm">
-              <div>
-                <span className="font-medium">
+            <li key={i} className="flex justify-between gap-4 px-4 py-3">
+              <div className="min-w-0">
+                <p className="t-body font-semibold text-ink">
                   {line.quantity} × {line.itemName}
-                </span>
+                </p>
                 {line.selectedModifiers.length > 0 && (
-                  <p className="text-muted-foreground">
-                    {line.selectedModifiers.map((m) => m.optionName).join(", ")}
-                  </p>
+                  <ul className="mt-0.5">
+                    {line.selectedModifiers.map((m, j) => (
+                      <li key={j} className="t-body-sm text-ink-muted">
+                        {m.optionName}
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
-              <span className="font-medium">{formatCents(line.lineTotalCents)}</span>
+              <span className="t-body t-nums shrink-0 text-ink">
+                {formatCents(line.lineTotalCents)}
+              </span>
             </li>
           ))}
         </ul>
-        <div className="space-y-1 border-t border-border px-4 py-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span>{formatCents(order.subtotalCents)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tax</span>
-            <span>{formatCents(order.taxCents)}</span>
-          </div>
-          {order.tipCents > 0 && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tip</span>
-              <span>{formatCents(order.tipCents)}</span>
-            </div>
-          )}
-          <div className="flex justify-between pt-1 text-base font-bold">
-            <span>Total</span>
-            <span>{formatCents(order.totalCents)}</span>
+
+        <div className="space-y-2 border-t border-line bg-paper-sunk px-4 py-3">
+          <Row label="Subtotal" value={formatCents(order.subtotalCents)} />
+          <Row label="Tax" value={formatCents(order.taxCents)} />
+          {order.tipCents > 0 && <Row label="Tip" value={formatCents(order.tipCents)} />}
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="t-display-sm text-ink">Total</span>
+            <span className="t-display-sm t-nums text-ink">{formatCents(order.totalCents)}</span>
           </div>
         </div>
       </section>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        Show this page or your confirmation at pickup. Pickup only — no delivery.
+      <p className="t-body-sm mt-6 text-center text-ink-muted">
+        Show this page at pickup. Pickup only — no delivery.
       </p>
+    </div>
+  );
+}
 
-      <div className="mt-6 flex justify-center">
-        <Link href="/">
-          <Button variant="outline">Order again</Button>
-        </Link>
-      </div>
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <span className="t-body text-ink-muted">{label}</span>
+      <span className="t-body t-nums text-ink">{value}</span>
     </div>
   );
 }

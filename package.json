@@ -32,6 +32,7 @@
     "test:pricing": "pnpm --filter @harolds/pricing test",
     "ensure-env": "node scripts/ensure-env.mjs",
     "reconcile": "pnpm --filter @harolds/db exec tsx src/reconcile-cli.ts",
+    "reconcile:sprint16": "pnpm --filter @harolds/db exec tsx --env-file=../../.env src/sprint16-reconcile-cli.ts",
     "openapi:validate": "pnpm --filter @harolds/web openapi:validate",
     "contract:probe": "node --env-file=.env scripts/sprint10-contract-probe.mjs",
     "backup": "node --env-file=.env scripts/backup-postgres.mjs",

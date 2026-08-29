@@ -60,6 +60,12 @@ export type MenuModifierGroup = {
   options: MenuModifierOption[];
 };
 
+export type MenuItemImageDerivatives = {
+  thumb: { webp: string; fallback: string };
+  modal: { webp: string; fallback: string };
+  preview: { webp: string; fallback: string };
+};
+
 export type MenuItemSummary = {
   id: string;
   slug: string;
@@ -67,6 +73,8 @@ export type MenuItemSummary = {
   description: string | null;
   basePriceCents: number;
   imageUrl: string | null;
+  /** SPRINT-12 additive: sized derivatives when an image is present. */
+  imageDerivatives?: MenuItemImageDerivatives | null;
   isSoldOut: boolean;
   isFeatured: boolean;
   isMostOrdered: boolean;
@@ -154,4 +162,19 @@ export type StoreStatus = {
   tippingEnabled: boolean;
   tipPresetsBps: number[];
   defaultTipPresetIndex: number;
+  /** SPRINT-12 additive: why the store is closed / paused; null when open and accepting. */
+  closedReason?:
+    | "ACCEPTING_ORDERS_OFF"
+    | "OVERRIDE_CLOSED_REST_OF_DAY"
+    | "OVERRIDE_CLOSE_EARLY"
+    | "OVERRIDE_OPEN_LATE"
+    | "SCHEDULE_CLOSED"
+    | "CLOSURE_DATE"
+    | null;
+  /** SPRINT-12 additive: message when closed by schedule/override. */
+  closedMessage?: string | null;
+  /** SPRINT-12 additive: prep estimate phrasing; may contain "{minutes}". */
+  prepEstimatePhrase?: string | null;
+  /** SPRINT-12 additive: active announcement text (null when none / outside window). */
+  announcement?: string | null;
 };

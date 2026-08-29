@@ -1,8 +1,8 @@
 // SPRINT-4: authoritative checkout — reprice, persist, charge, converge with webhooks.
 import { createHash } from "node:crypto";
-import { getPrinterConfig } from "@harolds/config";
+import { getOrderDuplicateGuardWindowMs, getPrinterConfig } from "@harolds/config";
 import {
-  createPendingOrder,
+  createPendingOrderGuarded,
   findOrderByIdempotencyKey,
   getPublicOrderView,
   markOrderPaidAndAllocate,
@@ -36,19 +36,49 @@ export type CheckoutFailure = {
   details?: Record<string, unknown> | null;
 };
 
-/** Deterministic fingerprint of cart + tip for idempotency conflict detection. */
+/**
+ * Deterministic fingerprint of cart + tip, used for idempotency conflict detection and (SPRINT-16)
+ * as the server-side cart signature the duplicate guard matches on.
+ *
+ * SPRINT-16 made this order-independent. It previously sorted `selectedOptionIds` within a line
+ * but left the LINES in whatever order the client sent, so the same cart built by adding A then B
+ * fingerprinted differently from B then A. That was harmless for conflict detection — the only
+ * prior consumer, which compares for equality — and fatal for the guard, which has to recognise
+ * the same cart arriving twice. Nothing depends on the old ordering: this value is written once
+ * and only ever compared for equality.
+ */
 export function cartFingerprint(cart: CartRequest): string {
-  const normalised = {
-    lines: cart.lines.map((l) => ({
+  const lines = cart.lines
+    .map((l) => ({
       itemId: l.itemId,
       quantity: l.quantity,
       selectedOptionIds: [...l.selectedOptionIds].sort(),
       customerNote: l.customerNote ?? null,
-    })),
-    tip: cart.tip ?? null,
-  };
-  return createHash("sha256").update(JSON.stringify(normalised)).digest("hex");
+    }))
+    .sort((a, b) => {
+      const left = `${a.itemId}|${a.selectedOptionIds.join(",")}|${a.customerNote ?? ""}|${a.quantity}`;
+      const right = `${b.itemId}|${b.selectedOptionIds.join(",")}|${b.customerNote ?? ""}|${b.quantity}`;
+      return left < right ? -1 : left > right ? 1 : 0;
+    });
+  return createHash("sha256").update(JSON.stringify({ lines, tip: cart.tip ?? null })).digest("hex");
 }
+
+/**
+ * SPRINT-16 (Phase 5). The single wording for an AMBIGUOUS payment outcome.
+ *
+ * The classification can distinguish, cleanly, and this matters:
+ *   - `declined`          -> a definite pre-capture decline. No money moved. -> PAYMENT_DECLINED
+ *   - `transport_failure` -> timeout / 5xx / unusable response. The outcome is UNKNOWN, which is
+ *                            why it routes through `markOrderPaymentUnknown`. -> PAYMENT_FAILED
+ *
+ * So PAYMENT_FAILED is emitted on the ambiguous class and ONLY the ambiguous class. The previous
+ * storefront copy — "Nothing has been charged" — asserted the one thing the system cannot know,
+ * on the one path where it is least likely to be true, and it is the sentence most likely to
+ * produce the second attempt. The confident wording stays on PAYMENT_DECLINED, where it is
+ * earned.
+ */
+export const AMBIGUOUS_PAYMENT_MESSAGE =
+  "We couldn't confirm that payment. Don't try again just yet — check your texts in a minute, or call the store.";
 
 /** Square payment idempotency key — derived from our order id so retries never double-charge. */
 export function squarePaymentIdempotencyKey(orderId: string): string {
@@ -201,7 +231,7 @@ function parseCreateOrderBody(body: unknown):
       failure: {
         ok: false,
         code: ApiErrorCode.VALIDATION_ERROR,
-        message: "customer.phone is not a valid phone number.",
+        message: "Enter a valid US phone number (10 digits, e.g. 7085551234).",
         details: { field: "customer.phone" },
       },
     };
@@ -283,8 +313,7 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
       return {
         ok: false,
         code: ApiErrorCode.PAYMENT_FAILED,
-        message:
-          "Payment status is unknown. Do not retry immediately — we will confirm shortly.",
+        message: AMBIGUOUS_PAYMENT_MESSAGE,
         details: null,
       };
     }
@@ -372,7 +401,12 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
   }
 
   const smsConsentAt = request.customer.smsConsent ? new Date() : null;
-  const pending = await createPendingOrder({
+
+  // SPRINT-16: the server-side duplicate guard. The derived client key stops the reload double
+  // charge, but a cleared browser, a second tab, or another device defeats it. This is the
+  // guarantee. `fingerprint` is computed here from the parsed request — a client-supplied
+  // signature would not be a guard.
+  const guarded = await createPendingOrderGuarded({
     quote: quoted.result,
     customer: {
       firstName: request.customer.firstName,
@@ -385,9 +419,48 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
     clientIdempotencyKey: request.idempotencyKey,
     cartFingerprint: fingerprint,
     customerNote: request.customerNote ?? null,
+    guardWindowMs: getOrderDuplicateGuardWindowMs(),
   });
 
-  return chargeExistingPending(pending, request.paymentToken);
+  if (guarded.kind === "existing") {
+    // Logged on EVERY hit so the false-positive rate is observable rather than assumed: a
+    // customer genuinely ordering the same thing twice inside the window lands here too.
+    console.warn(
+      JSON.stringify({
+        event: "checkout.duplicate_guard_hit",
+        requestId: getRequestId() ?? null,
+        matchedOrderId: guarded.order.id,
+        matchedOrderNumber: guarded.order.orderNumber,
+        matchedAgeMs: guarded.matchedAgeMs,
+        matchedPaymentStatus: guarded.order.paymentStatus,
+        customerPhone: guarded.order.customerPhone,
+        cartFingerprint: fingerprint,
+        guardWindowMs: getOrderDuplicateGuardWindowMs(),
+      }),
+    );
+
+    // Already paid: show them the order they already have. This is exactly right for the reload
+    // case where the first attempt actually succeeded.
+    if (
+      guarded.order.status === OrderStatus.PAID ||
+      guarded.order.paymentStatus === PaymentStatus.CAPTURED
+    ) {
+      return { ok: true, order: toCheckoutOrderResponse(guarded.order), replay: true };
+    }
+    // In flight against the processor with an unknown outcome — never fire a second charge.
+    if (guarded.order.paymentStatus === PaymentStatus.UNKNOWN) {
+      return {
+        ok: false,
+        code: ApiErrorCode.PAYMENT_FAILED,
+        message: AMBIGUOUS_PAYMENT_MESSAGE,
+        details: null,
+      };
+    }
+    // Unpaid: continue paying THAT order rather than creating another.
+    return chargeExistingPending(guarded.order, request.paymentToken);
+  }
+
+  return chargeExistingPending(guarded.order, request.paymentToken);
 }
 
 async function chargeExistingPending(
@@ -438,8 +511,7 @@ async function chargeExistingPending(
   return {
     ok: false,
     code: ApiErrorCode.PAYMENT_FAILED,
-    message:
-      "We could not confirm payment. Do not retry immediately — if you were charged, your order will appear shortly.",
+    message: AMBIGUOUS_PAYMENT_MESSAGE,
     details: null,
   };
 }

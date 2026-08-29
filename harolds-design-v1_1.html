@@ -1,0 +1,1374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harold's Chicken Oak Lawn — Design v1.1 Preview</title>
+<!--
+  DESIGN MOCKUP — not production code.
+  Evolves design.md v1.0 ("keep the bones"): four surfaces, band rhythm,
+  Alfa Slab One / Baloo 2 / Inter / JetBrains Mono, ticket chip signature.
+  Fonts load from Google Fonts HERE ONLY for preview convenience;
+  production remains self-hosted subset WOFF2 per design.md §3 / CSP.
+  Brand placeholders per design.md §9 Open Inputs: text wordmark,
+  #CE1126, paper-sunk initial tiles instead of photography.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Baloo+2:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* ================= TOKENS — design.md v1.0 frontmatter, verbatim ================= */
+:root{
+  --paper:#F7F0E1; --paper-sunk:#EDE3CF; --surface:#FFFFFF;
+  --roast:#4A2317; --roast-deep:#33170F;
+  --brand:#CE1126; --brand-hover:#AE0E20; --brand-tint:#FBE7E9;
+  --flame:#F2B233; --flame-deep:#D8951A;
+  --ink:#241611; --ink-muted:#6B5A50; --ink-faint:#72655D;
+  --ink-on-roast:#F7F0E1; --ink-on-roast-muted:#C4AC9C;
+  --line:#E0D3BC; --line-strong:#8A7C68; --line-on-roast:#6B4432;
+  --open:#2B7542; --warn:#9C5408; --danger:#A81321; --focus:#1B5FCC;
+  --kds-bg:#141110; --kds-card:#221C19; --kds-card-raised:#2E2622;
+  --kds-ink:#F7F0E1; --kds-ink-muted:#A89A90;
+  --kds-line:#3A302B; --kds-line-strong:#6E6763;
+  --kds-open:#2E7D46; --kds-danger:#B73C47;
+
+  --font-poster:'Alfa Slab One', Georgia, serif;
+  --font-display:'Baloo 2', system-ui, sans-serif;
+  --font-sans:'Inter', system-ui, sans-serif;
+  --font-mono:'JetBrains Mono', ui-monospace, monospace;
+
+  --poster-xl:clamp(2.5rem, 9vw, 4.5rem);
+  --poster-lg:clamp(1.875rem, 6vw, 2.75rem);
+  --display-lg:1.75rem; --display-md:1.375rem; --display-sm:1.125rem;
+  --body-lg:1.0625rem; --body:0.9375rem; --body-sm:0.8125rem;
+  --label:0.75rem; --mono-lg:1.5rem; --mono:0.875rem;
+
+  --ev-card:0 1px 2px 0 rgb(36 22 17 / .06);
+  --ev-raised:0 4px 12px -2px rgb(36 22 17 / .10);
+  --ev-overlay:0 16px 40px -8px rgb(36 22 17 / .18);
+
+  --r-sm:6px; --r-md:14px; --r-lg:24px; --r-pill:999px;
+  --wash:rgb(36 22 17 / .05);
+  --brand-text:var(--brand);
+  --t-fast:120ms; --t-base:200ms; --t-slow:320ms;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --container:1200px;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font-sans); font-size:var(--body); line-height:1.5; color:var(--ink); background:var(--paper)}
+img{display:block; max-width:100%}
+button{font:inherit; cursor:pointer; border:none; background:none; color:inherit}
+:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important; transition:none!important}
+}
+
+/* v1.1 EVOLUTION #1 — paper weave as zero-asset CSS (resolves Open Input #6).
+   Two crossed hairline repeats at ~3.5% ink. Band roots only, light surfaces only. */
+.textured{
+  background-image:
+    repeating-linear-gradient(0deg, rgb(36 22 17 / .035) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgb(36 22 17 / .035) 0 1px, transparent 1px 4px);
+}
+
+/* ================= PREVIEW CHROME (mockup shell, not part of the design) ============ */
+.chrome{position:sticky; top:0; z-index:400; background:#1A1512; color:#CFC4BA;
+  font-family:var(--font-mono); font-size:12px; border-bottom:1px solid #33291F}
+.chrome-row{display:flex; align-items:center; gap:2px; max-width:var(--container);
+  margin:0 auto; padding:0 12px; overflow-x:auto; scrollbar-width:none}
+.chrome-row::-webkit-scrollbar{display:none}
+.chrome-title{letter-spacing:.12em; text-transform:uppercase; padding:10px 12px 10px 0;
+  color:#8A7C68; white-space:nowrap}
+.chrome-tab{padding:10px 14px; white-space:nowrap; letter-spacing:.06em;
+  border-bottom:2px solid transparent; color:#CFC4BA}
+.chrome-tab:hover{color:#F7F0E1}
+.chrome-tab[aria-selected="true"]{color:#F2B233; border-bottom-color:#F2B233}
+.chrome-sub{background:#241D18}
+.chrome-sub .chrome-tab[aria-selected="true"]{color:#F7F0E1; border-bottom-color:#8A7C68}
+.screen{display:none}
+.screen.on{display:block}
+.surface-root{display:none}
+.surface-root.on{display:block}
+
+/* ================= SHARED PRIMITIVES (scope-aware) ================= */
+.band{padding:64px 0}
+.band .container{max-width:var(--container); margin:0 auto; padding:0 16px}
+@media(max-width:767px){.band{padding:40px 0}}
+.b-paper{background:var(--paper)}
+.b-sunk{background:var(--paper-sunk)}
+.b-roast{background:var(--roast); color:var(--ink-on-roast)}
+.b-roast-deep{background:var(--roast-deep); color:var(--ink-on-roast)}
+
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  border-radius:var(--r-pill); font-family:var(--font-display); font-weight:700;
+  font-size:var(--display-sm); height:44px; padding:0 22px;
+  transition:background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease)}
+.btn:active{transform:scale(.98)}
+.btn-sm{height:36px; font-size:var(--body); padding:0 16px}
+.btn-lg{height:52px; padding:0 28px}
+.btn-primary{background:var(--brand); color:#fff}
+.btn-primary:hover{background:var(--brand-hover)}
+.btn-secondary{border:1.5px solid var(--ink); color:var(--ink); background:transparent}
+.btn-secondary:hover{background:var(--wash)}
+.btn-ghost{color:var(--ink-muted); background:transparent}
+.btn-ghost:hover{background:var(--wash)}
+.btn-danger{border:1.5px solid var(--danger); color:var(--danger); background:transparent}
+.btn-danger:hover{background:var(--brand-tint)}
+.btn-poster{background:var(--roast); color:var(--ink-on-roast); font-family:var(--font-poster);
+  font-weight:400; text-transform:uppercase; letter-spacing:.04em; height:60px;
+  width:100%; max-width:560px; font-size:1.25rem}
+.btn-poster:hover{background:#5A2E1F}
+.b-roast .btn-poster,.b-roast-deep .btn-poster{background:var(--brand); color:#fff}
+.b-roast .btn-poster:hover{background:var(--brand-hover)}
+
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md);
+  box-shadow:var(--ev-card)}
+.b-roast .card,.b-roast-deep .card{border-color:var(--line-on-roast); box-shadow:none}
+
+.eyebrow{font-size:var(--label); letter-spacing:.08em; text-transform:uppercase;
+  font-weight:600; color:var(--ink-muted)}
+.b-roast .eyebrow,.b-roast-deep .eyebrow{color:var(--ink-on-roast-muted)}
+h2.poster{font-family:var(--font-poster); font-weight:400; font-size:var(--poster-lg);
+  text-transform:uppercase; line-height:1.05; letter-spacing:-.01em}
+
+/* Ticket chip — the signature. v1.1 refinement: true notched corners via clip-path,
+   dashed flame rule inset 4px via ::before. Only permitted dashed border in the system. */
+.chip{position:relative; display:inline-block; background:var(--paper-sunk); color:var(--ink);
+  font-family:var(--font-mono); font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  font-size:var(--mono); padding:10px 20px;
+  clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% calc(100% - 8px),
+    calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px),0 8px)}
+.chip::before{content:""; position:absolute; inset:4px; border:1px dashed var(--flame);
+  pointer-events:none;
+  clip-path:polygon(6px 0,calc(100% - 6px) 0,100% 6px,100% calc(100% - 6px),
+    calc(100% - 6px) 100%,6px 100%,0 calc(100% - 6px),0 6px)}
+.chip-lg{font-size:var(--mono-lg); padding:16px 32px}
+
+/* v1.1 EVOLUTION #2 — board leaders. Dotted rule connecting a name to its price in
+   totals/receipt contexts only. Functional (it binds label to figure), earned by
+   board-only pricing being how this system actually works. Dots, not dashes —
+   the dashed border stays exclusive to the chip. */
+.leader{display:flex; align-items:baseline; gap:8px}
+.leader .dots{flex:1; border-bottom:2px dotted var(--line-strong); transform:translateY(-4px)}
+.leader .amt{font-family:var(--font-display); font-weight:700; font-variant-numeric:tabular-nums}
+
+.badge{display:inline-flex; align-items:center; gap:6px; font-size:var(--label);
+  letter-spacing:.08em; text-transform:uppercase; font-weight:600;
+  border-radius:var(--r-pill); padding:4px 10px}
+.badge .dot{width:8px; height:8px; border-radius:50%; background:currentColor}
+.badge-open{background:rgb(43 117 66 / .12); color:var(--open)}
+.badge-warn{background:rgb(156 84 8 / .12); color:var(--warn)}
+.badge-danger{background:var(--brand-tint); color:var(--danger)}
+.badge-neutral{background:var(--paper-sunk); color:var(--ink-muted)}
+
+.corner-badge{position:absolute; top:0; right:0; background:var(--brand); color:#fff;
+  font-size:var(--label); letter-spacing:.08em; text-transform:uppercase; font-weight:600;
+  padding:6px 10px}
+</style>
+<style>
+/* ================= STOREFRONT SCOPE ================= */
+.sf-root{background:var(--paper)}
+.sf-header{position:sticky; top:0; z-index:100; background:var(--surface);
+  border-bottom:1px solid var(--line)}
+.sf-header .container{max-width:var(--container); margin:0 auto; padding:0 16px;
+  display:flex; align-items:center; gap:16px; height:64px}
+.wordmark{font-family:var(--font-poster); font-size:1.5rem; color:var(--brand-text);
+  text-transform:uppercase; letter-spacing:.01em; line-height:1}
+.wordmark small{display:block; font-family:var(--font-mono); font-size:10px;
+  letter-spacing:.24em; color:var(--ink-muted); margin-top:2px}
+.status-pill{display:inline-flex; align-items:center; gap:8px; background:var(--paper-sunk);
+  border-radius:var(--r-pill); padding:8px 14px; font-size:var(--body-sm); color:var(--ink)}
+.status-pill .dot{width:9px; height:9px; border-radius:50%; background:var(--open)}
+.cart-btn{margin-left:auto; position:relative; display:inline-flex; align-items:center;
+  gap:8px; height:44px; padding:0 18px; border-radius:var(--r-pill);
+  border:1.5px solid var(--ink); font-family:var(--font-display); font-weight:700}
+.cart-count{background:var(--brand); color:#fff; font-family:var(--font-mono);
+  font-size:12px; font-weight:700; border-radius:var(--r-pill); padding:1px 8px}
+
+.announce{background:color-mix(in srgb, var(--flame) 18%, var(--paper));
+  border-top:1px solid var(--flame); border-bottom:1px solid var(--flame);
+  text-align:center; padding:10px 16px; font-size:var(--body-lg)}
+.announce button{margin-left:12px; color:var(--ink-muted); font-size:var(--body-sm);
+  text-decoration:underline}
+
+.hero h1{font-family:var(--font-poster); font-weight:400; font-size:var(--poster-xl);
+  text-transform:uppercase; line-height:1.05; letter-spacing:-.01em; max-width:820px}
+.hero h1 .accent{color:var(--brand-text)}
+.hero p{font-size:var(--body-lg); color:var(--ink-muted); max-width:520px; margin:20px 0 32px}
+.hero-meta{display:flex; gap:12px; flex-wrap:wrap; margin-top:24px}
+
+.cat-rail{display:flex; gap:20px; overflow-x:auto; padding:4px; scrollbar-width:none}
+.cat-rail::-webkit-scrollbar{display:none}
+.cat-tile{flex:0 0 auto; text-align:center; width:104px}
+.cat-tile .circle{width:88px; height:88px; margin:0 auto 10px; border-radius:50%;
+  background:var(--surface); border:1px solid var(--line); box-shadow:var(--ev-card);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-poster); font-size:1.75rem; color:var(--ink-faint);
+  transition:transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease)}
+.cat-tile:hover .circle{transform:translateY(-2px); box-shadow:var(--ev-raised)}
+.cat-tile .lbl{font-size:var(--label); letter-spacing:.08em; text-transform:uppercase;
+  font-weight:600; color:var(--ink)}
+
+.grid-products{display:grid; gap:20px; grid-template-columns:1fr; margin-top:32px}
+@media(min-width:640px){.grid-products{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1024px){.grid-products{grid-template-columns:repeat(3,1fr)}}
+
+.pcard{overflow:hidden; display:flex; flex-direction:column; text-align:left;
+  transition:transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease)}
+.pcard:hover{transform:translateY(-2px); box-shadow:var(--ev-raised)}
+.pcard .img{position:relative; aspect-ratio:4/3; background:var(--paper-sunk);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-poster); font-size:3rem; color:rgb(114 101 93 / .4)}
+.pcard .body{padding:20px; display:flex; flex-direction:column; gap:6px; flex:1}
+@media(max-width:639px){.pcard .body{padding:16px}}
+.pcard h3{font-family:var(--font-display); font-weight:700; font-size:var(--display-md);
+  line-height:1.15}
+.pcard .desc{color:var(--ink-muted);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.pcard .hint{font-size:var(--body-sm); color:var(--ink-muted)}
+.pcard .foot{display:flex; align-items:center; justify-content:space-between; margin-top:auto; padding-top:12px}
+.pcard .price{font-family:var(--font-display); font-weight:700; font-size:var(--display-sm);
+  font-variant-numeric:tabular-nums; color:var(--ink)}
+.pcard.soldout .img > .init{opacity:.45}
+.pcard.soldout{cursor:default}
+.pcard.soldout:hover{transform:none; box-shadow:var(--ev-card)}
+.pcard .unavail{font-family:var(--font-display); font-weight:700; color:var(--ink-faint)}
+
+.sticky-tabs{position:sticky; top:64px; z-index:90; background:var(--surface);
+  border-bottom:1px solid var(--line)}
+.sticky-tabs .row{max-width:var(--container); margin:0 auto; padding:0 16px;
+  display:flex; gap:4px; overflow-x:auto; scrollbar-width:none}
+.sticky-tabs .row::-webkit-scrollbar{display:none}
+.mtab{padding:14px 16px; font-family:var(--font-display); font-weight:700;
+  font-size:var(--display-sm); color:var(--ink-muted); border-bottom:3px solid transparent;
+  white-space:nowrap; transition:color var(--t-base) var(--ease)}
+.mtab[aria-selected="true"]{color:var(--brand-text); border-bottom-color:var(--brand)}
+.menu-section{padding:48px 0 8px}
+.menu-section .container{max-width:var(--container); margin:0 auto; padding:0 16px}
+.menu-section h2{font-family:var(--font-poster); font-weight:400; font-size:var(--display-lg);
+  text-transform:uppercase; margin-bottom:4px}
+.menu-section .sub{color:var(--ink-muted); margin-bottom:8px}
+
+/* modal + sheets */
+.overlay{position:fixed; inset:0; z-index:200; background:rgb(36 22 17 / .5);
+  display:none; align-items:flex-end; justify-content:center; padding:0}
+.overlay.on{display:flex}
+@media(min-width:768px){.overlay{align-items:center; padding:24px}}
+.modal{background:var(--surface); width:100%; max-width:560px; max-height:92vh;
+  overflow:auto; border-radius:var(--r-lg) var(--r-lg) 0 0; box-shadow:var(--ev-overlay)}
+@media(min-width:768px){.modal{border-radius:var(--r-lg)}}
+.modal .img{position:relative; aspect-ratio:4/3; background:var(--paper-sunk);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-poster); font-size:4rem; color:rgb(114 101 93 / .4)}
+.modal .inner{padding:24px}
+.modal h3{font-family:var(--font-display); font-weight:800; font-size:var(--display-lg); line-height:1.15}
+.modal .desc{color:var(--ink-muted); margin:8px 0 20px}
+.mgroup{border-top:1px solid var(--line); padding:16px 0}
+.mgroup h4{font-family:var(--font-display); font-weight:700; font-size:var(--display-sm)}
+.mgroup .rule{font-size:var(--body-sm); color:var(--ink-muted); margin-bottom:12px}
+.mrow{display:flex; align-items:center; gap:12px; padding:10px 0; min-height:44px}
+.mrow input{width:20px; height:20px; accent-color:var(--brand)}
+.mrow .nm{flex:1}
+.mrow .pr{font-family:var(--font-display); font-weight:700; font-variant-numeric:tabular-nums; color:var(--ink)}
+.qty{display:inline-flex; align-items:center; gap:0; border:1.5px solid var(--ink); border-radius:var(--r-pill)}
+.qty button{width:44px; height:44px; font-family:var(--font-display); font-weight:700; font-size:1.25rem}
+.qty .n{min-width:36px; text-align:center; font-family:var(--font-display); font-weight:700;
+  font-variant-numeric:tabular-nums}
+.note-field{width:100%; border:1px solid var(--line); border-radius:var(--r-md);
+  padding:12px; font:inherit; background:var(--surface); color:var(--ink); resize:vertical; min-height:64px}
+.note-field::placeholder{color:var(--ink-faint)}
+.modal-foot{position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--line);
+  padding:16px 24px; display:flex; align-items:center; gap:16px}
+.modal-foot .btn-primary{flex:1; height:52px}
+
+.sheet{position:fixed; top:0; right:0; bottom:0; z-index:200; width:100%; max-width:420px;
+  background:var(--surface); box-shadow:var(--ev-overlay); transform:translateX(102%);
+  transition:transform var(--t-slow) var(--ease); display:flex; flex-direction:column}
+.sheet.on{transform:none}
+.sheet-head{display:flex; align-items:center; justify-content:space-between;
+  padding:20px 24px; border-bottom:1px solid var(--line)}
+.sheet-head h3{font-family:var(--font-display); font-weight:800; font-size:var(--display-md)}
+.sheet-body{flex:1; overflow:auto; padding:8px 24px}
+.cline{display:flex; gap:14px; padding:16px 0; border-bottom:1px solid var(--line)}
+.cline .nm{font-family:var(--font-display); font-weight:700}
+.cline .mods{font-size:var(--body-sm); color:var(--ink-muted)}
+.cline .right{margin-left:auto; text-align:right; display:flex; flex-direction:column; gap:8px; align-items:flex-end}
+.sheet-foot{border-top:1px solid var(--line); padding:20px 24px}
+.sheet-foot .note{font-size:var(--body-sm); color:var(--ink-muted); margin-bottom:12px}
+
+.cart-bar{position:fixed; left:12px; right:12px; bottom:12px; z-index:110;
+  background:var(--brand); color:#fff; border-radius:var(--r-pill); height:56px;
+  display:none; align-items:center; justify-content:space-between; padding:0 24px;
+  font-family:var(--font-display); font-weight:700; box-shadow:var(--ev-card)}
+.cart-bar.on{display:flex}
+@media(min-width:768px){.cart-bar.on{display:none}}
+
+/* checkout */
+.co-grid{display:grid; gap:32px; grid-template-columns:1fr; align-items:start}
+@media(min-width:1024px){.co-grid{grid-template-columns:1.2fr .8fr}}
+.co-card{padding:24px}
+.co-card h3{font-family:var(--font-display); font-weight:800; font-size:var(--display-md); margin-bottom:16px}
+.field{margin-bottom:16px}
+.field label{display:block; font-size:var(--label); letter-spacing:.08em; text-transform:uppercase;
+  font-weight:600; color:var(--ink-muted); margin-bottom:6px}
+.field input{width:100%; height:44px; border:1px solid var(--line); border-radius:var(--r-md);
+  padding:0 14px; font:inherit; color:var(--ink); background:var(--surface)}
+.field input::placeholder{color:var(--ink-faint)}
+.field .help{font-size:var(--body-sm); color:var(--ink-muted); margin-top:6px}
+.tips{display:flex; gap:8px; flex-wrap:wrap}
+.tip{height:44px; padding:0 18px; border-radius:var(--r-pill); border:1.5px solid var(--ink);
+  font-family:var(--font-display); font-weight:700; font-variant-numeric:tabular-nums}
+.tip[aria-pressed="true"]{background:var(--roast); color:var(--ink-on-roast); border-color:var(--roast)}
+.totals{background:var(--paper-sunk); border-radius:var(--r-md); padding:20px; margin-top:8px}
+.totals .leader{padding:6px 0}
+.totals .grand{border-top:1px solid var(--line-strong); margin-top:10px; padding-top:12px}
+.totals .grand .amt{font-size:var(--display-md)}
+.quote-note{display:flex; gap:8px; align-items:center; font-size:var(--body-sm);
+  color:var(--ink-muted); margin-top:12px}
+.paywith{display:flex; gap:8px; margin:16px 0}
+.paychip{flex:1; height:44px; border:1px solid var(--line); border-radius:var(--r-md);
+  display:flex; align-items:center; justify-content:center; font-family:var(--font-display);
+  font-weight:700; font-size:var(--body-sm); color:var(--ink-muted); background:var(--surface)}
+
+/* confirmation */
+.confirm-wrap{text-align:center; max-width:640px; margin:0 auto}
+.timeline{display:flex; justify-content:center; gap:0; margin:40px 0 8px}
+.tstep{flex:1; max-width:180px; position:relative; padding-top:22px}
+.tstep::before{content:""; position:absolute; top:7px; left:0; right:0; height:2px; background:var(--line)}
+.tstep:first-child::before{left:50%}
+.tstep:last-child::before{right:50%}
+.tstep .pt{position:absolute; top:0; left:50%; transform:translateX(-50%);
+  width:16px; height:16px; border-radius:50%; background:var(--surface); border:2px solid var(--line-strong)}
+.tstep.done .pt{background:var(--open); border-color:var(--open)}
+.tstep.now .pt{background:var(--flame); border-color:var(--flame-deep)}
+.tstep .lb{font-size:var(--label); letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:var(--ink-muted)}
+.tstep.done .lb,.tstep.now .lb{color:var(--ink)}
+
+.sf-footer .cols{display:grid; gap:32px; grid-template-columns:1fr}
+@media(min-width:768px){.sf-footer .cols{grid-template-columns:2fr 1fr 1fr}}
+.sf-footer h4{font-size:var(--label); letter-spacing:.08em; text-transform:uppercase;
+  font-weight:600; color:var(--ink-on-roast-muted); margin-bottom:12px}
+.sf-footer p, .sf-footer li{color:var(--ink-on-roast); list-style:none}
+.sf-footer li{padding:4px 0}
+.footer-deep{background:var(--roast-deep); padding:20px 0; font-size:var(--body-sm);
+  color:var(--ink-on-roast-muted)}
+.footer-deep .container{max-width:var(--container); margin:0 auto; padding:0 16px;
+  display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap}
+
+/* v1.1 EVOLUTION #6 — storefront dark scheme (amends design.md §8).
+   Opt-in, light default, manual toggle. Storefront scope ONLY — admin stays
+   light, and the .kds scope shares nothing with this and is untouched. */
+.sf-root.dark{
+  --paper:#211712; --paper-sunk:#19100C; --surface:#2B1F18;
+  --ink:#F7F0E1; --ink-muted:#C9B6A8; --ink-faint:#8F7E72;
+  --line:#3E2F25; --line-strong:#8A7C68;
+  --brand-tint:#3B171C; --brand-text:#EE5B67;
+  --wash:rgb(247 240 225 / .07);
+  background:var(--paper);
+}
+.sf-root.dark .textured{
+  background-image:
+    repeating-linear-gradient(0deg, rgb(247 240 225 / .03) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgb(247 240 225 / .03) 0 1px, transparent 1px 4px);
+}
+.sf-root.dark .pcard .img, .sf-root.dark .modal .img{color:rgb(247 240 225 / .28)}
+.sf-root.dark .badge-open{background:rgb(46 125 70 / .25); color:#63BB80}
+.sf-root.dark .badge-warn{background:rgb(242 178 51 / .16); color:var(--flame)}
+.sf-root.dark .badge-danger{background:#3B171C; color:#EE5B67}
+.sf-root.dark .status-pill .dot{background:#3AA45C}
+.sf-root.dark .tip[aria-pressed="true"]{background:var(--flame); color:#241611; border-color:var(--flame)}
+.sf-root.dark .card, .sf-root.dark .sf-header{box-shadow:none} /* shadows don't read on dark; borders carry depth */
+
+/* theme toggle — text + switch, never icon-only (§8) */
+.theme-toggle{display:inline-flex; align-items:center; gap:10px; height:44px; padding:0 16px;
+  border-radius:var(--r-pill); border:1.5px solid var(--line-strong);
+  font-family:var(--font-display); font-weight:700; font-size:var(--body-sm); color:var(--ink-muted)}
+.theme-toggle:hover{background:var(--wash)}
+.theme-toggle .sw{width:34px; height:20px; border-radius:var(--r-pill); background:var(--line-strong);
+  position:relative; transition:background var(--t-fast) var(--ease); flex:none}
+.theme-toggle .sw::after{content:""; position:absolute; top:3px; left:3px; width:14px; height:14px;
+  border-radius:50%; background:var(--surface); transition:left var(--t-fast) var(--ease)}
+.theme-toggle[aria-pressed="true"] .sw{background:var(--flame)}
+.theme-toggle[aria-pressed="true"] .sw::after{left:17px}
+.sf-header .theme-toggle{margin-left:auto}
+.sf-header .cart-btn{margin-left:0}
+</style>
+<style>
+/* ================= ADMIN SCOPE ================= */
+.adm-root{background:var(--paper); min-height:70vh}
+.adm-shell{display:grid; grid-template-columns:232px 1fr; max-width:var(--container);
+  margin:0 auto; min-height:70vh; background:var(--surface); border:1px solid var(--line)}
+@media(max-width:1023px){.adm-shell{grid-template-columns:64px 1fr}}
+.adm-side{background:var(--paper-sunk); border-right:1px solid var(--line); padding:20px 0}
+.adm-side .wordmark{padding:0 20px 20px; font-size:1.1rem}
+.adm-nav a{display:flex; align-items:center; gap:12px; padding:12px 20px;
+  color:var(--ink-muted); text-decoration:none; font-weight:500; font-size:var(--body);
+  border-left:3px solid transparent; cursor:pointer}
+.adm-nav a:hover{color:var(--ink)}
+.adm-nav a.active{background:var(--brand-tint); color:var(--ink); border-left-color:var(--brand); font-weight:600}
+.adm-nav .ic{font-family:var(--font-mono); font-size:11px; width:20px; color:var(--ink-faint)}
+@media(max-width:1023px){.adm-side .wordmark small,.adm-nav .tx{display:none}}
+.adm-main{padding:24px 28px; overflow:auto}
+.adm-top{display:flex; align-items:center; gap:16px; margin-bottom:20px; flex-wrap:wrap}
+.adm-top h2{font-family:var(--font-display); font-weight:800; font-size:var(--display-lg)}
+.adm-top .right{margin-left:auto; display:flex; gap:8px; align-items:center}
+
+table.adm{width:100%; border-collapse:collapse; font-size:var(--body-sm)}
+table.adm th{font-size:var(--label); letter-spacing:.08em; text-transform:uppercase;
+  font-weight:600; color:var(--ink-muted); text-align:left; padding:12px 16px;
+  border-bottom:1px solid var(--line)}
+table.adm td{padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:middle}
+table.adm tbody tr:nth-child(even){background:color-mix(in srgb, var(--paper-sunk) 40%, var(--surface))}
+table.adm tbody tr{cursor:pointer}
+table.adm tbody tr:hover{background:var(--paper-sunk)}
+table.adm .num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+table.adm th.num{text-align:right}
+.adm .chip{font-size:12px; padding:6px 12px}
+
+.adm-banner{display:flex; gap:12px; align-items:center; background:rgb(156 84 8 / .12);
+  border:1px solid var(--warn); border-radius:var(--r-md); padding:12px 16px;
+  color:var(--warn); font-weight:500; margin-bottom:20px}
+
+.adm-detail-grid{display:grid; gap:24px; grid-template-columns:1fr; align-items:start}
+@media(min-width:1024px){.adm-detail-grid{grid-template-columns:1.4fr 1fr}}
+.adm-panel{border:1px solid var(--line); border-radius:var(--r-md); padding:20px}
+.adm-panel h3{font-family:var(--font-display); font-weight:700; font-size:var(--display-sm); margin-bottom:12px}
+.adm-line{display:flex; justify-content:space-between; gap:12px; padding:8px 0;
+  border-bottom:1px solid var(--line)}
+.adm-line:last-child{border-bottom:none}
+.adm-line .mods{display:block; font-size:var(--body-sm); color:var(--ink-muted)}
+.adm-line .num{font-variant-numeric:tabular-nums; white-space:nowrap; font-weight:600}
+.adm-events{list-style:none}
+.adm-events li{display:flex; gap:12px; padding:8px 0; font-size:var(--body-sm)}
+.adm-events .t{font-family:var(--font-mono); color:var(--ink-muted); white-space:nowrap}
+
+.kpis{display:grid; gap:16px; grid-template-columns:repeat(2,1fr); margin-bottom:24px}
+@media(min-width:1024px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{border:1px solid var(--line); border-radius:var(--r-md); padding:16px 20px}
+.kpi .lb{font-size:var(--label); letter-spacing:.08em; text-transform:uppercase;
+  font-weight:600; color:var(--ink-muted)}
+.kpi .v{font-family:var(--font-display); font-weight:800; font-size:var(--display-lg);
+  font-variant-numeric:tabular-nums; margin-top:4px}
+.kpi .d{font-size:var(--body-sm); color:var(--ink-muted)}
+
+.confirm-dialog{max-width:440px; border-radius:var(--r-lg)}
+.confirm-dialog .inner{padding:28px}
+.confirm-dialog h3{font-family:var(--font-display); font-weight:800; font-size:var(--display-md)}
+.confirm-dialog p{color:var(--ink-muted); margin:12px 0 24px}
+.confirm-dialog p strong{color:var(--ink)}
+.confirm-dialog .row{display:flex; gap:12px; justify-content:flex-end}
+.toggle{width:44px; height:26px; border-radius:var(--r-pill); background:var(--line-strong);
+  position:relative; transition:background var(--t-fast) var(--ease); flex:none}
+.toggle::after{content:""; position:absolute; top:3px; left:3px; width:20px; height:20px;
+  border-radius:50%; background:#fff; transition:left var(--t-fast) var(--ease)}
+.toggle[aria-pressed="true"]{background:var(--open)}
+.toggle[aria-pressed="true"]::after{left:21px}
+.dev-card{display:flex; align-items:center; gap:16px; border:1px solid var(--line);
+  border-radius:var(--r-md); padding:16px 20px; margin-bottom:12px}
+.dev-card .nm{font-weight:600}
+.dev-card .meta{font-size:var(--body-sm); color:var(--ink-muted); font-family:var(--font-mono)}
+.dev-card .right{margin-left:auto; display:flex; align-items:center; gap:12px}
+
+/* ================= KITCHEN SCOPE — dark surface, not a theme ================= */
+.kds-root{background:var(--kds-bg); color:var(--kds-ink); min-height:80vh; padding-bottom:48px}
+.kds-top{display:flex; align-items:center; gap:20px; padding:16px 24px;
+  border-bottom:1px solid var(--kds-line-strong)}
+.kds-top .wm{font-family:var(--font-poster); font-size:1.25rem; color:var(--kds-ink);
+  text-transform:uppercase}
+.kds-top .clock{margin-left:auto; font-family:var(--font-mono); font-weight:700;
+  font-size:var(--mono-lg); font-variant-numeric:tabular-nums}
+.kds-top .net{display:flex; align-items:center; gap:8px; font-size:var(--body);
+  color:var(--kds-ink-muted)}
+.kds-top .net .dot{width:10px; height:10px; border-radius:50%; background:var(--kds-open)}
+.kds-grid{display:grid; gap:20px; padding:24px;
+  grid-template-columns:repeat(auto-fill, minmax(300px, 1fr))}
+.kcard{position:relative; background:var(--kds-card); border:1px solid var(--kds-line-strong);
+  border-radius:var(--r-md); padding:20px 20px 20px 26px; overflow:hidden;
+  display:flex; flex-direction:column; gap:12px}
+.kcard .agebar{position:absolute; left:0; top:0; bottom:0; width:6px; background:var(--kds-open)}
+.kcard.age-warn .agebar{background:var(--flame)}
+.kcard.age-late .agebar{background:var(--kds-danger)}
+@keyframes latepulse{0%,100%{border-color:var(--kds-line-strong)}50%{border-color:var(--kds-danger)}}
+@media (prefers-reduced-motion: no-preference){
+  .kcard.age-late{animation:latepulse 2s var(--ease) infinite}
+}
+.kcard .head{display:flex; align-items:center; gap:12px}
+.kcard .chip{background:var(--kds-card-raised); color:var(--kds-ink); font-size:var(--mono-lg); padding:12px 20px}
+.kcard .elapsed{margin-left:auto; font-family:var(--font-mono); font-weight:700;
+  font-size:var(--mono-lg); font-variant-numeric:tabular-nums}
+.kcard.age-warn .elapsed{color:var(--flame)}
+.kcard.age-late .elapsed{color:var(--kds-danger)}
+.kcard .lines{display:flex; flex-direction:column; gap:10px}
+.kline .qn{display:flex; gap:12px; font-family:var(--font-display); font-weight:700;
+  font-size:var(--display-md); line-height:1.15}
+.kline .qn .q{font-variant-numeric:tabular-nums; min-width:34px}
+.kline .mods{padding-left:46px; font-size:var(--body-lg); color:var(--kds-ink); font-weight:500}
+.knote{border:1px solid var(--flame); border-radius:var(--r-sm); padding:10px 14px;
+  font-size:var(--body-lg)}
+.knote .lb{display:block; font-size:var(--label); letter-spacing:.08em; text-transform:uppercase;
+  font-weight:600; color:var(--flame); margin-bottom:2px}
+.kbtn{margin-top:auto; height:64px; width:100%; border-radius:var(--r-pill);
+  font-family:var(--font-display); font-weight:800; font-size:var(--display-sm)}
+.kbtn-start{background:var(--kds-card-raised); color:var(--kds-ink); border:1.5px solid var(--kds-line-strong)}
+.kbtn-ready{background:var(--kds-open); color:#fff}
+.kbtn-picked{background:transparent; color:var(--kds-ink-muted); border:1.5px solid var(--kds-line)}
+.kds-unlock{position:absolute; inset:0; z-index:50; background:rgb(20 17 16 / .92);
+  display:none; align-items:center; justify-content:center; padding:24px}
+.kds-unlock.on{display:flex}
+.kds-unlock .panel{background:var(--kds-card-raised); border:1px solid var(--kds-line-strong);
+  border-radius:var(--r-lg); padding:40px; max-width:520px; text-align:center}
+.kds-unlock h3{font-family:var(--font-display); font-weight:800; font-size:var(--display-lg)}
+.kds-unlock p{color:var(--kds-ink-muted); margin:12px 0 28px; font-size:var(--body-lg)}
+.kds-offline{display:none; background:rgb(156 84 8 / .25); color:var(--flame);
+  border-bottom:1px solid var(--flame-deep); padding:10px 24px; font-weight:600}
+.kds-offline.on{display:block}
+
+/* ================= NOTES TAB ================= */
+.notes-root{background:#1A1512; color:#CFC4BA; font-family:var(--font-mono); font-size:13px;
+  min-height:70vh; padding:40px 16px}
+.notes-inner{max-width:820px; margin:0 auto}
+.notes-inner h2{color:#F2B233; font-size:15px; letter-spacing:.12em; text-transform:uppercase;
+  margin:32px 0 12px; font-weight:700}
+.notes-inner h2:first-child{margin-top:0}
+.notes-inner li{margin:0 0 10px 18px; line-height:1.7}
+.notes-inner strong{color:#F7F0E1; font-weight:700}
+.notes-inner code{color:#F2B233}
+</style>
+</head>
+<body>
+
+<!-- ============ PREVIEW CHROME ============ -->
+<nav class="chrome" aria-label="Design preview">
+  <div class="chrome-row">
+    <span class="chrome-title">Harold's · design v1.1</span>
+    <button class="chrome-tab" data-surface="sf" aria-selected="true" onclick="surf('sf')">Storefront</button>
+    <button class="chrome-tab" data-surface="adm" aria-selected="false" onclick="surf('adm')">Admin</button>
+    <button class="chrome-tab" data-surface="kds" aria-selected="false" onclick="surf('kds')">Kitchen</button>
+    <button class="chrome-tab" data-surface="notes" aria-selected="false" onclick="surf('notes')">&Delta; Notes</button>
+  </div>
+  <div class="chrome-sub" id="sub-sf">
+    <div class="chrome-row">
+      <button class="chrome-tab" data-screen="sf-home" aria-selected="true" onclick="scr('sf','sf-home')">Home</button>
+      <button class="chrome-tab" data-screen="sf-menu" aria-selected="false" onclick="scr('sf','sf-menu')">Menu</button>
+      <button class="chrome-tab" data-screen="sf-checkout" aria-selected="false" onclick="scr('sf','sf-checkout')">Checkout</button>
+      <button class="chrome-tab" data-screen="sf-confirm" aria-selected="false" onclick="scr('sf','sf-confirm')">Confirmation</button>
+    </div>
+  </div>
+  <div class="chrome-sub" id="sub-adm" hidden>
+    <div class="chrome-row">
+      <button class="chrome-tab" data-screen="adm-orders" aria-selected="true" onclick="scr('adm','adm-orders')">Orders</button>
+      <button class="chrome-tab" data-screen="adm-detail" aria-selected="false" onclick="scr('adm','adm-detail')">Order detail</button>
+      <button class="chrome-tab" data-screen="adm-menu" aria-selected="false" onclick="scr('adm','adm-menu')">Menu</button>
+      <button class="chrome-tab" data-screen="adm-reports" aria-selected="false" onclick="scr('adm','adm-reports')">Reports</button>
+      <button class="chrome-tab" data-screen="adm-settings" aria-selected="false" onclick="scr('adm','adm-settings')">Settings</button>
+    </div>
+  </div>
+  <div class="chrome-sub" id="sub-kds" hidden>
+    <div class="chrome-row">
+      <button class="chrome-tab" data-screen="kds-board" aria-selected="true" onclick="scr('kds','kds-board')">Board</button>
+      <button class="chrome-tab" onclick="toggleUnlock()" aria-selected="false">Show audio unlock</button>
+      <button class="chrome-tab" onclick="toggleOffline()" aria-selected="false">Toggle offline bar</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ==================== STOREFRONT ==================== -->
+<div class="surface-root sf-root on" id="root-sf">
+
+  <header class="sf-header" role="banner">
+    <div class="container">
+      <div class="wordmark">Harold's<small>Chicken · Oak Lawn</small></div>
+      <span class="status-pill"><span class="dot"></span>Open · ready in ~20 min</span>
+      <button class="theme-toggle" aria-pressed="false" onclick="toggleTheme(this)">
+        <span class="tx">Dark</span><span class="sw" aria-hidden="true"></span>
+      </button>
+      <button class="cart-btn" onclick="openCart()" aria-label="Cart, 3 items">
+        Cart <span class="cart-count">3</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============ HOME ============ -->
+  <div class="screen on" id="sf-home">
+    <div class="announce">Closing early Sunday at 8:00 PM for Labor Day weekend.
+      <button aria-label="Dismiss announcement">Dismiss</button></div>
+
+    <section class="band b-paper textured hero">
+      <div class="container">
+        <p class="eyebrow">87th &amp; Cicero · Pickup only</p>
+        <h1 style="margin-top:12px">Fries under.<br>Sauce over.<br><span class="accent">Fifty years loud.</span></h1>
+        <p>Fried to order the way the South Side has eaten it since 1950 — order ahead, skip the line, pick it up hot.</p>
+        <button class="btn btn-primary btn-lg" onclick="scr('sf','sf-menu')">Order pickup</button>
+        <div class="hero-meta">
+          <span class="badge badge-neutral">Guest checkout</span>
+          <span class="badge badge-neutral">Pay at pickup — never</span>
+          <span class="badge badge-neutral">Card · Apple Pay · Google Pay · Cash App</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="band b-sunk textured" style="padding-top:40px;padding-bottom:40px">
+      <div class="container">
+        <p class="eyebrow" style="margin-bottom:16px">Straight to a section</p>
+        <div class="cat-rail">
+          <button class="cat-tile" onclick="scr('sf','sf-menu')"><span class="circle">W</span><span class="lbl">Wings</span></button>
+          <button class="cat-tile" onclick="scr('sf','sf-menu')"><span class="circle">C</span><span class="lbl">Chicken</span></button>
+          <button class="cat-tile" onclick="scr('sf','sf-menu')"><span class="circle">F</span><span class="lbl">Fish</span></button>
+          <button class="cat-tile" onclick="scr('sf','sf-menu')"><span class="circle">G</span><span class="lbl">Gizzards</span></button>
+          <button class="cat-tile" onclick="scr('sf','sf-menu')"><span class="circle">S</span><span class="lbl">Sides</span></button>
+          <button class="cat-tile" onclick="scr('sf','sf-menu')"><span class="circle">D</span><span class="lbl">Drinks</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="band b-paper textured">
+      <div class="container">
+        <h2 class="poster">Most ordered</h2>
+        <p style="color:var(--ink-muted);margin-top:8px">What the neighborhood keeps coming back for.</p>
+        <div class="grid-products">
+
+          <button class="pcard card" onclick="openItem()">
+            <div class="img"><span class="init">6</span><span class="corner-badge">New</span></div>
+            <div class="body">
+              <h3>6 wing dinner</h3>
+              <p class="desc">Six whole wings fried to order, fries under, white bread on top.</p>
+              <p class="hint">Sauce choice · Extras</p>
+              <div class="foot"><span class="price">$13.99</span><span class="btn btn-secondary btn-sm">Add +</span></div>
+            </div>
+          </button>
+
+          <button class="pcard card" onclick="openItem()">
+            <div class="img"><span class="init">H</span></div>
+            <div class="body">
+              <h3>Half dark dinner</h3>
+              <p class="desc">Leg and thigh quarters, skin crisp, over fries with mild sauce.</p>
+              <p class="hint">Sauce choice · Extras</p>
+              <div class="foot"><span class="price">$11.99</span><span class="btn btn-secondary btn-sm">Add +</span></div>
+            </div>
+          </button>
+
+          <div class="pcard card soldout">
+            <div class="img"><span class="init">C</span><span class="corner-badge">Sold out</span></div>
+            <div class="body">
+              <h3>Catfish dinner</h3>
+              <p class="desc">Cornmeal-dusted catfish fillets, fried hard, fries and slaw.</p>
+              <p class="hint">Sauce choice</p>
+              <div class="foot"><span class="price">$15.99</span><span class="unavail">Unavailable</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <section class="band b-roast">
+      <div class="container" style="text-align:center">
+        <p class="eyebrow">87 items · priced off the board</p>
+        <h2 class="poster" style="margin:12px 0 32px">The whole board is here</h2>
+        <button class="btn btn-poster" onclick="scr('sf','sf-menu')">See the full menu</button>
+      </div>
+    </section>
+
+    <footer class="sf-footer">
+      <div class="band b-roast" style="padding-bottom:48px">
+        <div class="container cols">
+          <div>
+            <div class="wordmark" style="color:var(--ink-on-roast)">Harold's<small style="color:var(--ink-on-roast-muted)">Chicken · Oak Lawn</small></div>
+            <p style="margin-top:16px;max-width:320px;color:var(--ink-on-roast-muted)">One location. One street. Pickup only, paid online, ready when we text you.</p>
+          </div>
+          <div>
+            <h4>Find us</h4>
+            <ul><li>87th &amp; Cicero, Oak Lawn</li><li>(708) 555-0141</li><li>Open 11:00 AM – 9:00 PM</li></ul>
+          </div>
+          <div>
+            <h4>Ordering</h4>
+            <ul><li>Menu</li><li>Order status</li><li>Refund policy</li></ul>
+          </div>
+        </div>
+      </div>
+      <div class="footer-deep">
+        <div class="container"><span>© 2026 Harold's Chicken Oak Lawn</span><span>Prices set at the board</span></div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ============ MENU ============ -->
+  <div class="screen" id="sf-menu">
+    <div class="sticky-tabs">
+      <div class="row" role="tablist" aria-label="Menu categories">
+        <button class="mtab" aria-selected="true" onclick="mtab(this)">Wings</button>
+        <button class="mtab" aria-selected="false" onclick="mtab(this)">Chicken</button>
+        <button class="mtab" aria-selected="false" onclick="mtab(this)">Fish</button>
+        <button class="mtab" aria-selected="false" onclick="mtab(this)">Gizzards &amp; livers</button>
+        <button class="mtab" aria-selected="false" onclick="mtab(this)">Sides</button>
+        <button class="mtab" aria-selected="false" onclick="mtab(this)">Drinks</button>
+      </div>
+    </div>
+
+    <div class="band b-paper textured" style="padding-top:32px;padding-bottom:24px">
+      <div class="container">
+        <h2 class="poster" style="font-size:var(--poster-lg)">Our menu</h2>
+        <p style="color:var(--ink-muted);margin-top:8px">Every dinner comes with fries under, mild sauce over, and white bread on top — unless you say otherwise.</p>
+      </div>
+    </div>
+
+    <section class="menu-section">
+      <div class="container">
+        <h2>Wings</h2>
+        <p class="sub">Whole wings, fried to order.</p>
+        <div class="grid-products">
+          <button class="pcard card" onclick="openItem()">
+            <div class="img"><span class="init">6</span></div>
+            <div class="body">
+              <h3>6 wing dinner</h3>
+              <p class="desc">Six whole wings fried to order, fries under, white bread on top.</p>
+              <p class="hint">Sauce choice · Extras</p>
+              <div class="foot"><span class="price">$13.99</span><span class="btn btn-secondary btn-sm">Add +</span></div>
+            </div>
+          </button>
+          <button class="pcard card" onclick="openItem()">
+            <div class="img"><span class="init">10</span></div>
+            <div class="body">
+              <h3>10 wing dinner</h3>
+              <p class="desc">Ten whole wings for a real appetite, fries and bread included.</p>
+              <p class="hint">Sauce choice · Extras</p>
+              <div class="foot"><span class="price">$19.49</span><span class="btn btn-secondary btn-sm">Add +</span></div>
+            </div>
+          </button>
+          <button class="pcard card" onclick="openItem()">
+            <div class="img"><span class="init">4</span></div>
+            <div class="body">
+              <h3>4 wing snack</h3>
+              <p class="desc">Four whole wings over fries. The quick fix.</p>
+              <p class="hint">Sauce choice</p>
+              <div class="foot"><span class="price">$9.99</span><span class="btn btn-secondary btn-sm">Add +</span></div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="menu-section">
+      <div class="container">
+        <h2>Chicken</h2>
+        <p class="sub">Quarters and halves, dark or white.</p>
+        <div class="grid-products">
+          <button class="pcard card" onclick="openItem()">
+            <div class="img"><span class="init">H</span></div>
+            <div class="body">
+              <h3>Half dark dinner</h3>
+              <p class="desc">Leg and thigh quarters, skin crisp, over fries with mild sauce.</p>
+              <p class="hint">Sauce choice · Extras</p>
+              <div class="foot"><span class="price">$11.99</span><span class="btn btn-secondary btn-sm">Add +</span></div>
+            </div>
+          </button>
+          <button class="pcard card" onclick="openItem()">
+            <div class="img"><span class="init">H</span></div>
+            <div class="body">
+              <h3>Half white dinner</h3>
+              <p class="desc">Breast and wing quarters, fried hard if you want it.</p>
+              <p class="hint">Sauce choice · Extras</p>
+              <div class="foot"><span class="price">$13.49</span><span class="btn btn-secondary btn-sm">Add +</span></div>
+            </div>
+          </button>
+          <button class="pcard card" onclick="openItem()">
+            <div class="img"><span class="init">Q</span></div>
+            <div class="body">
+              <h3>Quarter dark dinner</h3>
+              <p class="desc">One leg quarter over fries. Lunch-sized.</p>
+              <p class="hint">Sauce choice</p>
+              <div class="foot"><span class="price">$8.99</span><span class="btn btn-secondary btn-sm">Add +</span></div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="menu-section" style="padding-bottom:48px">
+      <div class="container">
+        <h2>Fish</h2>
+        <p class="sub">Cornmeal-dusted, fried hard.</p>
+        <div class="grid-products">
+          <div class="pcard card soldout">
+            <div class="img"><span class="init">C</span><span class="corner-badge">Sold out</span></div>
+            <div class="body">
+              <h3>Catfish dinner</h3>
+              <p class="desc">Cornmeal-dusted catfish fillets, fried hard, fries and slaw.</p>
+              <p class="hint">Sauce choice</p>
+              <div class="foot"><span class="price">$15.99</span><span class="unavail">Unavailable</span></div>
+            </div>
+          </div>
+          <button class="pcard card" onclick="openItem()">
+            <div class="img"><span class="init">P</span></div>
+            <div class="body">
+              <h3>Perch dinner</h3>
+              <p class="desc">Lake perch, light and crisp, with fries and slaw.</p>
+              <p class="hint">Sauce choice</p>
+              <div class="foot"><span class="price">$14.99</span><span class="btn btn-secondary btn-sm">Add +</span></div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="band b-roast" style="padding:48px 0">
+      <div class="container" style="text-align:center">
+        <button class="btn btn-poster" onclick="openCart()">Review your order · 3 items</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ CHECKOUT ============ -->
+  <div class="screen" id="sf-checkout">
+    <div class="band b-paper textured" style="padding-top:40px">
+      <div class="container">
+        <h2 class="poster" style="font-size:var(--poster-lg);margin-bottom:32px">Checkout</h2>
+        <div class="co-grid">
+          <div>
+            <div class="co-card card" style="margin-bottom:24px">
+              <h3>Who's picking up</h3>
+              <div class="field">
+                <label for="f-name">Name</label>
+                <input id="f-name" placeholder="First name is fine" value="Marcus">
+              </div>
+              <div class="field">
+                <label for="f-phone">Mobile number</label>
+                <input id="f-phone" inputmode="tel" value="(708) 555-0192">
+                <p class="help">We text this number when your order is ready.</p>
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label for="f-email">Email</label>
+                <input id="f-email" inputmode="email" value="marcus@example.com">
+                <p class="help">Receipt only. No marketing, no account.</p>
+              </div>
+            </div>
+
+            <div class="co-card card">
+              <h3>Tip the kitchen</h3>
+              <div class="tips" role="group" aria-label="Tip amount">
+                <button class="tip" aria-pressed="false" onclick="pickTip(this)">No tip</button>
+                <button class="tip" aria-pressed="false" onclick="pickTip(this)">15%</button>
+                <button class="tip" aria-pressed="true" onclick="pickTip(this)">18%</button>
+                <button class="tip" aria-pressed="false" onclick="pickTip(this)">20%</button>
+              </div>
+              <p class="help" style="font-size:var(--body-sm);color:var(--ink-muted);margin-top:12px">
+                Presets and default are the configured values — unchanged by design. (Open Input #4)</p>
+            </div>
+          </div>
+
+          <div class="co-card card">
+            <h3>Your order</h3>
+            <div class="leader" style="padding:6px 0"><span>6 wing dinner ×1</span><span class="dots"></span><span class="amt">$13.99</span></div>
+            <p style="font-size:var(--body-sm);color:var(--ink-muted);padding-left:2px;margin-top:-4px">Mild sauce · Extra bread</p>
+            <div class="leader" style="padding:6px 0"><span>Half dark dinner ×1</span><span class="dots"></span><span class="amt">$11.99</span></div>
+            <p style="font-size:var(--body-sm);color:var(--ink-muted);padding-left:2px;margin-top:-4px">Hot sauce</p>
+            <div class="leader" style="padding:6px 0"><span>Coleslaw ×1</span><span class="dots"></span><span class="amt">$2.50</span></div>
+
+            <div class="totals">
+              <div class="leader"><span>Subtotal</span><span class="dots"></span><span class="amt">$28.48</span></div>
+              <div class="leader"><span>Tax</span><span class="dots"></span><span class="amt">$2.92</span></div>
+              <div class="leader"><span>Tip (18%)</span><span class="dots"></span><span class="amt" id="tip-amt">$5.13</span></div>
+              <div class="leader grand"><span style="font-family:var(--font-display);font-weight:800">Total</span><span class="dots"></span><span class="amt">$36.53</span></div>
+            </div>
+            <p class="quote-note">Quoted by the store just now — every figure above, tip included, comes from the server.</p>
+
+            <div class="paywith">
+              <span class="paychip">Card</span><span class="paychip">Apple&nbsp;Pay</span>
+              <span class="paychip">Google&nbsp;Pay</span><span class="paychip">Cash&nbsp;App</span>
+            </div>
+            <button class="btn btn-primary" style="width:100%;height:52px" onclick="scr('sf','sf-confirm')">Pay $36.53</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CONFIRMATION ============ -->
+  <div class="screen" id="sf-confirm">
+    <div class="band b-paper textured">
+      <div class="container confirm-wrap">
+        <p class="eyebrow">Order placed · paid</p>
+        <h2 class="poster" style="margin:12px 0 32px">We're on it</h2>
+        <span class="chip chip-lg">HC-047</span>
+        <div class="timeline">
+          <div class="tstep done"><span class="pt"></span><span class="lb">Received</span></div>
+          <div class="tstep now"><span class="pt"></span><span class="lb">Preparing</span></div>
+          <div class="tstep"><span class="pt"></span><span class="lb">Ready</span></div>
+        </div>
+        <p style="font-size:var(--body-lg);margin-top:24px">Ready around <strong style="font-family:var(--font-display)">6:42 PM</strong> — we'll text (708)&nbsp;555-0192 the moment it's up.</p>
+        <p style="color:var(--ink-muted);margin-top:8px">Give your order number at the counter. Receipt sent by text and email.</p>
+      </div>
+    </div>
+    <div class="band b-roast" style="padding:48px 0">
+      <div class="container" style="text-align:center">
+        <p class="eyebrow" style="margin-bottom:16px">Pick up at</p>
+        <p style="font-family:var(--font-display);font-weight:800;font-size:var(--display-lg)">87th &amp; Cicero, Oak Lawn</p>
+        <p style="color:var(--ink-on-roast-muted);margin-top:8px">Park in front — come straight to the counter.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ITEM MODAL ============ -->
+  <div class="overlay" id="ov-item" onclick="if(event.target===this)closeItem()">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="6 wing dinner">
+      <div class="img"><span>6</span><span class="corner-badge">New</span></div>
+      <div class="inner">
+        <h3>6 wing dinner</h3>
+        <p class="desc">Six whole wings fried to order, fries under, white bread on top.</p>
+        <div class="mgroup">
+          <h4>Sauce</h4>
+          <p class="rule">Choose 1</p>
+          <label class="mrow"><input type="radio" name="sauce" checked><span class="nm">Mild sauce</span></label>
+          <label class="mrow"><input type="radio" name="sauce"><span class="nm">Hot sauce</span></label>
+          <label class="mrow"><input type="radio" name="sauce"><span class="nm">Half &amp; half</span></label>
+          <label class="mrow"><input type="radio" name="sauce"><span class="nm">On the side</span></label>
+        </div>
+        <div class="mgroup">
+          <h4>Extras</h4>
+          <p class="rule">Optional · choose up to 3</p>
+          <label class="mrow"><input type="checkbox" class="ex" data-p="0.75" onchange="modalPrice()"><span class="nm">Extra mild sauce</span><span class="pr">+$0.75</span></label>
+          <label class="mrow"><input type="checkbox" class="ex" data-p="0.50" onchange="modalPrice()"><span class="nm">Extra bread</span><span class="pr">+$0.50</span></label>
+          <label class="mrow"><input type="checkbox" class="ex" data-p="2.50" onchange="modalPrice()"><span class="nm">Coleslaw</span><span class="pr">+$2.50</span></label>
+        </div>
+        <div class="mgroup">
+          <h4>Note for the kitchen</h4>
+          <p class="rule">Optional</p>
+          <textarea class="note-field" placeholder="Fried hard, salt &amp; pepper…"></textarea>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <div class="qty" aria-label="Quantity">
+          <button onclick="qty(-1)" aria-label="Decrease">−</button>
+          <span class="n" id="qty-n">1</span>
+          <button onclick="qty(1)" aria-label="Increase">+</button>
+        </div>
+        <button class="btn btn-primary" onclick="closeItem()">Add to cart · <span id="modal-total">$13.99</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CART SHEET ============ -->
+  <div class="sheet" id="cart-sheet" role="dialog" aria-modal="true" aria-label="Cart">
+    <div class="sheet-head">
+      <h3>Your order · 3 items</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeCart()">Close</button>
+    </div>
+    <div class="sheet-body">
+      <div class="cline">
+        <div><p class="nm">6 wing dinner</p><p class="mods">Mild sauce · Extra bread</p></div>
+        <div class="right"><div class="qty"><button aria-label="Decrease">−</button><span class="n">1</span><button aria-label="Increase">+</button></div></div>
+      </div>
+      <div class="cline">
+        <div><p class="nm">Half dark dinner</p><p class="mods">Hot sauce</p></div>
+        <div class="right"><div class="qty"><button aria-label="Decrease">−</button><span class="n">1</span><button aria-label="Increase">+</button></div></div>
+      </div>
+      <div class="cline" style="border-bottom:none">
+        <div><p class="nm">Coleslaw</p></div>
+        <div class="right"><div class="qty"><button aria-label="Decrease">−</button><span class="n">1</span><button aria-label="Increase">+</button></div></div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <p class="note">Your total is quoted at checkout — no figure here is computed on this device.</p>
+      <button class="btn btn-primary" style="width:100%;height:52px" onclick="closeCart();scr('sf','sf-checkout')">Go to checkout</button>
+    </div>
+  </div>
+
+  <button class="cart-bar on" id="cart-bar" onclick="openCart()">
+    <span>3 items in your order</span><span>View cart</span>
+  </button>
+
+</div>
+
+<!-- ==================== ADMIN ==================== -->
+<div class="surface-root adm-root" id="root-adm">
+  <div style="padding:24px 16px">
+    <div class="adm-shell">
+      <aside class="adm-side">
+        <div class="wordmark">Harold's<small>Back office</small></div>
+        <nav class="adm-nav" aria-label="Admin">
+          <a class="active" id="an-orders" onclick="scr('adm','adm-orders')"><span class="ic">01</span><span class="tx">Orders</span></a>
+          <a id="an-menu" onclick="scr('adm','adm-menu')"><span class="ic">02</span><span class="tx">Menu</span></a>
+          <a id="an-reports" onclick="scr('adm','adm-reports')"><span class="ic">03</span><span class="tx">Reports</span></a>
+          <a id="an-settings" onclick="scr('adm','adm-settings')"><span class="ic">04</span><span class="tx">Settings</span></a>
+        </nav>
+      </aside>
+      <main class="adm-main">
+
+        <!-- Orders list -->
+        <div class="screen on" id="adm-orders">
+          <div class="adm-top">
+            <h2>Orders — today</h2>
+            <span class="badge badge-open"><span class="dot"></span>Store open</span>
+            <div class="right">
+              <button class="btn btn-secondary btn-sm">Export day</button>
+            </div>
+          </div>
+          <table class="adm">
+            <thead><tr>
+              <th>Order</th><th>Placed</th><th>Customer</th><th>Items</th>
+              <th class="num">Total</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody>
+              <tr onclick="scr('adm','adm-detail')">
+                <td><span class="chip">HC-047</span></td><td class="num">6:18 PM</td>
+                <td>Marcus · (708) 555-0192</td><td>3</td><td class="num">$36.53</td>
+                <td><span class="badge badge-warn">Preparing</span></td>
+                <td><button class="btn btn-ghost btn-sm">View</button></td>
+              </tr>
+              <tr onclick="scr('adm','adm-detail')">
+                <td><span class="chip">HC-046</span></td><td class="num">6:12 PM</td>
+                <td>Denise · (773) 555-0114</td><td>1</td><td class="num">$13.99</td>
+                <td><span class="badge badge-warn">Preparing</span></td>
+                <td><button class="btn btn-ghost btn-sm">View</button></td>
+              </tr>
+              <tr onclick="scr('adm','adm-detail')">
+                <td><span class="chip">HC-045</span></td><td class="num">6:04 PM</td>
+                <td>Ray · (708) 555-0177</td><td>4</td><td class="num">$47.21</td>
+                <td><span class="badge badge-open">Ready</span></td>
+                <td><button class="btn btn-ghost btn-sm">View</button></td>
+              </tr>
+              <tr onclick="scr('adm','adm-detail')">
+                <td><span class="chip">HC-044</span></td><td class="num">5:51 PM</td>
+                <td>Tanya · (312) 555-0139</td><td>2</td><td class="num">$25.47</td>
+                <td><span class="badge badge-neutral">Picked up</span></td>
+                <td><button class="btn btn-ghost btn-sm">View</button></td>
+              </tr>
+              <tr onclick="scr('adm','adm-detail')">
+                <td><span class="chip">HC-043</span></td><td class="num">5:47 PM</td>
+                <td>Andre · (708) 555-0102</td><td>2</td><td class="num">$22.10</td>
+                <td><span class="badge badge-neutral">Picked up</span></td>
+                <td><button class="btn btn-ghost btn-sm">View</button></td>
+              </tr>
+              <tr onclick="scr('adm','adm-detail')">
+                <td><span class="chip">HC-042</span></td><td class="num">5:31 PM</td>
+                <td>Keisha · (773) 555-0186</td><td>1</td><td class="num">$18.40</td>
+                <td><span class="badge badge-danger">Refunded</span></td>
+                <td><button class="btn btn-ghost btn-sm">View</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Order detail -->
+        <div class="screen" id="adm-detail">
+          <div class="adm-top">
+            <button class="btn btn-ghost btn-sm" onclick="scr('adm','adm-orders')">&larr; Orders</button>
+            <h2>Order <span class="chip" style="vertical-align:middle">HC-047</span></h2>
+            <span class="badge badge-warn">Preparing</span>
+            <div class="right">
+              <button class="btn btn-secondary btn-sm">Reprint ticket</button>
+              <button class="btn btn-danger btn-sm" onclick="openRefund()">Refund…</button>
+            </div>
+          </div>
+          <div class="adm-detail-grid">
+            <div class="adm-panel">
+              <h3>Items</h3>
+              <div class="adm-line">
+                <span>1 × 6 wing dinner<span class="mods">Mild sauce · Extra bread</span></span>
+                <span class="num">$14.49</span>
+              </div>
+              <div class="adm-line">
+                <span>1 × Half dark dinner<span class="mods">Hot sauce</span></span>
+                <span class="num">$11.99</span>
+              </div>
+              <div class="adm-line">
+                <span>1 × Coleslaw</span>
+                <span class="num">$2.50</span>
+              </div>
+              <div class="totals" style="margin-top:16px">
+                <div class="leader"><span>Subtotal</span><span class="dots"></span><span class="amt">$28.98</span></div>
+                <div class="leader"><span>Tax</span><span class="dots"></span><span class="amt">$2.92</span></div>
+                <div class="leader"><span>Tip</span><span class="dots"></span><span class="amt">$5.13</span></div>
+                <div class="leader grand"><span style="font-weight:700">Charged</span><span class="dots"></span><span class="amt">$37.03</span></div>
+              </div>
+              <p style="font-size:var(--body-sm);color:var(--ink-muted);margin-top:10px">Square payment <code style="font-family:var(--font-mono)">sq_9F2KX…</code> · captured 6:18 PM</p>
+            </div>
+            <div>
+              <div class="adm-panel" style="margin-bottom:24px">
+                <h3>Customer</h3>
+                <p style="font-weight:600">Marcus</p>
+                <p style="font-family:var(--font-mono);font-size:var(--body-sm);color:var(--ink-muted)">(708) 555-0192 · marcus@example.com</p>
+                <p style="font-size:var(--body-sm);color:var(--ink-muted);margin-top:8px">Ready SMS not yet sent · receipt email delivered</p>
+              </div>
+              <div class="adm-panel">
+                <h3>Timeline</h3>
+                <ul class="adm-events">
+                  <li><span class="t">6:18:03</span><span>Order received · paid</span></li>
+                  <li><span class="t">6:18:04</span><span>Kitchen ticket printed</span></li>
+                  <li><span class="t">6:19:41</span><span>Started on the board</span></li>
+                  <li><span class="t">—</span><span style="color:var(--ink-faint)">Ready · not yet</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Menu management -->
+        <div class="screen" id="adm-menu">
+          <div class="adm-top">
+            <h2>Menu</h2>
+            <div class="right"><button class="btn btn-primary btn-sm">Add item</button></div>
+          </div>
+          <div class="adm-banner">
+            <strong>3 items</strong> have unverified prices against the board. Every price ships from the board, not from memory.
+          </div>
+          <table class="adm">
+            <thead><tr>
+              <th>Item</th><th>Category</th><th class="num">Price</th>
+              <th>Modifiers</th><th>Flags</th><th>Available</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td style="font-weight:600">6 wing dinner</td><td>Wings</td><td class="num">$13.99</td>
+                <td>Sauce · Extras</td><td></td>
+                <td><button class="toggle" aria-pressed="true" aria-label="Available" onclick="tg(this);event.stopPropagation()"></button></td>
+              </tr>
+              <tr>
+                <td style="font-weight:600">Half white dinner</td><td>Chicken</td><td class="num">$13.49</td>
+                <td>Sauce · Extras</td>
+                <td><span class="badge badge-warn">Unverified price</span></td>
+                <td><button class="toggle" aria-pressed="true" aria-label="Available" onclick="tg(this);event.stopPropagation()"></button></td>
+              </tr>
+              <tr>
+                <td style="font-weight:600">Catfish dinner</td><td>Fish</td><td class="num">$15.99</td>
+                <td>Sauce</td>
+                <td><span class="badge badge-danger">Sold out</span></td>
+                <td><button class="toggle" aria-pressed="false" aria-label="Unavailable" onclick="tg(this);event.stopPropagation()"></button></td>
+              </tr>
+              <tr>
+                <td style="font-weight:600">Gizzards</td><td>Gizzards &amp; livers</td><td class="num">$9.49</td>
+                <td style="color:var(--ink-faint)">None bound</td>
+                <td><span class="badge badge-warn">No modifiers</span></td>
+                <td><button class="toggle" aria-pressed="true" aria-label="Available" onclick="tg(this);event.stopPropagation()"></button></td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="font-size:var(--body-sm);color:var(--ink-muted);margin-top:16px">
+            Changes save on <strong>Save</strong> only — nothing autosaves. A price is a financial event.</p>
+        </div>
+
+        <!-- Reports -->
+        <div class="screen" id="adm-reports">
+          <div class="adm-top">
+            <h2>Reports — Fri, Aug 28</h2>
+            <div class="right"><button class="btn btn-secondary btn-sm">Change day</button></div>
+          </div>
+          <div class="kpis">
+            <div class="kpi"><p class="lb">Orders</p><p class="v">64</p><p class="d">58 picked up · 1 refund</p></div>
+            <div class="kpi"><p class="lb">Gross</p><p class="v">$1,842.17</p><p class="d">incl. tax &amp; tips</p></div>
+            <div class="kpi"><p class="lb">Tips</p><p class="v">$196.40</p><p class="d">avg 14.2%</p></div>
+            <div class="kpi"><p class="lb">Avg ready time</p><p class="v">17 min</p><p class="d">longest 31 min</p></div>
+          </div>
+          <table class="adm">
+            <thead><tr><th>Item</th><th class="num">Sold</th><th class="num">Gross</th></tr></thead>
+            <tbody>
+              <tr><td>6 wing dinner</td><td class="num">31</td><td class="num">$433.69</td></tr>
+              <tr><td>Half dark dinner</td><td class="num">22</td><td class="num">$263.78</td></tr>
+              <tr><td>Perch dinner</td><td class="num">14</td><td class="num">$209.86</td></tr>
+              <tr><td>Coleslaw</td><td class="num">27</td><td class="num">$67.50</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Settings -->
+        <div class="screen" id="adm-settings">
+          <div class="adm-top"><h2>Settings &amp; devices</h2></div>
+          <div class="dev-card">
+            <div><p class="nm">Kitchen printer — Epson TM-m30III</p>
+              <p class="meta">Server Direct Print · last poll 6:19:52 PM</p></div>
+            <div class="right"><span class="badge badge-open"><span class="dot"></span>Online</span>
+              <button class="btn btn-ghost btn-sm">Test print</button></div>
+          </div>
+          <div class="dev-card">
+            <div><p class="nm">Kitchen display — Swan 1 Pro</p>
+              <p class="meta">PWA · last heartbeat 6:19:58 PM · audio unlocked</p></div>
+            <div class="right"><span class="badge badge-open"><span class="dot"></span>Online</span></div>
+          </div>
+          <div class="dev-card">
+            <div><p class="nm">Store hours</p>
+              <p class="meta">Mon–Sun 11:00 AM – 9:00 PM · Sunday early close 8:00 PM set</p></div>
+            <div class="right"><button class="btn btn-secondary btn-sm">Edit hours</button></div>
+          </div>
+          <div class="dev-card">
+            <div><p class="nm">Pause new orders</p>
+              <p class="meta">Storefront shows the reason exactly as entered</p></div>
+            <div class="right"><button class="toggle" aria-pressed="false" aria-label="Orders paused" onclick="tg(this)"></button></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Refund confirm dialog -->
+  <div class="overlay" id="ov-refund" onclick="if(event.target===this)closeRefund()">
+    <div class="modal confirm-dialog" role="dialog" aria-modal="true" aria-label="Confirm refund">
+      <div class="inner">
+        <h3>Refund this order?</h3>
+        <p>This refunds <strong>$37.03 to Marcus's card for HC-047</strong> through Square. It can't be undone, and the customer is texted a confirmation.</p>
+        <div class="row">
+          <button class="btn btn-ghost" onclick="closeRefund()">Keep the order</button>
+          <button class="btn btn-danger" onclick="closeRefund()">Refund $37.03</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== KITCHEN ==================== -->
+<div class="surface-root kds-root" id="root-kds">
+  <div style="position:relative">
+    <div class="kds-offline" id="kds-offline">Connection lost · showing orders as of 6:18 PM — new orders will appear when it's back.</div>
+    <div class="kds-top">
+      <span class="wm">Harold's — Kitchen</span>
+      <span class="net"><span class="dot"></span>Connected</span>
+      <span class="clock" id="kds-clock">6:21 PM</span>
+    </div>
+    <div class="screen on" id="kds-board">
+      <div class="kds-grid">
+
+        <div class="kcard">
+          <span class="agebar"></span>
+          <div class="head"><span class="chip">HC-048</span><span class="elapsed">1 min</span></div>
+          <div class="lines">
+            <div class="kline"><p class="qn"><span class="q">1×</span><span>10 wing dinner</span></p>
+              <p class="mods">Hot sauce · Fried hard</p></div>
+            <div class="kline"><p class="qn"><span class="q">2×</span><span>Coleslaw</span></p></div>
+          </div>
+          <button class="kbtn kbtn-start" onclick="advance(this)">Start</button>
+        </div>
+
+        <div class="kcard">
+          <span class="agebar"></span>
+          <div class="head"><span class="chip">HC-047</span><span class="elapsed">3 min</span></div>
+          <div class="lines">
+            <div class="kline"><p class="qn"><span class="q">1×</span><span>6 wing dinner</span></p>
+              <p class="mods">Mild sauce · Extra bread</p></div>
+            <div class="kline"><p class="qn"><span class="q">1×</span><span>Half dark dinner</span></p>
+              <p class="mods">Hot sauce</p></div>
+            <div class="kline"><p class="qn"><span class="q">1×</span><span>Coleslaw</span></p></div>
+          </div>
+          <button class="kbtn kbtn-ready" onclick="advance(this)">Mark ready</button>
+        </div>
+
+        <div class="kcard age-warn">
+          <span class="agebar"></span>
+          <div class="head"><span class="chip">HC-046</span><span class="elapsed">8 min</span></div>
+          <div class="lines">
+            <div class="kline"><p class="qn"><span class="q">1×</span><span>6 wing dinner</span></p>
+              <p class="mods">Half &amp; half sauce</p></div>
+          </div>
+          <div class="knote"><span class="lb">Customer note</span>Salt &amp; pepper on the fries please</div>
+          <button class="kbtn kbtn-ready" onclick="advance(this)">Mark ready</button>
+        </div>
+
+        <div class="kcard age-late">
+          <span class="agebar"></span>
+          <div class="head"><span class="chip">HC-045</span><span class="elapsed">14 min</span></div>
+          <div class="lines">
+            <div class="kline"><p class="qn"><span class="q">2×</span><span>Perch dinner</span></p>
+              <p class="mods">Sauce on the side</p></div>
+            <div class="kline"><p class="qn"><span class="q">1×</span><span>Half white dinner</span></p>
+              <p class="mods">Mild sauce</p></div>
+            <div class="kline"><p class="qn"><span class="q">1×</span><span>Gizzards</span></p></div>
+          </div>
+          <button class="kbtn kbtn-picked" onclick="advance(this)">Picked up</button>
+        </div>
+
+      </div>
+    </div>
+    <div class="kds-unlock" id="kds-unlock">
+      <div class="panel">
+        <h3>Turn the sound on</h3>
+        <p>Android needs one tap before the new-order chime can play. This board stays silent until then.</p>
+        <button class="kbtn kbtn-ready" style="max-width:320px;margin:0 auto" onclick="toggleUnlock()">Enable the chime</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Δ NOTES ==================== -->
+<div class="surface-root notes-root" id="root-notes">
+  <div class="notes-inner">
+    <h2>What v1.1 keeps — the bones</h2>
+    <li>The four-surface logic (<code>paper / paper-sunk / surface / roast</code>), band rhythm, and at least one roast band per page.</li>
+    <li>All tokens verbatim from the v1.0 frontmatter — nothing renamed, nothing added to the palette.</li>
+    <li>The four faces and their jobs: Alfa Slab One poster, Baloo 2 display, Inter body, JetBrains Mono utility.</li>
+    <li>The ticket chip as the signature, identical across confirmation, kitchen card, and admin tables.</li>
+    <li>Prices in ink, brand as accent only, blue focus, no gradients/glass/blur, KDS dark scope with full-weight modifiers and printed elapsed minutes.</li>
+    <h2>What v1.1 evolves — proposed design.md amendments</h2>
+    <li><strong>1. Weave texture as zero-asset CSS.</strong> Two crossed 1px repeating-linear-gradients at 3.5% ink on light band roots. Resolves Open Input #6 with no asset, no request, no CSP change. If the tiling PNG ever arrives it can replace this one rule.</li>
+    <li><strong>2. Board leaders.</strong> A dotted rule binding a name to its price in totals/receipt contexts (checkout summary, admin order detail). Functional, not decorative — it encodes board-only pricing, the same way the chip encodes the ticket. Dots, never dashes; the dashed border stays exclusive to the chip. Requires amending §6's "only decorative element" sentence to name both system elements.</li>
+    <li><strong>3. Chip construction.</strong> Notched corners are now real (clip-path octagon) with the dashed flame rule following the notch, instead of square corners approximating the spec.</li>
+    <li><strong>4. Poster face confirmed.</strong> Alfa Slab One shipped throughout this preview; Bevan not loaded. Closes Open Input #7 pending Manav's sign-off.</li>
+    <li><strong>5. Hero voice.</strong> Three stacked poster lines with one brand-red accent line — spends red once, in type, instead of on a component.</li>
+    <li><strong>6. Storefront dark scheme — amends &sect;8.</strong> The dark-mode prohibition is lifted for the <em>storefront only</em>: an opt-in scheme, light by default, behind a labelled header toggle (which also amends &sect;6's "three elements, no more" header rule to four). The <code>.sf-root.dark</code> scope re-derives the four light surfaces from the roast family; band rhythm, roast bands, chip, and flame are untouched. Brand red lifts to <code>--brand-text #EE5B67</code> for text on dark (raw <code>#CE1126</code> fails contrast there); the tip's pressed state moves to flame for the same reason. Admin stays light. The KDS scope shares no token with this and is unaffected. Contrast table to be recomputed for the dark pairs before anything ships.</li>
+    <h2>Placeholders still in force (Open Inputs §9)</h2>
+    <li>Text wordmark in Alfa Slab One, brand on paper — no logo yet.</li>
+    <li><code>#CE1126</code> as brand red, declared once in the token block.</li>
+    <li>Paper-sunk initial tiles in every 4:3 frame — no photography yet.</li>
+    <li>Tip presets shown are the configured values; default selection untouched.</li>
+    <li>Gizzards shown with zero modifier groups — the unbound-majority case renders correctly.</li>
+    <h2>Mockup caveats</h2>
+    <li>Fonts load from Google Fonts in this file only; production stays self-hosted subset WOFF2 (<code>font-src 'self'</code>).</li>
+    <li>All money figures are static fixtures. The modal's "live price" is faked here; in production it and every checkout figure come from the server quote.</li>
+    <li>This file is presentation only — nothing here implies any behaviour change. Sprint 16 deploys first, then Sprint 14, then any of this.</li>
+  </div>
+</div>
+
+<script>
+/* mockup-only interactivity */
+function surf(id){
+  document.querySelectorAll('.surface-root').forEach(function(el){el.classList.toggle('on', el.id==='root-'+id)});
+  document.querySelectorAll('.chrome-tab[data-surface]').forEach(function(t){t.setAttribute('aria-selected', t.dataset.surface===id)});
+  ['sf','adm','kds'].forEach(function(s){var sub=document.getElementById('sub-'+s); if(sub) sub.hidden=(s!==id)});
+  window.scrollTo({top:0});
+}
+function scr(surface,id){
+  document.querySelectorAll('#root-'+surface+' .screen').forEach(function(el){el.classList.toggle('on', el.id===id)});
+  var sub=document.getElementById('sub-'+surface);
+  if(sub) sub.querySelectorAll('.chrome-tab[data-screen]').forEach(function(t){t.setAttribute('aria-selected', t.dataset.screen===id)});
+  if(surface==='adm'){
+    var map={'adm-orders':'an-orders','adm-detail':'an-orders','adm-menu':'an-menu','adm-reports':'an-reports','adm-settings':'an-settings'};
+    document.querySelectorAll('.adm-nav a').forEach(function(a){a.classList.toggle('active', a.id===map[id])});
+  }
+  if(surface==='sf'){document.getElementById('cart-bar').classList.toggle('on', id==='sf-home'||id==='sf-menu')}
+  window.scrollTo({top:0});
+}
+function mtab(el){el.parentElement.querySelectorAll('.mtab').forEach(function(t){t.setAttribute('aria-selected', t===el)})}
+var lastFocus=null;
+function openItem(){lastFocus=document.activeElement; document.getElementById('ov-item').classList.add('on')}
+function closeItem(){document.getElementById('ov-item').classList.remove('on'); if(lastFocus)lastFocus.focus()}
+function openCart(){document.getElementById('cart-sheet').classList.add('on')}
+function closeCart(){document.getElementById('cart-sheet').classList.remove('on')}
+function openRefund(){document.getElementById('ov-refund').classList.add('on')}
+function closeRefund(){document.getElementById('ov-refund').classList.remove('on')}
+var q=1, base=13.99;
+function qty(d){q=Math.max(1,q+d); document.getElementById('qty-n').textContent=q; modalPrice()}
+function modalPrice(){ /* faked here; server-quoted in production */
+  var ex=0; document.querySelectorAll('.ex:checked').forEach(function(c){ex+=parseFloat(c.dataset.p)});
+  document.getElementById('modal-total').textContent='$'+((base+ex)*q).toFixed(2);
+}
+function pickTip(el){el.parentElement.querySelectorAll('.tip').forEach(function(t){t.setAttribute('aria-pressed', t===el)})}
+function tg(el){el.setAttribute('aria-pressed', el.getAttribute('aria-pressed')!=='true')}
+function advance(btn){
+  if(btn.classList.contains('kbtn-start')){btn.classList.replace('kbtn-start','kbtn-ready'); btn.textContent='Mark ready'}
+  else if(btn.classList.contains('kbtn-ready')){btn.classList.replace('kbtn-ready','kbtn-picked'); btn.textContent='Picked up'}
+  else{var c=btn.closest('.kcard'); c.style.transition='opacity .32s'; c.style.opacity='0'; setTimeout(function(){c.remove()},340)}
+}
+function toggleTheme(btn){
+  var dark=document.getElementById('root-sf').classList.toggle('dark');
+  btn.setAttribute('aria-pressed', dark);
+  btn.querySelector('.tx').textContent=dark?'Light':'Dark'; /* label names the outcome of pressing */
+}
+function toggleUnlock(){document.getElementById('kds-unlock').classList.toggle('on')}
+function toggleOffline(){document.getElementById('kds-offline').classList.toggle('on')}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeItem();closeCart();closeRefund()}});
+setInterval(function(){
+  var d=new Date(), h=d.getHours()%12||12, m=('0'+d.getMinutes()).slice(-2);
+  document.getElementById('kds-clock').textContent=h+':'+m+' '+(d.getHours()>=12?'PM':'AM');
+},1000);
+</script>
+</body>
+</html>

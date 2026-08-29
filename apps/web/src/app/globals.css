@@ -1,5 +1,241 @@
-/* Storefront theme — Harold's Chicken Oak Lawn brand (red / black / white, gold accent) */
+/* SPRINT-14: the single token declaration for every surface (design.md §5, §6.1).
+   Nothing else in this codebase declares a colour, font stack, radius, duration, or z-index.
+   Loaded by the ROOT layout, so it reaches the storefront, admin and the kitchen display.
+   Admin and the KDS keep their own scoped stylesheets (admin.css / kitchen.css) and are
+   redesigned in Sprint 15 — nothing here restyles them. */
 @import "tailwindcss";
+
+@theme {
+  /* ---- §5.1 Colour — light surfaces (storefront + admin) ---- */
+  --color-paper: #f7f0e4;
+  --color-paper-sunk: #efe6d6;
+  --color-surface: #ffffff;
+  --color-ink: #241611;
+  --color-ink-muted: #6b5a50;
+  --color-ink-faint: #72655d;
+  --color-line: #e2d6c4;
+  --color-line-strong: #8a7c68;
+  --color-brand: #ce1126;
+  --color-brand-hover: #b00e20;
+  --color-brand-tint: #fbe9eb;
+  --color-gold: #f2b233;
+  --color-open: #2b7542;
+  --color-warn: #9c5408;
+  --color-danger: #a81321;
+  --color-focus: #1b5fcc;
+
+  /* ---- §5.2 Colour — kitchen display (dark). Declared now so the primitives can never
+     render light-surface tokens on the board. Consumed in Sprint 15. ---- */
+  --color-kds-bg: #141110;
+  --color-kds-card: #221c19;
+  --color-kds-card-raised: #2e2622;
+  --color-kds-ink: #f7f0e4;
+  --color-kds-ink-muted: #a89a90;
+  /* ---- Storefront dark theme (SPRINT-17). Distinct from the §5.2 KDS set: those values are
+     tuned for a tablet read at two metres in a bright kitchen, these for a phone in a dark room,
+     and the two surface stacks differ, so every accent had to be re-solved. Every pair is in
+     scripts/sprint14-contrast-audit.mjs. ---- */
+  --color-paper-dark: #1a1512;
+  --color-paper-sunk-dark: #241d19;
+  --color-surface-dark: #2a221e;
+  --color-ink-dark: #f7f0e4;
+  --color-ink-muted-dark: #bca99b;
+  --color-ink-faint-dark: #9a8878;
+  --color-line-dark: #3a302b;
+  --color-line-strong-dark: #807974;
+  --color-brand-dark: #e8646d;
+  --color-brand-hover-dark: #f2858c;
+  --color-brand-tint-dark: #3a2224;
+  --color-open-dark: #4fa86a;
+  --color-warn-dark: #d19a4a;
+  --color-danger-dark: #e26a72;
+  --color-focus-dark: #5b8def;
+
+  --color-kds-line: #3a302b;
+  --color-kds-line-strong: #6e6763;
+  --color-open-on-dark: #2e7d46;
+  --color-danger-on-dark: #b73c47;
+
+  /* ---- §5.3 Typography — families ---- */
+  --font-display: var(--font-bricolage), system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  /* ---- §5.5 Radius ---- */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  /* ---- §5.6 Elevation ---- */
+  --shadow-card: 0 1px 2px rgb(36 22 17 / 0.06);
+  --shadow-raised: 0 4px 12px rgb(36 22 17 / 0.1);
+  --shadow-overlay: 0 16px 40px rgb(36 22 17 / 0.18);
+
+  /* ---- §5.8 Breakpoints ---- */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+}
+
+:root {
+  /* ---- §5.7 Motion ---- */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --ease-fast: ease-out;
+  --ease-base: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ---- §5.8 Z-index, exhaustive ---- */
+  --z-sticky-tabs: 90;
+  --z-sticky-header: 100;
+  --z-cart-bar: 110;
+  --z-overlay: 200;
+  --z-toast: 300;
+
+  /* ---- §5.4 Spacing constants that are layout facts, not utilities ---- */
+  --content-max: 1200px;
+  --modal-max: 560px;
+  --checkout-max: 560px;
+
+  /* ---- §6.1 shadcn semantic variables, aliased onto the tokens. One source, two names.
+     These are aliases only; correcting a token corrects both names. ---- */
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-brand);
+  --primary-foreground: var(--color-surface);
+  --secondary: var(--color-paper-sunk);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-paper-sunk);
+  --muted-foreground: var(--color-ink-muted);
+  --accent: var(--color-brand-tint);
+  --accent-foreground: var(--color-brand);
+  --destructive: var(--color-danger);
+  --border: var(--color-line);
+  --input: var(--color-line);
+  --ring: var(--color-focus);
+  --radius: var(--radius-md);
+}
+
+/* §6.1: the KDS route group scopes the dark set. It is not a `.dark` class — the storefront
+   and admin have no dark mode in v1. Nothing consumes this scope until Sprint 15; it exists so
+   that a shared primitive rendered on the board can never pick up a light-surface token. */
+.kds {
+  --background: var(--color-kds-bg);
+  --foreground: var(--color-kds-ink);
+  --card: var(--color-kds-card);
+  --card-foreground: var(--color-kds-ink);
+  --popover: var(--color-kds-card-raised);
+  --popover-foreground: var(--color-kds-ink);
+  --secondary: var(--color-kds-card-raised);
+  --secondary-foreground: var(--color-kds-ink);
+  --muted: var(--color-kds-card-raised);
+  --muted-foreground: var(--color-kds-ink-muted);
+  --border: var(--color-kds-line);
+  --input: var(--color-kds-line);
+}
+
+/* ---------------------------------------------------------------------------
+   SPRINT-17: the storefront dark theme.
+   Scoped to `.sf-root` deliberately. The theme attribute lives on <html>, but only the
+   storefront's own root (and the portalled overlays, which carry `sf-root` too) resolves the dark
+   values. Admin and the KDS are structurally unreachable from here — they have their own roots
+   and their own stylesheets, and design.md §16.3 still prohibits dark mode on admin.
+   --------------------------------------------------------------------------- */
+html[data-theme="dark"] .sf-root {
+  --color-paper: var(--color-paper-dark);
+  --color-paper-sunk: var(--color-paper-sunk-dark);
+  --color-surface: var(--color-surface-dark);
+  --color-ink: var(--color-ink-dark);
+  --color-ink-muted: var(--color-ink-muted-dark);
+  --color-ink-faint: var(--color-ink-faint-dark);
+  --color-line: var(--color-line-dark);
+  --color-line-strong: var(--color-line-strong-dark);
+  --color-brand: var(--color-brand-dark);
+  --color-brand-hover: var(--color-brand-hover-dark);
+  --color-brand-tint: var(--color-brand-tint-dark);
+  --color-open: var(--color-open-dark);
+  --color-warn: var(--color-warn-dark);
+  --color-danger: var(--color-danger-dark);
+  --color-focus: var(--color-focus-dark);
+
+  /* shadcn aliases follow the tokens, as in light. One source, two names. */
+  --background: var(--color-paper-dark);
+  --foreground: var(--color-ink-dark);
+  --card: var(--color-surface-dark);
+  --card-foreground: var(--color-ink-dark);
+  --popover: var(--color-surface-dark);
+  --popover-foreground: var(--color-ink-dark);
+  --primary: var(--color-brand-dark);
+  --primary-foreground: var(--color-paper-dark);
+  --secondary: var(--color-paper-sunk-dark);
+  --secondary-foreground: var(--color-ink-dark);
+  --muted: var(--color-paper-sunk-dark);
+  --muted-foreground: var(--color-ink-muted-dark);
+  --accent: var(--color-brand-tint-dark);
+  --accent-foreground: var(--color-brand-dark);
+  --destructive: var(--color-danger-dark);
+  --border: var(--color-line-dark);
+  --input: var(--color-line-dark);
+  --ring: var(--color-focus-dark);
+
+  /* §5.6: the light shadows are tuned against warm paper and are invisible on dark. Borders
+     carry elevation instead, exactly as the KDS does. */
+  --shadow-card: 0 0 0 1px var(--color-line-dark);
+  --shadow-raised: 0 4px 12px rgb(0 0 0 / 0.45);
+  --shadow-overlay: 0 16px 40px rgb(0 0 0 / 0.6);
+}
+
+/* "system" follows the device. No attribute at all behaves the same way, so a first visit with
+   no stored preference honours the OS. */
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] .sf-root,
+  html:not([data-theme]) .sf-root {
+    --color-paper: var(--color-paper-dark);
+    --color-paper-sunk: var(--color-paper-sunk-dark);
+    --color-surface: var(--color-surface-dark);
+    --color-ink: var(--color-ink-dark);
+    --color-ink-muted: var(--color-ink-muted-dark);
+    --color-ink-faint: var(--color-ink-faint-dark);
+    --color-line: var(--color-line-dark);
+    --color-line-strong: var(--color-line-strong-dark);
+    --color-brand: var(--color-brand-dark);
+    --color-brand-hover: var(--color-brand-hover-dark);
+    --color-brand-tint: var(--color-brand-tint-dark);
+    --color-open: var(--color-open-dark);
+    --color-warn: var(--color-warn-dark);
+    --color-danger: var(--color-danger-dark);
+    --color-focus: var(--color-focus-dark);
+
+    --background: var(--color-paper-dark);
+    --foreground: var(--color-ink-dark);
+    --card: var(--color-surface-dark);
+    --card-foreground: var(--color-ink-dark);
+    --popover: var(--color-surface-dark);
+    --popover-foreground: var(--color-ink-dark);
+    --primary: var(--color-brand-dark);
+    --primary-foreground: var(--color-paper-dark);
+    --secondary: var(--color-paper-sunk-dark);
+    --secondary-foreground: var(--color-ink-dark);
+    --muted: var(--color-paper-sunk-dark);
+    --muted-foreground: var(--color-ink-muted-dark);
+    --accent: var(--color-brand-tint-dark);
+    --accent-foreground: var(--color-brand-dark);
+    --destructive: var(--color-danger-dark);
+    --border: var(--color-line-dark);
+    --input: var(--color-line-dark);
+    --ring: var(--color-focus-dark);
+
+    --shadow-card: 0 0 0 1px var(--color-line-dark);
+    --shadow-raised: 0 4px 12px rgb(0 0 0 / 0.45);
+    --shadow-overlay: 0 16px 40px rgb(0 0 0 / 0.6);
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -20,71 +256,243 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-brand: var(--brand);
-  --color-brand-foreground: var(--brand-foreground);
-  --color-brand-dark: var(--brand-dark);
-  --color-gold: var(--gold);
-  --font-display: var(--font-display);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
 }
 
-:root {
-  --radius: 0.75rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+/* ---------------------------------------------------------------------------
+   §5.3 Type scale. One class per row of the table, so a component never states a
+   size, weight, face, or tracking. Mobile step-down and the KDS step-up live here
+   and nowhere else.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .t-display-xl {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 34px;
+    line-height: 38px;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .t-display-lg {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 26px;
+    line-height: 30px;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .t-display-md {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 26px;
+  }
+  .t-display-sm {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 22px;
+  }
+  .t-body-lg {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 26px;
+  }
+  .t-body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 22px;
+  }
+  .t-body-sm {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .t-label {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 12px;
+    line-height: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .t-mono-lg {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 28px;
+  }
+  .t-mono {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+  }
 
-  /* Harold's red — primary brand color, from menu board signage */
-  --primary: oklch(0.47 0.19 25);
-  --primary-foreground: oklch(0.99 0 0);
+  /* §5.3: only display-xl and display-lg scale. Nothing else. */
+  @media (min-width: 768px) {
+    .t-display-xl {
+      font-size: 44px;
+      line-height: 46px;
+    }
+    .t-display-lg {
+      font-size: 32px;
+      line-height: 36px;
+    }
+  }
 
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.145 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.96 0.01 25);
-  --accent-foreground: oklch(0.47 0.19 25);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.9 0 0);
-  --input: oklch(0.9 0 0);
-  --ring: oklch(0.47 0.19 25);
+  /* §5.3 KDS: the whole scale steps up one stop. Reserved for Sprint 15. */
+  .kds .t-display-md {
+    font-size: 26px;
+    line-height: 30px;
+  }
+  .kds .t-display-sm {
+    font-size: 22px;
+    line-height: 26px;
+  }
+  .kds .t-body-sm {
+    font-size: 15px;
+    line-height: 22px;
+  }
+  .kds .t-mono {
+    font-size: 18px;
+    line-height: 24px;
+  }
 
-  /* Brand-specific tokens (beyond shadcn base) */
-  --brand: oklch(0.47 0.19 25);
-  --brand-foreground: oklch(0.99 0 0);
-  --brand-dark: oklch(0.16 0 0);
-  --gold: oklch(0.75 0.14 80);
-  --font-display: "Georgia", "Times New Roman", serif;
+  /* §5.3: prices and every numeric column are tabular. */
+  .t-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* §7.8 the ticket chip's dashed inner rule — the only dashed border in the system. */
+  .ticket-chip-rule {
+    border: 1px dashed var(--color-gold);
+    letter-spacing: 0.12em;
+  }
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  /* Scoped to the storefront root deliberately. The pre-Sprint-14 file applied this to `*`,
+     which reached admin and kitchen elements from the root layout. Narrowing it is the whole
+     of this sprint's Critical-rule-4 exposure. */
+  .sf-root *,
+  .sf-root *::before,
+  .sf-root *::after {
+    border-color: var(--color-line);
   }
+
   body {
-    @apply bg-background text-foreground;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+
+  /* §14: focus is never removed, and it is blue on purpose — a red ring on a red-accented
+     interface is invisible to the people who need it most. */
+  .sf-root :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
   }
 }
 
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* §5.7: all motion is wrapped in a no-preference query. There is no scroll-triggered
+   animation anywhere in this system. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-fast {
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--ease-fast);
+  }
+  .motion-base {
+    transition-duration: var(--motion-base);
+    transition-timing-function: var(--ease-base);
+  }
+  .motion-slow {
+    transition-duration: var(--motion-slow);
+    transition-timing-function: var(--ease-base);
+  }
+
+  @keyframes sf-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes sf-slide-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes sf-slide-in-bottom {
+    from {
+      transform: translateY(16px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: sf-fade-in var(--motion-base) var(--ease-base) both;
+  }
+  .animate-slide-in-right {
+    animation: sf-slide-in-right var(--motion-base) var(--ease-base) both;
+  }
+  .animate-slide-in-bottom {
+    animation: sf-slide-in-bottom var(--motion-slow) var(--ease-base) both;
+  }
 }
 
-@keyframes slide-in-from-right {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+/* §5.8 z-index, exhaustive. Nothing else declares one. */
+@layer utilities {
+  .z-sticky-header {
+    z-index: var(--z-sticky-header);
+  }
+  .z-sticky-tabs {
+    z-index: var(--z-sticky-tabs);
+  }
+  .z-cart-bar {
+    z-index: var(--z-cart-bar);
+  }
+  .z-overlay {
+    z-index: var(--z-overlay);
+  }
+  .z-toast {
+    z-index: var(--z-toast);
+  }
+
+  /* §7.3: snap rail with no visible scrollbar. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* §7.7: the mobile cart bar clears the device safe area. */
+  .pb-safe {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
 }
 
-.animate-in {
-  animation-duration: 200ms;
-  animation-timing-function: ease-out;
-  animation-fill-mode: both;
+/* §5.7 / §14: under reduced motion nothing transitions and nothing animates. The KDS late
+   pulse becomes a static bar for the same reason. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
 }
-.fade-in { animation-name: fade-in; }
-.slide-in-from-right { animation-name: slide-in-from-right; }

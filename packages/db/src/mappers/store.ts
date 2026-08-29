@@ -1,6 +1,6 @@
-// SPRINT-2: StoreConfig + hours + closures + open/closed → StoreStatus contract.
+// SPRINT-2 / SPRINT-12: StoreConfig + hours + closures + trading overrides → StoreStatus.
 import type { StoreConfigData, StoreStatus } from "@harolds/types";
-import type { OpenClosedResult } from "../open-closed";
+import type { TradingClosedReason, TradingOverrideRow } from "../trading-state";
 
 export type StoreHoursInput = {
   dayOfWeek: number;
@@ -18,14 +18,33 @@ export type MapStoreStatusArgs = {
   config: StoreConfigData;
   hours: StoreHoursInput[];
   closures: StoreClosureInput[];
-  openClosed: OpenClosedResult;
-  /** Evaluation instant used for estimatedReadyAt */
+  isOpen: boolean;
+  nextOpenAt: Date | null;
+  closedReason: TradingClosedReason;
+  activeOverride: TradingOverrideRow | null;
+  /** Evaluation instant used for estimatedReadyAt and announcement window */
   instant: Date;
   prepMinutes: number;
 };
 
+const ANNOUNCEMENT_MAX = 280;
+
+export function resolveAnnouncement(
+  config: StoreConfigData,
+  instant: Date,
+): string | null {
+  const text = config.announcementText?.trim() ?? "";
+  if (!text) return null;
+  const clipped = text.slice(0, ANNOUNCEMENT_MAX);
+  const start = config.announcementStartsAt;
+  const end = config.announcementEndsAt;
+  if (start && instant.getTime() < start.getTime()) return null;
+  if (end && instant.getTime() >= end.getTime()) return null;
+  return clipped;
+}
+
 export function mapStoreStatus(args: MapStoreStatusArgs): StoreStatus {
-  const { config, hours, closures, openClosed, instant, prepMinutes } = args;
+  const { config, hours, closures, isOpen, nextOpenAt, closedReason, instant, prepMinutes } = args;
   const estimatedReadyAt = new Date(instant.getTime() + prepMinutes * 60_000);
 
   return {
@@ -47,8 +66,8 @@ export function mapStoreStatus(args: MapStoreStatusArgs): StoreStatus {
       date: c.date,
       reason: c.reason,
     })),
-    isOpen: openClosed.isOpen,
-    nextOpenAt: openClosed.nextOpenAt ? openClosed.nextOpenAt.toISOString() : null,
+    isOpen,
+    nextOpenAt: nextOpenAt ? nextOpenAt.toISOString() : null,
     acceptingOrders: config.acceptingOrders,
     notAcceptingMessage: config.notAcceptingMessage,
     prepMinutes,
@@ -58,5 +77,9 @@ export function mapStoreStatus(args: MapStoreStatusArgs): StoreStatus {
     tippingEnabled: config.tippingEnabled,
     tipPresetsBps: [...config.tipPresetsBps],
     defaultTipPresetIndex: config.defaultTipPresetIndex,
+    closedReason,
+    closedMessage: config.closedMessage,
+    prepEstimatePhrase: config.prepEstimatePhrase ?? "about {minutes} min",
+    announcement: resolveAnnouncement(config, instant),
   };
 }

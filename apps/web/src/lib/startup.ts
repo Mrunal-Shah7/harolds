@@ -1,9 +1,11 @@
 // SPRINT-11: one structured startup line — what this instance can actually do.
+// SPRINT-12: include Square client-build identifier presence.
 import {
   emitLog,
   env,
   getPrinterConfig,
   managerDestinationProblems,
+  publicSquareIdsPresentAtBuild,
 } from "@harolds/config";
 import { getStoreConfig } from "@harolds/db";
 import { getSquareEnvironment } from "@harolds/square";
@@ -34,12 +36,14 @@ export async function runStartupChecks(): Promise<void> {
   }
 
   const printers = getPrinterConfig();
+  const squareClientIdsAtBuild = publicSquareIdsPresentAtBuild(process.env);
   emitLog(
     "info",
     "app.startup_summary",
     {
       nodeEnv: env.NODE_ENV,
       squareEnvironment: getSquareEnvironment(),
+      squareClientIdsAtBuild,
       smsConfigured: configured(env.TWILIO_ACCOUNT_SID) && configured(env.TWILIO_AUTH_TOKEN) && configured(env.TWILIO_FROM_NUMBER),
       emailConfigured: configured(env.EMAIL_API_KEY) && configured(env.EMAIL_FROM_ADDRESS),
       alertingConfigured,

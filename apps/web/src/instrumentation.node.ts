@@ -6,6 +6,8 @@ import { startJobWorker } from "./lib/job-worker";
 import { startReconcileScheduler } from "./lib/reconcile-scheduler";
 import { runStartupChecks } from "./lib/startup";
 
+import { startImageSweeper } from "./lib/media-sweeper";
+
 export async function registerNode(): Promise<void> {
   setLogLevel(getLogLevelFromEnv());
   emitLog("info", "app.start", { nodeEnv: process.env.NODE_ENV ?? "unknown" }, { scope: "app" });
@@ -14,4 +16,5 @@ export async function registerNode(): Promise<void> {
   startKitchenAlertSweeper();
   startJobWorker();
   startReconcileScheduler();
+  startImageSweeper();
 }

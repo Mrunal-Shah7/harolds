@@ -49,6 +49,11 @@ const envSchema = z.object({
     })
     .min(1, "SQUARE_WEBHOOK_SIGNATURE_KEY is required and must not be empty"),
 
+  // SPRINT-12: public Square IDs for the Web Payments SDK (required at build; required in production start).
+  NEXT_PUBLIC_SQUARE_APPLICATION_ID: z.string().optional(),
+  NEXT_PUBLIC_SQUARE_LOCATION_ID: z.string().optional(),
+  NEXT_PUBLIC_SQUARE_ENVIRONMENT: z.string().optional(),
+
   // Required — Sprint 5 (Epson Server Direct Print). Comma-separated serials supported.
   PRINTER_SERIAL_NUMBER: z
     .string({ required_error: "PRINTER_SERIAL_NUMBER is required (Epson TM serial, comma-separated if several)" })
@@ -58,6 +63,12 @@ const envSchema = z.object({
       required_error: "PRINTER_SDP_SHARED_SECRET is required (Server Direct Print shared secret)",
     })
     .min(1, "PRINTER_SDP_SHARED_SECRET is required and must not be empty"),
+  /**
+   * SPRINT-16: how far back the duplicate-order guard looks for an equivalent order from the same
+   * phone. Optional; defaults to 180s. Shorten it if the guard's log shows legitimate repeat
+   * orders being collapsed.
+   */
+  ORDER_DUPLICATE_GUARD_WINDOW_SECONDS: z.coerce.number().int().positive().max(3600).optional(),
   /** Optional override: kitchen-ticket printer serial. Defaults to the first PRINTER_SERIAL_NUMBER. */
   PRINTER_KITCHEN_SERIAL: z.string().optional(),
   /** Optional override: counter-receipt printer serial. Defaults to the first PRINTER_SERIAL_NUMBER. */

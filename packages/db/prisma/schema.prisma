@@ -547,12 +547,50 @@ model StoreConfig {
   acceptingOrders     Boolean @default(true)
   notAcceptingMessage String?
 
+  // SPRINT-12: storefront messaging (plain text; announcement is optional and time-bounded)
+  /// Shown when the store is closed by schedule/closure/override (not the pause switch).
+  closedMessage        String?
+  /// Prep estimate phrasing; may include "{minutes}" which the banner substitutes.
+  prepEstimatePhrase   String? @default("about {minutes} min")
+  announcementText     String?
+  announcementStartsAt DateTime?
+  announcementEndsAt   DateTime?
+
   // SPRINT-2: manager alert contacts
   managerAlertPhone String?
   managerAlertEmail String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// SPRINT-12: temporary trading override for a business date — expires by itself.
+enum TradingOverrideKind {
+  CLOSE_EARLY
+  OPEN_LATE
+  CLOSED_REST_OF_DAY
+  OPEN_ANYWAY
+}
+
+model TradingOverride {
+  id              String              @id @default(cuid())
+  /// Business date (YYYY-MM-DD semantics via @db.Date) this override applies to.
+  businessDate    DateTime            @db.Date
+  kind            TradingOverrideKind
+  /// Wall-clock HH:mm — used by CLOSE_EARLY (new close), OPEN_LATE (new open), OPEN_ANYWAY (window start).
+  openTime        String?
+  /// Wall-clock HH:mm — used by CLOSE_EARLY / OPEN_ANYWAY (window end).
+  closeTime       String?
+  customerMessage String?
+  /// When this override stops applying. Default: end of the business date.
+  expiresAt       DateTime
+  cancelledAt     DateTime?
+  createdById     String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([businessDate, expiresAt])
+  @@index([cancelledAt])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -669,6 +707,8 @@ model AdminAuditLog {
   entityType String
   entityId   String?
   summary    String
+  /// SPRINT-12: optional before/after payload for price, hours, and merchandising mutations.
+  details    Json?
   createdAt  DateTime @default(now())
 
   user AdminUser? @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)

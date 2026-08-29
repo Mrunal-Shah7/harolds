@@ -47,5 +47,10 @@ export default function KitchenLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
-  return <div className={`kds-root ${anton.variable} ${plexMono.variable}`}>{children}</div>;
+  // SPRINT-14: `kds` applies the §5.2 dark token scope at the route-group root, so a shared
+  // primitive rendered on the board can never resolve a light-surface token. The board's own
+  // presentation still comes from kitchen.css and is redesigned in Sprint 15.
+  return (
+    <div className={`kds kds-root ${anton.variable} ${plexMono.variable}`}>{children}</div>
+  );
 }

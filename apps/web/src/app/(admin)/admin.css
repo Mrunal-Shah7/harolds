@@ -353,3 +353,48 @@
     width: 100%;
   }
 }
+
+/* SPRINT-17: loading skeletons (design.md §12) and the sign-out button on the dark nav.
+   These stay in the admin palette because admin.css is not retokenised until Sprint 15. */
+.adm-skel {
+  display: block;
+  background: #ded2ba;
+  border-radius: 2px;
+}
+
+.adm-nav .adm-skel {
+  background: #3a2f22;
+}
+
+.adm-skel-navrow {
+  display: block;
+  padding: 0.45rem 0.55rem;
+}
+
+.adm-skel-block {
+  height: 18rem;
+  background: #f6efe1;
+  border: 1px solid #c9bda8;
+}
+
+.adm-btn-onDark {
+  margin-top: 0.6rem;
+  color: #f3ead8;
+  border-color: #f3ead8;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .adm-skel,
+  .adm-skel-block {
+    animation: adm-skel-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes adm-skel-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+}

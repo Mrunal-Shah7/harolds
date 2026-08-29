@@ -2,122 +2,52 @@
 
 // SPRINT-8: admin application shell and screens — role nav, dense tables, confirmation.
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCents } from "@harolds/pricing";
-import { adminApi, AdminApiError } from "@/components/admin/admin-api";
+import { adminApi } from "@/components/admin/admin-api";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { useAdminSession } from "@/components/admin/AdminShell";
+import {
+  AdminDashboardSkeleton,
+  AdminFormSkeleton,
+  AdminTableSkeleton,
+  AdminViewSkeleton,
+} from "@/components/admin/AdminSkeletons";
 import { formatStoreDateTime } from "@/lib/admin-format";
 
-type SessionUser = { id: string; email: string; displayName: string; role: string };
-
 type Flash = { kind: "ok" | "err"; text: string } | null;
-
-const NAV = [
-  { href: "/admin", label: "Dashboard", ownerOnly: false },
-  { href: "/admin/menu", label: "Menu", ownerOnly: false },
-  { href: "/admin/modifiers", label: "Modifiers", ownerOnly: false },
-  { href: "/admin/store", label: "Store", ownerOnly: false },
-  { href: "/admin/orders", label: "Orders", ownerOnly: false },
-  { href: "/admin/reports", label: "Reports", ownerOnly: false },
-  { href: "/admin/jobs", label: "Jobs", ownerOnly: false },
-  { href: "/admin/staff", label: "Staff", ownerOnly: true },
-];
 
 function money(cents: number): string {
   return formatCents(Math.max(0, cents));
 }
 
 export function AdminApp() {
+  // SPRINT-17: the shell — session, sidebar, <main> — moved to AdminShell, mounted by the
+  // (admin) route-group layout. A route change inside the group no longer unmounts the sidebar.
+  // This component is now only the section switch that fills <main>.
   const pathname = usePathname();
-  const router = useRouter();
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [bootError, setBootError] = useState<string | null>(null);
-  const [timezone, setTimezone] = useState("America/Chicago");
-
-  useEffect(() => {
-    let cancelled = false;
-    adminApi<{ user: SessionUser; expiresAt: string }>("/api/internal/admin/auth/session")
-      .then((data) => {
-        if (!cancelled) setUser(data.user);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        if (err instanceof AdminApiError && (err.status === 401 || err.status === 403)) {
-          router.replace("/admin/signin");
-          return;
-        }
-        setBootError(err instanceof Error ? err.message : "Could not load session.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  useEffect(() => {
-    adminApi<{ config: { timezone: string } }>("/api/internal/admin/store")
-      .then((d) => setTimezone(d.config.timezone))
-      .catch(() => undefined);
-  }, [user]);
-
-  if (bootError) {
-    return <div className="adm-main"><div className="adm-error">{bootError}</div></div>;
-  }
-  if (!user) {
-    return <div className="adm-main"><p className="adm-muted">Loading…</p></div>;
-  }
+  const { user, timezone } = useAdminSession();
 
   const parts = pathname.split("/").filter(Boolean);
   const section = parts[1] ?? "";
   const id = parts[2];
 
   return (
-    <div className="adm-app">
-      <nav className="adm-nav">
-        <p className="adm-brand">Harold&apos;s</p>
-        <p className="adm-brand-sub">Oak Lawn back office</p>
-        {NAV.filter((n) => !n.ownerOnly || user.role === "OWNER").map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            className={pathname === n.href || (n.href !== "/admin" && pathname.startsWith(n.href)) ? "is-active" : ""}
-          >
-            {n.label}
-          </Link>
-        ))}
-        <div className="adm-nav-user">
-          <strong>{user.displayName}</strong>
-          {user.role.toLowerCase()}
-          <div>
-            <button
-              type="button"
-              className="adm-btn adm-btn-ghost"
-              style={{ marginTop: "0.6rem", color: "#f3ead8", borderColor: "#f3ead8" }}
-              onClick={async () => {
-                await adminApi("/api/internal/admin/auth/signout", { method: "POST" });
-                router.replace("/admin/signin");
-              }}
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </nav>
-      <main className="adm-main">
-        {section === "" && <DashboardView timezone={timezone} />}
-        {section === "menu" && !id && <MenuView />}
-        {section === "menu" && id === "curation" && <CurationView />}
-        {section === "menu" && id && id !== "curation" && <ItemView id={id} />}
-        {section === "modifiers" && !id && <ModifiersView />}
-        {section === "modifiers" && id && <GroupView id={id} />}
-        {section === "store" && <StoreView role={user.role} />}
-        {section === "orders" && !id && <OrdersView timezone={timezone} />}
-        {section === "orders" && id && <OrderDetailView id={id} timezone={timezone} />}
-        {section === "reports" && <ReportsView />}
-        {section === "jobs" && <JobsView />}
-        {section === "staff" && user.role === "OWNER" && <StaffView />}
-      </main>
-    </div>
+    <>
+      {section === "" && <DashboardView timezone={timezone} />}
+      {section === "menu" && !id && <MenuView />}
+      {section === "menu" && id === "curation" && <CurationView />}
+      {section === "menu" && id && id !== "curation" && <ItemView id={id} />}
+      {section === "modifiers" && !id && <ModifiersView />}
+      {section === "modifiers" && id && <GroupView id={id} />}
+      {section === "store" && <StoreView role={user.role} />}
+      {section === "orders" && !id && <OrdersView timezone={timezone} />}
+      {section === "orders" && id && <OrderDetailView id={id} timezone={timezone} />}
+      {section === "reports" && <ReportsView />}
+      {section === "jobs" && <JobsView />}
+      {section === "staff" && user.role === "OWNER" && <StaffView />}
+    </>
   );
 }
 
@@ -145,7 +75,7 @@ function DashboardView({ timezone }: { timezone: string }) {
     return () => clearInterval(t);
   }, [load]);
   if (err) return <div className="adm-error">{err}</div>;
-  if (!data) return <p className="adm-muted">Loading dashboard…</p>;
+  if (!data) return <AdminDashboardSkeleton />;
   const jobs = data.jobs as { deadCount: number; counts: Record<string, number>; oldestPendingAgeMs: number | null };
   const print = data.print as {
     counts: Record<string, number>;
@@ -224,6 +154,7 @@ function DashboardView({ timezone }: { timezone: string }) {
 
 function MenuView() {
   const [items, setItems] = useState<Array<Record<string, unknown>>>([]);
+  const [loaded, setLoaded] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [filters, setFilters] = useState({ categoryId: "", isSoldOut: "", isUnverifiedPrice: "", q: "" });
   const [flash, setFlash] = useFlash();
@@ -235,7 +166,8 @@ function MenuView() {
     if (filters.q) q.set("q", filters.q);
     adminApi<Array<Record<string, unknown>>>(`/api/internal/admin/menu/items?${q}`)
       .then(setItems)
-      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }));
+      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }))
+      .finally(() => setLoaded(true));
   }, [filters, setFlash]);
   useEffect(() => {
     adminApi<Array<{ id: string; name: string; slug: string }>>("/api/internal/admin/menu/categories").then(setCategories).catch(() => undefined);
@@ -243,6 +175,9 @@ function MenuView() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // §12: skeleton on the first load only. A filter refetch keeps the toolbar in place.
+  if (!loaded) return <AdminTableSkeleton rows={10} cols={6} />;
 
   return (
     <>
@@ -405,11 +340,15 @@ function MenuView() {
 
 function CurationView() {
   const [items, setItems] = useState<Array<{ id: string; name: string }>>([]);
+  const [loaded, setLoaded] = useState(false);
   const [featured, setFeatured] = useState<string[]>([]);
   const [most, setMost] = useState<string[]>([]);
   const [flash, setFlash] = useFlash();
   useEffect(() => {
-    adminApi<Array<{ id: string; name: string }>>("/api/internal/admin/menu/items").then(setItems).catch(() => undefined);
+    adminApi<Array<{ id: string; name: string }>>("/api/internal/admin/menu/items")
+      .then(setItems)
+      .catch(() => undefined)
+      .finally(() => setLoaded(true));
     adminApi<{ featured: Array<{ id: string }>; mostOrdered: Array<{ id: string }> }>("/api/internal/admin/menu/curation")
       .then((d) => {
         setFeatured(d.featured.map((i) => i.id));
@@ -428,6 +367,9 @@ function CurationView() {
       setFlash({ kind: "err", text: e instanceof Error ? e.message : "Not saved." });
     }
   }
+  // §12: skeleton on the first load only.
+  if (!loaded) return <AdminViewSkeleton />;
+
   return (
     <>
       <h1 className="adm-h1">Curation</h1>
@@ -466,7 +408,7 @@ function ItemView({ id }: { id: string }) {
     adminApi<Array<{ id: string; name: string }>>("/api/internal/admin/menu/categories").then(setCategories).catch(() => undefined);
     adminApi<Array<{ id: string; name: string }>>("/api/internal/admin/modifiers").then(setGroups).catch(() => undefined);
   }, [load]);
-  if (!item) return <p className="adm-muted">Loading item…</p>;
+  if (!item) return <AdminFormSkeleton fields={10} />;
   const cents = Number(item.basePriceCents);
   const dollars = `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
   const bound = ((item.modifierGroups as Array<{ groupId: string; sortOrder: number }>) ?? []).map((b) => b.groupId);
@@ -494,7 +436,6 @@ function ItemView({ id }: { id: string }) {
                 isSoldOut: form.get("isSoldOut") === "on",
                 isFeatured: form.get("isFeatured") === "on",
                 isMostOrdered: form.get("isMostOrdered") === "on",
-                imageUrl: form.get("imageUrl") || null,
               }),
             });
             setFlash({ kind: "ok", text: "Saved." });
@@ -516,9 +457,59 @@ function ItemView({ id }: { id: string }) {
         </label>
         <label className="adm-field">Sort<input name="sortOrder" type="number" defaultValue={Number(item.sortOrder)} /></label>
         <label className="adm-field adm-form-wide">Description<textarea name="description" defaultValue={String(item.description ?? "")} /></label>
-        <label className="adm-field adm-form-wide">Image URL<input name="imageUrl" defaultValue={String(item.imageUrl ?? "")} /></label>
-        <label className="adm-field">Active<input type="checkbox" name="isActive" defaultChecked={Boolean(item.isActive)} /></label>
-        <label className="adm-field">Sold out<input type="checkbox" name="isSoldOut" defaultChecked={Boolean(item.isSoldOut)} /></label>
+        <div className="adm-form-wide">
+          <p className="adm-muted">Photograph</p>
+          {item.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- admin preview of local media
+            <img src={String(item.imageUrl)} alt="" style={{ width: 120, height: 120, objectFit: "cover" }} />
+          ) : (
+            <p className="adm-muted">No photo yet — customers see a placeholder.</p>
+          )}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const body = new FormData();
+              body.append("file", file);
+              try {
+                const res = await fetch(`/api/internal/admin/menu/items/${id}/image`, {
+                  method: "POST",
+                  body,
+                  credentials: "include",
+                });
+                if (!res.ok) {
+                  const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+                  throw new Error(j?.error?.message ?? "Upload failed");
+                }
+                setFlash({ kind: "ok", text: "Photo uploaded." });
+                load();
+              } catch (err) {
+                setFlash({ kind: "err", text: err instanceof Error ? err.message : "Upload failed" });
+              }
+            }}
+          />
+          {item.imageUrl ? (
+            <button
+              type="button"
+              className="adm-btn adm-btn-ghost"
+              onClick={async () => {
+                try {
+                  await adminApi(`/api/internal/admin/menu/items/${id}/image`, { method: "DELETE" });
+                  setFlash({ kind: "ok", text: "Photo removed from item (file kept for recovery)." });
+                  load();
+                } catch (err) {
+                  setFlash({ kind: "err", text: err instanceof Error ? err.message : "Failed" });
+                }
+              }}
+            >
+              Remove photo
+            </button>
+          ) : null}
+        </div>
+        <label className="adm-field">Active (on the menu)<input type="checkbox" name="isActive" defaultChecked={Boolean(item.isActive)} /></label>
+        <label className="adm-field">Sold out today<input type="checkbox" name="isSoldOut" defaultChecked={Boolean(item.isSoldOut)} /></label>
         <label className="adm-field">Featured<input type="checkbox" name="isFeatured" defaultChecked={Boolean(item.isFeatured)} /></label>
         <label className="adm-field">Most ordered<input type="checkbox" name="isMostOrdered" defaultChecked={Boolean(item.isMostOrdered)} /></label>
         {item.isUnverifiedPrice ? <p className="adm-warn">Placeholder price. Saving a new price clears this flag.</p> : null}
@@ -558,12 +549,19 @@ function ItemView({ id }: { id: string }) {
 
 function ModifiersView() {
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
+  const [loaded, setLoaded] = useState(false);
   const [flash, setFlash] = useFlash();
   const load = () => {
-    adminApi<Array<Record<string, unknown>>>("/api/internal/admin/modifiers").then(setRows).catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }));
+    adminApi<Array<Record<string, unknown>>>("/api/internal/admin/modifiers")
+      .then(setRows)
+      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }))
+      .finally(() => setLoaded(true));
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- load on mount
   useEffect(load, []);
+
+  // §12: skeleton on the first load only.
+  if (!loaded) return <AdminTableSkeleton rows={8} cols={5} />;
 
   return (
     <>
@@ -631,7 +629,7 @@ function GroupView({ id }: { id: string }) {
     load();
     adminApi<Array<{ id: string; name: string }>>("/api/internal/admin/menu/items").then((rows) => setAllItems(rows as Array<{ id: string; name: string }>)).catch(() => undefined);
   }, [load]);
-  if (!group) return <p className="adm-muted">Loading group…</p>;
+  if (!group) return <AdminFormSkeleton fields={4} />;
   const options = (group.options as Array<Record<string, unknown>>) ?? [];
   const offering = ((group.items as Array<{ itemId: string }>) ?? []).map((b) => b.itemId);
   return (
@@ -639,6 +637,9 @@ function GroupView({ id }: { id: string }) {
       <h1 className="adm-h1">{String(group.name)}</h1>
       <FlashBar flash={flash} />
       {group.isProvisional ? <p className="adm-warn">Provisional group. Saving the prompt or selection counts clears this flag.</p> : null}
+      <p className="adm-warn">
+        This group is on {offering.length} item{offering.length === 1 ? "" : "s"}. Saving changes those items together.
+      </p>
       <form
         className="adm-form"
         onSubmit={async (e) => {
@@ -769,7 +770,7 @@ function StoreView({ role }: { role: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- load on mount
   useEffect(load, []);
 
-  if (!data) return <p className="adm-muted">Loading store…</p>;
+  if (!data) return <AdminFormSkeleton fields={12} />;
   const c = data.config;
   return (
     <>
@@ -796,6 +797,11 @@ function StoreView({ role }: { role: string }) {
             isBusy: form.get("isBusy") === "on",
             acceptingOrders: form.get("acceptingOrders") === "on",
             notAcceptingMessage: form.get("notAcceptingMessage") || null,
+            closedMessage: form.get("closedMessage") || null,
+            prepEstimatePhrase: form.get("prepEstimatePhrase") || null,
+            announcementText: form.get("announcementText") || null,
+            announcementStartsAt: form.get("announcementStartsAt") || null,
+            announcementEndsAt: form.get("announcementEndsAt") || null,
             managerAlertPhone: form.get("managerAlertPhone") || null,
             managerAlertEmail: form.get("managerAlertEmail") || null,
           };
@@ -833,7 +839,12 @@ function StoreView({ role }: { role: string }) {
         <label className="adm-field">Busy prep<input name="busyPrepMinutes" type="number" defaultValue={Number(c.busyPrepMinutes)} /></label>
         <label className="adm-field">Busy now<input type="checkbox" name="isBusy" defaultChecked={Boolean(c.isBusy)} /></label>
         <label className="adm-field">Accepting orders<input type="checkbox" name="acceptingOrders" defaultChecked={Boolean(c.acceptingOrders)} /></label>
-        <label className="adm-field adm-form-wide">Not-accepting message<input name="notAcceptingMessage" defaultValue={String(c.notAcceptingMessage ?? "")} /></label>
+        <label className="adm-field adm-form-wide">Not-accepting (paused) message<input name="notAcceptingMessage" defaultValue={String(c.notAcceptingMessage ?? "")} /></label>
+        <label className="adm-field adm-form-wide">Closed message<input name="closedMessage" defaultValue={String(c.closedMessage ?? "")} /></label>
+        <label className="adm-field adm-form-wide">Prep estimate phrasing (use {"{minutes}"})<input name="prepEstimatePhrase" defaultValue={String(c.prepEstimatePhrase ?? "about {minutes} min")} /></label>
+        <label className="adm-field adm-form-wide">Announcement (plain text, max 280)<input name="announcementText" defaultValue={String(c.announcementText ?? "")} maxLength={280} /></label>
+        <label className="adm-field">Announcement starts<input name="announcementStartsAt" type="datetime-local" defaultValue={c.announcementStartsAt ? String(c.announcementStartsAt).slice(0, 16) : ""} /></label>
+        <label className="adm-field">Announcement ends<input name="announcementEndsAt" type="datetime-local" defaultValue={c.announcementEndsAt ? String(c.announcementEndsAt).slice(0, 16) : ""} /></label>
         <label className="adm-field">Manager alert phone<input name="managerAlertPhone" defaultValue={String(c.managerAlertPhone ?? "")} /></label>
         <label className="adm-field">Manager alert email<input name="managerAlertEmail" defaultValue={String(c.managerAlertEmail ?? "")} /></label>
         {owner ? (
@@ -889,6 +900,85 @@ function StoreView({ role }: { role: string }) {
             </button>
           </li>
         ))}
+      </ul>
+      <TradingOverridesPanel setFlash={setFlash} />
+    </>
+  );
+}
+
+function TradingOverridesPanel({ setFlash }: { setFlash: (f: Flash) => void }) {
+  const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
+  const load = () => {
+    adminApi<Array<Record<string, unknown>>>("/api/internal/admin/store/overrides")
+      .then(setRows)
+      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }));
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- load on mount
+  useEffect(load, []);
+  return (
+    <>
+      <h2>Temporary trading overrides</h2>
+      <p className="adm-lead">
+        Overrides expire by themselves at the end of the business date. Precedence: accepting-orders switch
+        beats override; override beats the weekly schedule.
+      </p>
+      <form
+        className="adm-form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const form = new FormData(e.currentTarget);
+          try {
+            await adminApi("/api/internal/admin/store/overrides", {
+              method: "POST",
+              body: JSON.stringify({
+                kind: form.get("kind"),
+                businessDate: form.get("businessDate") || undefined,
+                openTime: form.get("openTime") || null,
+                closeTime: form.get("closeTime") || null,
+                customerMessage: form.get("customerMessage") || null,
+              }),
+            });
+            setFlash({ kind: "ok", text: "Override applied." });
+            e.currentTarget.reset();
+            load();
+          } catch (err) {
+            setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
+          }
+        }}
+      >
+        <label className="adm-field">
+          Kind
+          <select name="kind" required>
+            <option value="CLOSE_EARLY">Close early</option>
+            <option value="OPEN_LATE">Open late</option>
+            <option value="CLOSED_REST_OF_DAY">Closed rest of day</option>
+            <option value="OPEN_ANYWAY">Open anyway</option>
+          </select>
+        </label>
+        <label className="adm-field">Business date<input name="businessDate" type="date" /></label>
+        <label className="adm-field">Open / late-open time<input name="openTime" placeholder="11:00" /></label>
+        <label className="adm-field">Close / early-close time<input name="closeTime" placeholder="19:00" /></label>
+        <label className="adm-field adm-form-wide">Customer message<input name="customerMessage" maxLength={280} /></label>
+        <div className="adm-form-wide"><button className="adm-btn" type="submit">Apply override</button></div>
+      </form>
+      <ul>
+        {rows.map((o) => (
+          <li key={String(o.id)} className="adm-warn" style={{ marginBottom: "0.5rem" }}>
+            <strong>{String(o.kind)}</strong> on {String(o.businessDate)} — lapses{" "}
+            {String(o.expiresAt)}{" "}
+            <button
+              type="button"
+              className="adm-btn adm-btn-danger"
+              onClick={async () => {
+                await adminApi(`/api/internal/admin/store/overrides/${o.id}/cancel`, { method: "POST" });
+                load();
+              }}
+            >
+              Cancel now
+            </button>
+          </li>
+        ))}
+        {rows.length === 0 ? <li className="adm-muted">No active overrides.</li> : null}
       </ul>
     </>
   );
@@ -947,6 +1037,7 @@ function HoursEditor({
 
 function OrdersView({ timezone }: { timezone: string }) {
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
+  const [loaded, setLoaded] = useState(false);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [flash, setFlash] = useFlash();
@@ -956,11 +1047,15 @@ function OrdersView({ timezone }: { timezone: string }) {
     if (status) p.set("status", status);
     adminApi<{ orders: Array<Record<string, unknown>> }>(`/api/internal/admin/orders?${p}`)
       .then((d) => setRows(d.orders))
-      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }));
+      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }))
+      .finally(() => setLoaded(true));
   }, [q, status, setFlash]);
   useEffect(() => {
     load();
   }, [load]);
+  // §12: skeleton on the first load only.
+  if (!loaded) return <AdminTableSkeleton rows={10} cols={7} />;
+
   return (
     <>
       <h1 className="adm-h1">Orders</h1>
@@ -1011,7 +1106,7 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
   useEffect(() => {
     load();
   }, [load]);
-  if (!order) return <p className="adm-muted">Loading order…</p>;
+  if (!order) return <AdminViewSkeleton />;
   const remaining = Number(order.remainingRefundableCents);
   return (
     <>
@@ -1310,15 +1405,22 @@ function ReportsView() {
 
 function JobsView() {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [inspect, setInspect] = useState<Record<string, unknown> | null>(null);
   const [flash, setFlash] = useFlash();
   const load = () => {
-    adminApi<Record<string, unknown>>("/api/internal/admin/jobs").then(setData).catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }));
+    adminApi<Record<string, unknown>>("/api/internal/admin/jobs")
+      .then(setData)
+      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }))
+      .finally(() => setLoaded(true));
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- load on mount
   useEffect(load, []);
 
   const dead = (data?.deadJobs as Array<Record<string, unknown>>) ?? [];
+  // §12: skeleton on the first load only.
+  if (!loaded) return <AdminDashboardSkeleton />;
+
   return (
     <>
       <h1 className="adm-h1">Jobs & print</h1>
@@ -1385,15 +1487,22 @@ function JobsView() {
 
 function StaffView() {
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
+  const [loaded, setLoaded] = useState(false);
   const [audit, setAudit] = useState<Array<Record<string, unknown>>>([]);
   const [pinOnce, setPinOnce] = useState<string | null>(null);
   const [flash, setFlash] = useFlash();
   const load = () => {
-    adminApi<Array<Record<string, unknown>>>("/api/internal/admin/staff").then(setRows).catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }));
+    adminApi<Array<Record<string, unknown>>>("/api/internal/admin/staff")
+      .then(setRows)
+      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }))
+      .finally(() => setLoaded(true));
     adminApi<Array<Record<string, unknown>>>("/api/internal/admin/audit").then(setAudit).catch(() => undefined);
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- load on mount
   useEffect(load, []);
+
+  // §12: skeleton on the first load only.
+  if (!loaded) return <AdminTableSkeleton rows={6} cols={5} />;
 
   return (
     <>

@@ -1,14 +1,15 @@
-// SPRINT-9: dependency-aware health — process alive is not enough; database and worker matter.
+// SPRINT-9 / SPRINT-12: dependency-aware health — process alive is not enough; database and worker matter.
 import { env, getWorkerStaleMs } from "@harolds/config";
 import { prisma } from "@harolds/db";
 import { getSquareEnvironment } from "@harolds/square";
+import { API_CONTRACT_VERSION } from "@harolds/types";
 import { getWorkerHeartbeat } from "@/lib/worker-heartbeat";
 
 export type HealthSnapshot = {
   ok: boolean;
   squareEnvironment: string;
   nodeEnv: string;
-  contractVersion: "1.2.0";
+  contractVersion: typeof API_CONTRACT_VERSION;
   checks: {
     database: "up" | "down";
     worker: "up" | "stale" | "down";
@@ -51,7 +52,7 @@ export async function getHealthSnapshot(
     ok,
     squareEnvironment: getSquareEnvironment(),
     nodeEnv: env.NODE_ENV,
-    contractVersion: "1.2.0",
+    contractVersion: API_CONTRACT_VERSION,
     checks: {
       database: dbUp ? "up" : "down",
       worker,

@@ -79,6 +79,7 @@ export function mapModifierGroup(
 }
 
 export function mapMenuItemSummary(row: DbMenuItem): MenuItemSummary {
+  const imageDerivatives = derivativesFromImageUrl(row.imageUrl);
   return {
     id: row.id,
     slug: row.slug,
@@ -86,10 +87,25 @@ export function mapMenuItemSummary(row: DbMenuItem): MenuItemSummary {
     description: row.description,
     basePriceCents: row.basePriceCents,
     imageUrl: row.imageUrl,
+    imageDerivatives,
     isSoldOut: row.isSoldOut,
     isFeatured: row.isFeatured,
     isMostOrdered: row.isMostOrdered,
     sortOrder: row.sortOrder,
+  };
+}
+
+/** SPRINT-12: derive public derivative URLs from a content-addressed media URL. */
+function derivativesFromImageUrl(imageUrl: string | null): MenuItemSummary["imageDerivatives"] {
+  if (!imageUrl) return null;
+  const m = /^\/api\/v1\/media\/([a-f0-9]{64})/.exec(imageUrl);
+  if (!m) return null;
+  const hash = m[1]!;
+  const base = `/api/v1/media/${hash}`;
+  return {
+    thumb: { webp: `${base}/thumb.webp`, fallback: `${base}/thumb` },
+    modal: { webp: `${base}/modal.webp`, fallback: `${base}/modal` },
+    preview: { webp: `${base}/preview.webp`, fallback: `${base}/preview` },
   };
 }
 

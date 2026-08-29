@@ -37,6 +37,8 @@ export const BODY_LIMITS = {
   jsonAdminBytes: 64 * 1024,
   webhookBytes: 1024 * 1024,
   printBytes: 256 * 1024,
+  /** SPRINT-12: menu image upload (checked before the body is fully read). */
+  imageUploadBytes: 8 * 1024 * 1024,
 } as const;
 
 export const WORKER_STALE_DEFAULT_MS = 30_000;
@@ -74,6 +76,8 @@ export function getWorkerStaleMs(): number {
 /**
  * Square Web Payments SDK plus Next.js hydration.
  * `unsafe-inline` / `unsafe-eval` are required for the App Router without per-request nonces.
+ * style-src / font-src must include Square CDN hosts — the card iframe loads
+ * `card-wrapper.css` and Square fonts from squarecdn (see Square CSP docs).
  */
 export function contentSecurityPolicy(): string {
   const square = [
@@ -85,14 +89,23 @@ export function contentSecurityPolicy(): string {
     "https://pci-connect.squareup.com",
     "https://pci-connect.squareupsandbox.com",
   ].join(" ");
+  // Fonts served by the Web Payments SDK (documented Square CSP hosts).
+  const squareFonts = [
+    "https://*.squarecdn.com",
+    "https://square-fonts-production-f.squarecdn.com",
+    "https://cash-f.squarecdn.com",
+    "https://d1g145x70srn7h.cloudfront.net",
+  ].join(" ");
+  // Square's own SDK telemetry (ingest) — documented alongside connect-src for Web Payments.
+  const squareConnectExtra = "https://o160250.ingest.sentry.io";
   return [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${square}`,
-    "style-src 'self' 'unsafe-inline'",
+    `style-src 'self' 'unsafe-inline' ${square}`,
     "img-src 'self' data: blob: https:",
-    "font-src 'self' data: https://fonts.gstatic.com",
+    `font-src 'self' data: https://fonts.gstatic.com ${squareFonts}`,
     `frame-src 'self' ${square}`,
-    `connect-src 'self' ${square}`,
+    `connect-src 'self' ${square} ${squareConnectExtra}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

@@ -26,11 +26,15 @@ describe("rate limit policy", () => {
 });
 
 describe("content security policy", () => {
-  it("allows Square Web Payments script, frame, and connect origins", () => {
+  it("allows Square Web Payments script, frame, connect, style, and font origins", () => {
     const csp = contentSecurityPolicy();
     assert.match(csp, /squarecdn\.com/);
     assert.match(csp, /squareup\.com/);
     assert.match(csp, /squareupsandbox\.com/);
     assert.match(csp, /frame-ancestors 'none'/);
+    assert.match(csp, /style-src[^;]*sandbox\.web\.squarecdn\.com/);
+    assert.match(csp, /font-src[^;]*square-fonts-production-f\.squarecdn\.com/);
+    assert.match(csp, /font-src[^;]*d1g145x70srn7h\.cloudfront\.net/);
+    assert.match(csp, /connect-src[^;]*o160250\.ingest\.sentry\.io/);
   });
 });

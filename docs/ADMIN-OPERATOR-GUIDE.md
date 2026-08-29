@@ -54,11 +54,45 @@ To close a holiday, add a **closure date**. That date is closed even if the week
 
 ## Pausing ordering
 
-On **Store**, uncheck **Accepting orders**. Put a short message in **Not-accepting message** (for example, the fryer is down). Save.
+On **Store**, uncheck **Accepting orders**. Put a short message in **Not-accepting (paused) message** (for example, the fryer is down). Save.
 
 The storefront stops taking new orders immediately. Check the box again when you are ready. That also takes effect immediately.
 
 This is the control to use when something in the kitchen is broken. It is not the same as marking one item sold out.
+
+---
+
+## Closing early tonight (or opening late)
+
+Do **not** edit the weekly hours for a one-night change — you will forget to put them back.
+
+1. Open **Store**.
+2. Under **Temporary trading overrides**, pick the kind (close early, open late, closed rest of day, or open anyway).
+3. Save. The override **expires by itself** at the end of that business day. You can also tap **Cancel now**.
+
+The accepting-orders switch still wins over an override.
+
+---
+
+## Posting an announcement
+
+On **Store**, type a short plain-text **Announcement** (no links). Optionally set start and end times. Save.
+
+Also editable: **Closed message**, paused message, and **Prep estimate phrasing** (use `{minutes}` where the number goes).
+
+---
+
+## Uploading a photograph
+
+1. Open the item from **Menu**.
+2. Choose a JPEG, PNG, or WebP. Good photos are well lit and fill the frame with the food.
+3. Customers see it on the next menu load. **Remove photo** detaches it; the file is kept for a week for recovery.
+
+---
+
+## Adding an item
+
+Create or edit from **Menu**: name, price in dollars (like `8.79`), category, description. **Active** means on the menu; **Sold out today** is the same-day kitchen toggle. They are different.
 
 ---
 

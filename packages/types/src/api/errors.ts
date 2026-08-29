@@ -32,5 +32,5 @@ export const API_ERROR_STATUS: Record<ApiErrorCode, number> = {
   UNAUTHORIZED: 401,
 };
 
-/** Contract version — 1.2.0 adds orders, payment, and webhooks (additive over 1.1.0). */
-export const API_CONTRACT_VERSION = "1.2.0" as const;
+/** Contract version — 1.3.0 adds images, announcements, closed reason (additive over 1.2.0). */
+export const API_CONTRACT_VERSION = "1.3.0" as const;

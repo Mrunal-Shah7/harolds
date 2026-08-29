@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./env": "./src/env.ts",
+    "./square-public": "./src/square-public.ts",
     "./eslint": "./eslint.config.mjs",
     "./tsconfig.base.json": "./tsconfig.base.json"
   },

@@ -63,6 +63,16 @@ describe("classifySquareError — payment mode", () => {
     const result = classifySquareError(new TypeError("fetch failed"), "payment");
     assert.equal(result.outcome, "transport_failure");
   });
+
+  // SPRINT-13: unknown/invalid source_id (sandbox cnon:card-nonce-rejected) is payment-failed.
+  it("maps a processor 404 on payment to transport_failure (payment-failed), not client_error", () => {
+    const result = classifySquareError(
+      makeSquareError(404, "NOT_FOUND", "INVALID_REQUEST_ERROR"),
+      "payment",
+    );
+    assert.equal(result.outcome, "transport_failure");
+    assert.match((result as { message: string }).message, /could not confirm payment/i);
+  });
 });
 
 describe("classifySquareError — refund mode", () => {

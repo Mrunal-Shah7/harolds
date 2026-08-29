@@ -1,0 +1,27 @@
+SPRINT-14 Phase 1.3 — production bundle baseline
+Captured before any Sprint 14 change, from `pnpm --filter @harolds/web build` (Next 15.5.23, exit 0).
+API routes omitted (all 289 B / 103 kB).
+
+Route (app)                          Size      First Load JS
+/                                    6.89 kB   120 kB
+/checkout                            7.41 kB   121 kB
+/order/[lookupToken]                 2.6 kB    116 kB
+/_not-found                          991 B     103 kB
+/admin/[[...slug]]                   12.6 kB   118 kB
+/admin/signin                        1.3 kB    104 kB
+/kitchen                             4.89 kB   107 kB
+
+First Load JS shared by all          102 kB
+  chunks/7637-*.js                   46.3 kB
+  chunks/87c73c54-*.js               54.2 kB
+  other shared chunks                1.96 kB
+Middleware                           49.1 kB
+
+Fonts loaded at baseline: 0 webfont files. globals.css declares
+  --font-display: "Georgia", "Times New Roman", serif  (system faces only)
+No external font origin is contacted. CSP font-src is 'self' data: https://fonts.gstatic.com
+plus Square hosts (packages/config/src/security.ts) and is NOT modified by this sprint.
+
+NOT CAPTURED (no capability in this environment): LCP, CLS, Lighthouse accessibility scores.
+No browser, no Playwright/Puppeteer, no Lighthouse binary is installed in this repo.
+These baseline numbers are recorded as BLOCKED rather than estimated.

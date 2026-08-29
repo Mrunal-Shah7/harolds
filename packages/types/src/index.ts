@@ -200,6 +200,11 @@ export type StoreConfigData = {
   defaultTipPresetIndex: number;
   acceptingOrders: boolean;
   notAcceptingMessage: string | null;
+  closedMessage: string | null;
+  prepEstimatePhrase: string | null;
+  announcementText: string | null;
+  announcementStartsAt: Date | null;
+  announcementEndsAt: Date | null;
   managerAlertPhone: string | null;
   managerAlertEmail: string | null;
 };

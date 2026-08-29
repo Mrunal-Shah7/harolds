@@ -440,7 +440,7 @@ app.get("/api/v1/orders/status/:lookupToken", (c) => {
 });
 
 app.get("/api/v1/health", (c) => {
-  return c.json(okBody({ ok: true, squareEnvironment: "mock", nodeEnv: "development", contractVersion: "1.2.0" }));
+  return c.json(okBody({ ok: true, squareEnvironment: "mock", nodeEnv: "development", contractVersion: "1.3.0" }));
 });
 
 app.notFound((c) => {

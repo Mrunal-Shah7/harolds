@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// SPRINT-9: take a PostgreSQL backup. Restore is proven by scripts/restore-postgres.mjs.
+// SPRINT-9 / SPRINT-12: take a PostgreSQL backup AND the image upload directory.
 import { spawn } from "node:child_process";
-import { mkdirSync, existsSync } from "node:fs";
+import { mkdirSync, existsSync, cpSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -39,6 +39,19 @@ const child = spawn(pgDump, ["--format=custom", "--no-owner", "--file", outFile,
 });
 
 child.on("exit", (code) => {
-  if (code === 0) console.log(`backup wrote ${outFile}`);
-  process.exit(code ?? 1);
+  if (code !== 0) process.exit(code ?? 1);
+  console.log(`backup wrote ${outFile}`);
+
+  // SPRINT-12: menu photographs live outside the DB — back them up beside the dump.
+  const uploadDir = process.env.IMAGE_UPLOAD_DIR
+    ? path.resolve(process.env.IMAGE_UPLOAD_DIR)
+    : path.join(root, "data", "uploads");
+  if (existsSync(uploadDir)) {
+    const imagesOut = path.join(outDir, `harolds-images-${stamp}`);
+    cpSync(uploadDir, imagesOut, { recursive: true });
+    console.log(`backup wrote images ${imagesOut}`);
+  } else {
+    console.log(`no image upload dir at ${uploadDir} — skipped`);
+  }
+  process.exit(0);
 });

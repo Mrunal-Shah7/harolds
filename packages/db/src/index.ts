@@ -48,6 +48,8 @@ export { normalizePhoneToE164, validateEmail } from "./customer";
 // SPRINT-4: order persistence — pending-order creation, payment transitions, lookup
 export {
   createPendingOrder,
+  createPendingOrderGuarded,
+  type DuplicateGuardOutcome,
   generateLookupToken,
   findOrderByIdempotencyKey,
   findOrderByLookupToken,
@@ -266,3 +268,20 @@ export {
 export { getOperationsSnapshot } from "./admin-dashboard";
 export { maybeRunScheduledReconciliation, getLatestReconciliationRun } from "./scheduled-reconcile";
 export type { ScheduledReconcileResult } from "./scheduled-reconcile";
+// SPRINT-12
+export {
+  evaluateTradingState,
+  defaultOverrideExpiry,
+  TradingOverrideKind,
+  type TradingClosedReason,
+  type TradingOverrideRow,
+  type EvaluateTradingStateArgs,
+  type TradingStateResult,
+} from "./trading-state";
+export {
+  listTradingOverrides,
+  createTradingOverride,
+  cancelTradingOverride,
+  type CreateTradingOverrideInput,
+} from "./admin-trading";
+export { reorderEntities } from "./admin-menu";

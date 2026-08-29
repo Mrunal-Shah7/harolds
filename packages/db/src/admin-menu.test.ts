@@ -37,6 +37,9 @@ describe("parseCurrencyInput", () => {
 let dbAvailable = true;
 let ACTOR = "";
 
+/** Seeded catalogue only — never temporary fixtures from other suites (e.g. s8rep-*). */
+const SEEDED_ITEM = { isActive: true as const, workbookId: { startsWith: "itm_" } };
+
 before(async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -60,7 +63,9 @@ after(async () => {
 describe("sold-out and unverified price", () => {
   it("toggles sold-out and the next cached menu read reflects it", async () => {
     if (!dbAvailable || !ACTOR) return;
-    const item = await prisma.menuItem.findFirstOrThrow({ where: { isActive: true } });
+    // SPRINT-13: scope to seeded itm_* rows. Parallel admin-reports creates/deletes
+    // s8rep-* items; findFirst({ isActive }) could race on a deleted temporary row.
+    const item = await prisma.menuItem.findFirstOrThrow({ where: SEEDED_ITEM });
     await getCachedFullMenu();
     assert.equal(__menuCacheIsHot(), true);
     await setItemSoldOut(item.id, true, ACTOR);
@@ -74,7 +79,7 @@ describe("sold-out and unverified price", () => {
 
   it("clears every sold-out flag and invalidates the cache once", async () => {
     if (!dbAvailable || !ACTOR) return;
-    const items = await prisma.menuItem.findMany({ where: { isActive: true }, take: 3 });
+    const items = await prisma.menuItem.findMany({ where: SEEDED_ITEM, take: 3 });
     for (const item of items) {
       await prisma.menuItem.update({ where: { id: item.id }, data: { isSoldOut: true } });
     }
@@ -82,13 +87,18 @@ describe("sold-out and unverified price", () => {
     const cleared = await clearAllSoldOut(ACTOR);
     assert.ok(cleared >= 3);
     assert.equal(__menuCacheIsHot(), false);
-    const still = await prisma.menuItem.count({ where: { isSoldOut: true } });
+    const still = await prisma.menuItem.count({
+      where: { isSoldOut: true, workbookId: { startsWith: "itm_" } },
+    });
     assert.equal(still, 0);
   });
 
   it("clears the unverified flag only on the item whose price changed", async () => {
     if (!dbAvailable || !ACTOR) return;
-    const flagged = await prisma.menuItem.findMany({ where: { isUnverifiedPrice: true }, take: 2 });
+    const flagged = await prisma.menuItem.findMany({
+      where: { isUnverifiedPrice: true, workbookId: { startsWith: "itm_" } },
+      take: 2,
+    });
     assert.ok(flagged.length >= 2);
     const [target, other] = flagged;
     const previous = target!.basePriceCents;
@@ -109,10 +119,13 @@ describe("sold-out and unverified price", () => {
 
   it("persists curated featured order for the public featured list", async () => {
     if (!dbAvailable || !ACTOR) return;
-    const items = await prisma.menuItem.findMany({ where: { isActive: true }, take: 2, orderBy: { sortOrder: "asc" } });
+    const items = await prisma.menuItem.findMany({
+      where: SEEDED_ITEM,
+      take: 2,
+      orderBy: { sortOrder: "asc" },
+    });
     await setCuration("featured", [items[1]!.id, items[0]!.id], ACTOR);
     const { menu } = await getCachedFullMenu();
-    // featured is a separate endpoint; check flags
     const a = await prisma.menuItem.findUniqueOrThrow({ where: { id: items[1]!.id } });
     const b = await prisma.menuItem.findUniqueOrThrow({ where: { id: items[0]!.id } });
     assert.equal(a.isFeatured, true);
@@ -157,9 +170,11 @@ describe("modifier groups", () => {
       ACTOR,
     );
     const unbound = await prisma.menuItem.findFirst({
-      where: { isActive: true, isSoldOut: false, modifierGroups: { none: {} } },
+      where: { ...SEEDED_ITEM, isSoldOut: false, modifierGroups: { none: {} } },
     });
-    const item = unbound ?? (await prisma.menuItem.findFirstOrThrow({ where: { isActive: true, isSoldOut: false } }));
+    const item =
+      unbound ??
+      (await prisma.menuItem.findFirstOrThrow({ where: { ...SEEDED_ITEM, isSoldOut: false } }));
     const original = await prisma.itemModifierGroup.findMany({
       where: { itemId: item.id },
       select: { groupId: true, sortOrder: true },

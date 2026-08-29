@@ -1,0 +1,92 @@
+foreground      surface           fg hex    bg hex    need  ratio         use
+--------------------------------------------------------------------------------------------------------------
+--color-ink     --color-paper     #241611   #f7f0e4   4.5:1 15.48:1 PASS    Page copy on paper
+--color-ink     --color-surface   #241611   #ffffff   4.5:1 17.53:1 PASS    Card and modal copy
+--color-ink     --color-paper-sunk#241611   #efe6d6   4.5:1 14.16:1 PASS    Totals block, rail labels
+--color-ink-muted--color-paper     #6b5a50   #f7f0e4   4.5:1 5.79:1  PASS    Descriptions on paper
+--color-ink-muted--color-surface   #6b5a50   #ffffff   4.5:1 6.56:1  PASS    Card descriptions, modifier lists
+--color-ink-muted--color-paper-sunk#6b5a50   #efe6d6   4.5:1 5.29:1  PASS    Totals labels, inactive tab
+--color-ink-faint--color-paper     #72655d   #f7f0e4   4.5:1 4.96:1  PASS    Helper text on paper
+--color-ink-faint--color-surface   #72655d   #ffffff   4.5:1 5.62:1  PASS    Modifier hint line, Unavailable
+--color-ink-faint--color-paper-sunk#72655d   #efe6d6   4.5:1 4.54:1  PASS    Placeholder text on sunk fills
+--color-brand   --color-surface   #ce1126   #ffffff   4.5:1 5.63:1  PASS    Price emphasis, active tab, links
+--color-brand   --color-paper     #ce1126   #f7f0e4   4.5:1 4.97:1  PASS    Section accents on paper
+--color-brand   --color-brand-tint#ce1126   #fbe9eb   4.5:1 4.81:1  PASS    Selected row text
+--color-danger  --color-surface   #a81321   #ffffff   4.5:1 7.55:1  PASS    Payment failure copy
+--color-danger  --color-paper     #a81321   #f7f0e4   4.5:1 6.67:1  PASS    Closure and error copy
+--color-danger  --color-paper-sunk#a81321   #efe6d6   4.5:1 6.10:1  PASS    Failure copy on sunk fills
+--color-danger  --color-brand-tint#a81321   #fbe9eb   4.5:1 6.46:1  PASS    Failed badge
+--color-open    --color-surface   #2b7542   #ffffff   4.5:1 5.64:1  PASS    Paid badge text
+--color-open    --color-paper     #2b7542   #f7f0e4   4.5:1 4.98:1  PASS    Open state copy
+--color-open    --color-paper-sunk#2b7542   #efe6d6   4.5:1 4.55:1  PASS    Store-open pill text
+--color-warn    --color-surface   #9c5408   #ffffff   4.5:1 5.70:1  PASS    Degraded notice
+--color-warn    --color-paper     #9c5408   #f7f0e4   4.5:1 5.03:1  PASS    Stale-data label
+--color-warn    --color-paper-sunk#9c5408   #efe6d6   4.5:1 4.60:1  PASS    Degraded chip
+--color-surface --color-brand     #ffffff   #ce1126   4.5:1 5.63:1  PASS    Primary button label
+--color-surface --color-brand-hover#ffffff   #b00e20   4.5:1 7.17:1  PASS    Primary button label, pressed
+--color-surface --color-danger    #ffffff   #a81321   4.5:1 7.55:1  PASS    Destructive button label
+--color-surface --color-warn      #ffffff   #9c5408   4.5:1 5.70:1  PASS    Warning bar label
+--color-paper   --color-ink       #f7f0e4   #241611   4.5:1 15.48:1 PASS    Inverted copy on ink
+--color-ink     --color-gold      #241611   #f2b233   4.5:1 9.34:1  PASS    Announcement strip text on gold
+--color-line-strong--color-surface   #8a7c68   #ffffff   3:1   4.07:1  PASS    Input border, secondary control boundary on white
+--color-line-strong--color-paper     #8a7c68   #f7f0e4   3:1   3.59:1  PASS    Control boundary on paper
+--color-line-strong--color-paper-sunk#8a7c68   #efe6d6   3:1   3.28:1  PASS    Control boundary on sunk fills
+--color-focus   --color-surface   #1b5fcc   #ffffff   3:1   5.91:1  PASS    Focus ring on white
+--color-focus   --color-paper     #1b5fcc   #f7f0e4   3:1   5.21:1  PASS    Focus ring on paper
+--color-focus   --color-paper-sunk#1b5fcc   #efe6d6   3:1   4.77:1  PASS    Focus ring on sunk fills
+--color-brand   --color-paper-sunk#ce1126   #efe6d6   3:1   4.54:1  PASS    Active tab underline
+--color-brand   --color-surface   #ce1126   #ffffff   3:1   5.63:1  PASS    Cart count badge fill boundary
+--color-line    --color-surface   #e2d6c4   #ffffff   3:1   1.43:1  EXEMPT  Card outline / divider on white — decorative rule, no control
+--color-line    --color-paper     #e2d6c4   #f7f0e4   3:1   1.27:1  EXEMPT  Divider on paper — decorative rule, no control
+--color-gold    --color-surface   #f2b233   #ffffff   3:1   1.88:1  EXEMPT  Ticket chip dashed rule — decoration; the chip reads from its mono text
+--color-gold    --color-paper-sunk#f2b233   #efe6d6   3:1   1.52:1  EXEMPT  Ticket chip rule on its own fill — decoration
+--color-kds-ink --color-kds-bg    #f7f0e4   #141110   4.5:1 16.59:1 PASS    Board text
+--color-kds-ink --color-kds-card  #f7f0e4   #221c19   4.5:1 14.85:1 PASS    Card text
+--color-kds-ink --color-kds-card-raised#f7f0e4   #2e2622   4.5:1 13.09:1 PASS    Selected card text
+--color-kds-ink-muted--color-kds-card  #a89a90   #221c19   4.5:1 6.16:1  PASS    Secondary card text
+--color-kds-ink-muted--color-kds-bg    #a89a90   #141110   4.5:1 6.88:1  PASS    Column headers
+--color-kds-line-strong--color-kds-card  #6e6763   #221c19   3:1   3.03:1  PASS    Card boundary — replaces the shadow on dark (§5.6)
+--color-kds-line-strong--color-kds-bg    #6e6763   #141110   3:1   3.39:1  PASS    Board rules
+--color-gold    --color-kds-card  #f2b233   #221c19   3:1   8.97:1  PASS    Working age bar
+--color-open-on-dark--color-kds-card  #2e7d46   #221c19   3:1   3.32:1  PASS    Fresh age bar
+--color-open-on-dark--color-kds-bg    #2e7d46   #141110   3:1   3.70:1  PASS    Fresh age bar against the board
+--color-danger-on-dark--color-kds-card  #b73c47   #221c19   3:1   3.01:1  PASS    Late age bar
+--color-danger-on-dark--color-kds-bg    #b73c47   #141110   3:1   3.36:1  PASS    Late age bar against the board
+--color-kds-line--color-kds-card  #3a302b   #221c19   3:1   1.31:1  EXEMPT  Internal hairline inside a card — decorative
+--color-ink-dark--color-paper-dark#f7f0e4   #1a1512   4.5:1 15.98:1 PASS    Dark: page copy
+--color-ink-dark--color-paper-sunk-dark#f7f0e4   #241d19   4.5:1 14.66:1 PASS    Dark: totals block, rails
+--color-ink-dark--color-surface-dark#f7f0e4   #2a221e   4.5:1 13.77:1 PASS    Dark: card and modal copy
+--color-ink-muted-dark--color-paper-dark#bca99b   #1a1512   4.5:1 8.01:1  PASS    Dark: descriptions on paper
+--color-ink-muted-dark--color-paper-sunk-dark#bca99b   #241d19   4.5:1 7.34:1  PASS    Dark: totals labels, inactive tab
+--color-ink-muted-dark--color-surface-dark#bca99b   #2a221e   4.5:1 6.90:1  PASS    Dark: card descriptions, modifier lists
+--color-ink-faint-dark--color-paper-dark#9a8878   #1a1512   4.5:1 5.32:1  PASS    Dark: helper text
+--color-ink-faint-dark--color-paper-sunk-dark#9a8878   #241d19   4.5:1 4.88:1  PASS    Dark: placeholders on sunk fills
+--color-ink-faint-dark--color-surface-dark#9a8878   #2a221e   4.5:1 4.58:1  PASS    Dark: modifier hint, Unavailable
+--color-brand-dark--color-paper-dark#e8646d   #1a1512   4.5:1 5.58:1  PASS    Dark: section accents, links
+--color-brand-dark--color-paper-sunk-dark#e8646d   #241d19   4.5:1 5.12:1  PASS    Dark: active tab on sunk
+--color-brand-dark--color-surface-dark#e8646d   #2a221e   4.5:1 4.81:1  PASS    Dark: price emphasis, active tab
+--color-brand-dark--color-brand-tint-dark#e8646d   #3a2224   4.5:1 4.51:1  PASS    Dark: selected row text
+--color-danger-dark--color-paper-dark#e26a72   #1a1512   4.5:1 5.64:1  PASS    Dark: closure and error copy
+--color-danger-dark--color-surface-dark#e26a72   #2a221e   4.5:1 4.86:1  PASS    Dark: payment failure copy
+--color-danger-dark--color-brand-tint-dark#e26a72   #3a2224   4.5:1 4.56:1  PASS    Dark: failed badge
+--color-open-dark--color-paper-dark#4fa86a   #1a1512   4.5:1 6.16:1  PASS    Dark: open state copy
+--color-open-dark--color-paper-sunk-dark#4fa86a   #241d19   4.5:1 5.65:1  PASS    Dark: store-open pill text
+--color-open-dark--color-surface-dark#4fa86a   #2a221e   4.5:1 5.31:1  PASS    Dark: paid badge text
+--color-warn-dark--color-paper-dark#d19a4a   #1a1512   4.5:1 7.27:1  PASS    Dark: stale-data label
+--color-warn-dark--color-paper-sunk-dark#d19a4a   #241d19   4.5:1 6.67:1  PASS    Dark: degraded chip
+--color-warn-dark--color-surface-dark#d19a4a   #2a221e   4.5:1 6.26:1  PASS    Dark: degraded notice
+--color-gold    --color-surface-dark#f2b233   #2a221e   4.5:1 8.31:1  PASS    Dark: announcement strip text is ink; gold reads as text here
+--color-surface-dark--color-brand-dark#2a221e   #e8646d   4.5:1 4.81:1  PASS    Dark: primary button label on its fill
+--color-surface-dark--color-brand-hover-dark#2a221e   #f2858c   4.5:1 6.32:1  PASS    Dark: primary button label, pressed
+--color-surface-dark--color-danger-dark#2a221e   #e26a72   4.5:1 4.86:1  PASS    Dark: destructive button label on fill
+--color-line-strong-dark--color-paper-dark#807974   #1a1512   3:1   4.23:1  PASS    Dark: control boundary on paper
+--color-line-strong-dark--color-paper-sunk-dark#807974   #241d19   3:1   3.88:1  PASS    Dark: control boundary on sunk
+--color-line-strong-dark--color-surface-dark#807974   #2a221e   3:1   3.64:1  PASS    Dark: input border on card
+--color-focus-dark--color-paper-dark#5b8def   #1a1512   3:1   5.60:1  PASS    Dark: focus ring on paper
+--color-focus-dark--color-paper-sunk-dark#5b8def   #241d19   3:1   5.14:1  PASS    Dark: focus ring on sunk
+--color-focus-dark--color-surface-dark#5b8def   #2a221e   3:1   4.83:1  PASS    Dark: focus ring on card
+--color-surface-dark--color-paper-dark#2a221e   #1a1512   1:1   1.16:1  EXEMPT  Dark: card plane against page — separation carried by the border, not luminance
+--color-line-dark--color-surface-dark#3a302b   #2a221e   3:1   1.22:1  EXEMPT  Dark: decorative divider inside a card
+--color-line-dark--color-paper-dark#3a302b   #1a1512   3:1   1.41:1  EXEMPT  Dark: decorative divider on paper
+--------------------------------------------------------------------------------------------------------------
+88 pairs, 8 decorative exemptions, 0 failing.

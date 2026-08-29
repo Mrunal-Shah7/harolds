@@ -1,13 +1,19 @@
-<!-- SPRINT-11: what only the storefront developer can implement — the six things that cause incidents if they get them wrong. -->
+<!-- SPRINT-11 / SPRINT-12: what only the storefront developer can implement — the six things that cause incidents if they get them wrong. -->
 
 # Storefront requirements — Harold's Chicken Oak Lawn
 
-Public contract **1.2.0**. Pickup only, guest checkout, ASAP only.
+Public contract **1.3.0** (additive over 1.2.0). Pickup only, guest checkout, ASAP only.
 
 This is the single document for whoever builds the customer UI. The OpenAPI spec and [`API-CONTRACT-HANDOFF.md`](./API-CONTRACT-HANDOFF.md) are the contract. This page is the behaviour the contract cannot see.
 
 Work against **`pnpm mock`** (`http://localhost:4001`) with no database and no `.env`. Point at the real API (`http://localhost:3000`) only after the mock journey works.
 
+**Sprint 12 additions a storefront must know:**
+
+- Menu items may include optional `imageDerivatives` (thumb / modal / preview, webp + fallback). Prefer those over `imageUrl` alone. Missing images are normal — reserve aspect ratio and show a deliberate placeholder.
+- Store status may include `announcement`, `closedMessage`, `prepEstimatePhrase`, and `closedReason`. Trading and prep segments stay derived; do not let typed announcement text override "Open now".
+- Public Square IDs (`NEXT_PUBLIC_SQUARE_APPLICATION_ID`, `NEXT_PUBLIC_SQUARE_LOCATION_ID`, `NEXT_PUBLIC_SQUARE_ENVIRONMENT`) must be present at **build** time. A runtime-only server env produces a permanently broken checkout.
+- Media is served from `/api/v1/media/{hash}/…` with immutable caching.
 ---
 
 ## 1. Tokenise in the browser. Send only the token.

@@ -1,9 +1,12 @@
 "use client";
 
+// SPRINT-14: dialog (design.md §7.6, §14). A centred dialog at md and above, a bottom sheet
+// below. No backdrop blur — §16 item 2. Focus is trapped and returned on close.
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useOverlay } from "@/components/ui/use-overlay";
 
 type DialogProps = {
   open: boolean;
@@ -14,39 +17,25 @@ type DialogProps = {
 };
 
 export function Dialog({ open, onClose, children, className, labelledBy }: DialogProps) {
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => setMounted(true), []);
-
-  React.useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [open, onClose]);
+  const { mounted, panelRef } = useOverlay(open, onClose);
 
   if (!mounted || !open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+    // `sf-root` travels with the portal: this panel is mounted on document.body, OUTSIDE the
+    // storefront layout, so without the class the base :focus-visible ring and the default
+    // border colour from globals.css would not reach anything inside the modal.
+    <div className="sf-root fixed inset-0 z-overlay flex items-end justify-center md:items-center">
+      <div className="absolute inset-0 bg-ink/60 animate-fade-in" onClick={onClose} aria-hidden="true" />
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
         className={cn(
-          "relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-background shadow-xl sm:max-w-lg sm:rounded-2xl",
+          "relative z-overlay flex max-h-[92dvh] w-full flex-col overflow-hidden bg-surface shadow-overlay",
+          "rounded-t-lg md:max-w-[560px] md:rounded-md",
+          "animate-slide-in-bottom",
           className,
         )}
       >
@@ -54,9 +43,9 @@ export function Dialog({ open, onClose, children, className, labelledBy }: Dialo
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 z-20 rounded-full bg-background/90 p-1.5 text-foreground shadow-sm hover:bg-muted"
+          className="absolute right-3 top-3 z-overlay flex h-11 w-11 items-center justify-center rounded-pill bg-surface/90 text-ink motion-fast transition-colors hover:bg-paper-sunk"
         >
-          <X className="h-5 w-5" />
+          <X className="h-5 w-5" aria-hidden="true" />
         </button>
         {children}
       </div>

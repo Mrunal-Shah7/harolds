@@ -18,6 +18,7 @@ import {
   SessionRevokedError,
 } from "@harolds/db";
 import { RateLimitedError, rateLimitedResponse } from "@/lib/enforce-rate-limit";
+import { AdminRouteDeniedError } from "@/lib/admin-route-registry";
 
 export const ADMIN_COOKIE = "harolds_admin";
 
@@ -74,6 +75,9 @@ export function adminAuthError(err: unknown): NextResponse {
     return adminFail(AdminErrorCode.PASSWORD_INVALID, err.message);
   }
   if (err instanceof AdminForbiddenError) {
+    return adminFail(AdminErrorCode.FORBIDDEN, err.message);
+  }
+  if (err instanceof AdminRouteDeniedError) {
     return adminFail(AdminErrorCode.FORBIDDEN, err.message);
   }
   if (err instanceof PasswordTooWeakError || err instanceof AdminValidationError) {

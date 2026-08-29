@@ -1,6 +1,10 @@
 // SPRINT-1 / SPRINT-5: config package public exports
 export { env, parseEnv, type Env } from "./env";
 export { getPrinterConfig, isKnownPrinterSerial, type PrinterConfig } from "./printers";
+export {
+  getOrderDuplicateGuardWindowMs,
+  DEFAULT_ORDER_DUPLICATE_GUARD_WINDOW_SECONDS,
+} from "./checkout-guard";
 export { getKitchenConfig, KITCHEN_DEFAULTS, type KitchenConfig } from "./kitchen";
 export {
   getJobWorkerConfig,
@@ -47,3 +51,9 @@ export {
   isPlaceholderManagerPhone,
   isPlaceholderManagerEmail,
 } from "./production-guards";
+export {
+  assertPublicSquareIdentifiersForBuild,
+  missingPublicSquareIdentifiers,
+  publicSquareIdsPresentAtBuild,
+  type PublicSquareEnv,
+} from "./square-public";

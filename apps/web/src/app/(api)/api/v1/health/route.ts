@@ -1,4 +1,5 @@
-// SPRINT-4 / SPRINT-9: GET /api/v1/health — Square env plus database and worker dependency checks
+// SPRINT-4 / SPRINT-9 / SPRINT-12: GET /api/v1/health — Square env plus database and worker dependency checks
+import { API_CONTRACT_VERSION } from "@harolds/types";
 import { handleRouteError, ok } from "@/lib/api";
 import { getHealthSnapshot } from "@/lib/health";
 import { NextResponse } from "next/server";
@@ -11,7 +12,10 @@ export async function GET() {
     const snapshot = await getHealthSnapshot();
     if (!snapshot.ok) {
       return NextResponse.json(
-        { data: snapshot, meta: { serverTime: new Date().toISOString(), version: "1.2.0" } },
+        {
+          data: snapshot,
+          meta: { serverTime: new Date().toISOString(), version: API_CONTRACT_VERSION },
+        },
         { status: 503, headers: { "Cache-Control": "no-store" } },
       );
     }

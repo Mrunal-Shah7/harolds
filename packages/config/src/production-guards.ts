@@ -12,6 +12,15 @@ export type ProductionEnvSlice = {
   EMAIL_API_KEY?: string;
   EMAIL_FROM_ADDRESS?: string;
   PRINTER_SDP_SHARED_SECRET?: string;
+  // SPRINT-12: public Square IDs must be present in a production start (build embeds them).
+  NEXT_PUBLIC_SQUARE_APPLICATION_ID?: string;
+  NEXT_PUBLIC_SQUARE_LOCATION_ID?: string;
+  NEXT_PUBLIC_SQUARE_ENVIRONMENT?: string;
+  SQUARE_APPLICATION_ID?: string;
+  SQUARE_ACCESS_TOKEN?: string;
+  SQUARE_LOCATION_ID?: string;
+  SQUARE_ENVIRONMENT?: string;
+  SQUARE_WEBHOOK_SIGNATURE_KEY?: string;
 };
 
 function present(value: string | undefined): boolean {
@@ -32,6 +41,27 @@ export function missingProductionVariables(env: ProductionEnvSlice): string[] {
     missing.push(
       `PRINTER_SDP_SHARED_SECRET: must be at least ${PRINT_SECRET_MIN_PRODUCTION} characters in production (query-string secret on the printer)`,
     );
+  }
+  // SPRINT-12: Square must be complete in production — server secrets and client-build IDs.
+  if (!present(env.SQUARE_APPLICATION_ID)) missing.push("SQUARE_APPLICATION_ID: required in production");
+  if (!present(env.SQUARE_ACCESS_TOKEN)) missing.push("SQUARE_ACCESS_TOKEN: required in production");
+  if (!present(env.SQUARE_LOCATION_ID)) missing.push("SQUARE_LOCATION_ID: required in production");
+  if (!present(env.SQUARE_ENVIRONMENT)) missing.push("SQUARE_ENVIRONMENT: required in production (sandbox | production)");
+  if (!present(env.SQUARE_WEBHOOK_SIGNATURE_KEY)) {
+    missing.push("SQUARE_WEBHOOK_SIGNATURE_KEY: required in production");
+  }
+  if (!present(env.NEXT_PUBLIC_SQUARE_APPLICATION_ID)) {
+    missing.push(
+      "NEXT_PUBLIC_SQUARE_APPLICATION_ID: required in production (must have been present at build time for the Web Payments SDK)",
+    );
+  }
+  if (!present(env.NEXT_PUBLIC_SQUARE_LOCATION_ID)) {
+    missing.push(
+      "NEXT_PUBLIC_SQUARE_LOCATION_ID: required in production (must have been present at build time for the Web Payments SDK)",
+    );
+  }
+  if (!present(env.NEXT_PUBLIC_SQUARE_ENVIRONMENT)) {
+    missing.push("NEXT_PUBLIC_SQUARE_ENVIRONMENT: required in production (sandbox | production)");
   }
   return missing;
 }

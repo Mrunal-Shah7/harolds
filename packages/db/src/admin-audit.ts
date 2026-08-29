@@ -7,6 +7,8 @@ export type RecordAdminAuditArgs = {
   entityType: string;
   entityId?: string | null;
   summary: string;
+  /** SPRINT-12: before/after values for mutations that will be questioned later. */
+  details?: { before?: unknown; after?: unknown } | Record<string, unknown> | null;
 };
 
 export async function recordAdminAudit(args: RecordAdminAuditArgs): Promise<void> {
@@ -17,6 +19,7 @@ export async function recordAdminAudit(args: RecordAdminAuditArgs): Promise<void
       entityType: args.entityType,
       entityId: args.entityId ?? null,
       summary: args.summary,
+      details: (args.details ?? undefined) as object | undefined,
     },
   });
 }

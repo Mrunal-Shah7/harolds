@@ -1,4 +1,4 @@
-// SPRINT-1 / SPRINT-2: typed StoreConfig accessor with short in-process TTL cache and explicit invalidation
+// SPRINT-1 / SPRINT-2 / SPRINT-12: typed StoreConfig accessor with short in-process TTL cache.
 import type { StoreConfigData } from "@harolds/types";
 import { prisma } from "./client";
 
@@ -30,6 +30,11 @@ function toData(row: {
   defaultTipPresetIndex: number;
   acceptingOrders: boolean;
   notAcceptingMessage: string | null;
+  closedMessage: string | null;
+  prepEstimatePhrase: string | null;
+  announcementText: string | null;
+  announcementStartsAt: Date | null;
+  announcementEndsAt: Date | null;
   managerAlertPhone: string | null;
   managerAlertEmail: string | null;
 }): StoreConfigData {
@@ -57,6 +62,11 @@ function toData(row: {
     defaultTipPresetIndex: row.defaultTipPresetIndex,
     acceptingOrders: row.acceptingOrders,
     notAcceptingMessage: row.notAcceptingMessage,
+    closedMessage: row.closedMessage,
+    prepEstimatePhrase: row.prepEstimatePhrase,
+    announcementText: row.announcementText,
+    announcementStartsAt: row.announcementStartsAt,
+    announcementEndsAt: row.announcementEndsAt,
     managerAlertPhone: row.managerAlertPhone,
     managerAlertEmail: row.managerAlertEmail,
   };
@@ -78,12 +88,12 @@ export async function getStoreConfig(): Promise<StoreConfigData> {
   return value;
 }
 
-/** Clear the in-process store-config cache. Sprint 8 admin panel calls this after mutations. */
+/** Drop the in-process cache after an admin mutation. */
 export function invalidateStoreConfigCache(): void {
   cache = null;
 }
 
-/** Test helper — exposes whether the cache currently holds a value. */
-export function __storeConfigCacheIsHot(): boolean {
-  return cache !== null && cache.expiresAt > Date.now();
+/** Test helper — force a specific cache entry. */
+export function _setStoreConfigCacheForTests(value: StoreConfigData | null): void {
+  cache = value ? { value, expiresAt: Date.now() + CACHE_TTL_MS } : null;
 }

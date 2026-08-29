@@ -17,6 +17,9 @@ build/
 .env.*.local
 !.env.example
 
+# SPRINT-12: uploaded menu photographs (content-addressed; outside build output)
+data/uploads/
+
 # Prisma
 packages/db/src/generated/
 

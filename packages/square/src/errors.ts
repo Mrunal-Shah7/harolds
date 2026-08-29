@@ -167,6 +167,17 @@ export function classifySquareError(err: unknown, mode: "payment" | "refund"): E
       };
     }
 
+    // SPRINT-13: a processor 404 on create-payment (e.g. unknown/invalid source_id nonce)
+    // is payment-failed, not an internal application error. The customer must not retry
+    // immediately — outcome of any prior attempt is unknown to them.
+    if (mode === "payment" && statusCode === 404) {
+      return {
+        outcome: "transport_failure",
+        message:
+          "We could not confirm payment. Do not retry immediately — if you were charged, your order will appear shortly.",
+      };
+    }
+
     return {
       outcome: "client_error",
       error: new SquareClientError(
