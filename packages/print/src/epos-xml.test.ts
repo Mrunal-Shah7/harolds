@@ -11,7 +11,7 @@ const order: TicketOrderInput = {
   orderNumber: "HC-003",
   paidAt: new Date("2026-08-09T18:59:34.836Z"),
   timeZone: "America/Chicago",
-  storeName: "Harold's Chicken Oak Lawn",
+  storeName: "Harold's Chicken Burnham",
   customerFirstName: "José",
   customerLastName: "Nuñez",
   paymentStatus: "CAPTURED",

@@ -1,19 +1,17 @@
-// SPRINT-1: root application layout — shared HTML shell for all route-group surfaces
+// Root application layout — shared HTML shell for all route-group surfaces.
 import type { Metadata } from "next";
 import { ClientErrorReporter } from "@/components/ClientErrorReporter";
-// SPRINT-14: self-hosted display/body/utility faces (design.md §5.3, §15).
+// Self-hosted poster/display/body/utility faces.
 import { fontVariables } from "./fonts";
-// SPRINT-17: storefront theme preference, applied before first paint.
-import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Harold's Chicken Oak Lawn",
-  description: "Order pickup online from Harold's Chicken Oak Lawn.",
+  title: "Harold's Chicken Burnham",
+  description: "Order pickup online from Harold's Chicken Burnham.",
 };
 
 export const viewport = {
-  themeColor: "#1a1a1a",
+  themeColor: "#f7f0e1",
 };
 
 export default function RootLayout({
@@ -22,13 +20,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={fontVariables} suppressHydrationWarning>
-      <head>
-        {/* Runs before paint so the page never renders light and repaints dark. Inline is
-            permitted by the existing CSP (script-src 'self' 'unsafe-inline'); the policy is
-            NOT widened by this. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
+    // LIGHT ONLY, for now. The dark scheme and its toggle are hidden rather than deleted: the
+    // `html[data-theme="dark"] .sf-root` rules and lib/theme.ts are still in the tree, and
+    // stamping "light" here is what keeps them from firing — including for a visitor whose OS
+    // prefers dark, whom the `system` default would otherwise have sent to the dark scheme.
+    <html lang="en" data-theme="light" className={fontVariables} suppressHydrationWarning>
       <body>
         <ClientErrorReporter />
         {children}

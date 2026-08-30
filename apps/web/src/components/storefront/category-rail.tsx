@@ -7,7 +7,13 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 
-export type RailCategory = { id: string; name: string; slug?: string };
+export type RailCategory = {
+  id: string;
+  name: string;
+  slug?: string;
+  /** Operator-set tile image. Absent falls back to the initial, the design's placeholder. */
+  imageUrl?: string | null;
+};
 
 /** Home variant. */
 export function CategoryRail({ categories }: { categories: RailCategory[] }) {
@@ -16,7 +22,13 @@ export function CategoryRail({ categories }: { categories: RailCategory[] }) {
       {categories.map((cat) => (
         <Link key={cat.id} href={`/menu#cat-${cat.id}`} className="cat-tile">
           <span className="circle" aria-hidden="true">
-            {cat.name.trim().charAt(0)}
+            {/* The initial is the fallback, not the default: an operator can set a real image
+                per category from the admin Menu screen. */}
+            {cat.imageUrl ? (
+              <img src={cat.imageUrl} alt="" loading="lazy" decoding="async" />
+            ) : (
+              cat.name.trim().charAt(0)
+            )}
           </span>
           <span className="lbl">{cat.name}</span>
         </Link>

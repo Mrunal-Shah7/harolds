@@ -175,13 +175,13 @@ export default function OrderStatusPage() {
                     hour: "numeric",
                     minute: "2-digit",
                   })}
-                </strong>{" "}
-                — we&apos;ll text you the moment it&apos;s up.
+                </strong>
+                .
               </p>
             ) : null}
 
             <p style={{ color: "var(--ink-muted)", marginTop: 8 }}>
-              Give your order number at the counter. Receipt sent by text and email.
+              Give your order number at the counter. Receipt sent by email.
             </p>
           </div>
         </div>

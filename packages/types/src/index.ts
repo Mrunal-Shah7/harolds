@@ -207,6 +207,8 @@ export type StoreConfigData = {
   announcementEndsAt: Date | null;
   managerAlertPhone: string | null;
   managerAlertEmail: string | null;
+  /** Storefront hero background, as a content-addressed media URL. Null = the plain paper hero. */
+  heroImageUrl: string | null;
 };
 
 // SPRINT-2: public API contract + error codes

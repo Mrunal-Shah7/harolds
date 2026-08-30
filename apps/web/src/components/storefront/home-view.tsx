@@ -76,7 +76,15 @@ export function HomeView({
       <AnnouncementStrip announcement={status.announcement} />
 
       <main>
-        <section className="band b-paper textured hero">
+        {/* The banner is optional. Without one this is the design's plain paper hero; with one
+            the band gets a full-bleed background and a paper-tinted scrim (globals.css), because
+            the poster headline is unreadable over an arbitrary photograph. */}
+        <section
+          className={`band b-paper textured hero${status.heroImageUrl ? " has-banner" : ""}`}
+          style={
+            status.heroImageUrl ? { backgroundImage: `url(${status.heroImageUrl})` } : undefined
+          }
+        >
           <div className="container">
             <p className="eyebrow">
               {status.city}, {status.state} · Pickup only
@@ -86,15 +94,27 @@ export function HomeView({
               <br />
               Sauce over.
               <br />
-              <span className="accent">Fifty years loud.</span>
+              <span className="accent">75 years loud.</span>
             </h1>
             <p>
               Fried to order, the way the South Side has eaten it — order ahead, skip the line,
               pick it up hot.
             </p>
-            <Link href="/menu" className="btn btn-primary btn-lg">
-              Order pickup
-            </Link>
+            <div className="hero-actions">
+              <Link href="/menu" className="btn btn-primary btn-lg">
+                Order pickup
+              </Link>
+              {/* Delivery is DoorDash's, not ours — it leaves the site, so it is the secondary
+                  action and opens in a new tab. */}
+              <a
+                href="https://www.doordash.com/store/51035085?utm_source=mx_share&aw=ToYEXtfMfeYuP_Lz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary btn-lg"
+              >
+                Order delivery
+              </a>
+            </div>
             <div className="hero-meta">
               <span className="badge badge-neutral">Guest checkout</span>
               <span className="badge badge-neutral">Paid online</span>
@@ -117,7 +137,13 @@ export function HomeView({
               <p className="eyebrow" style={{ marginBottom: 16 }}>
                 Straight to a section
               </p>
-              <CategoryRail categories={categories.map((c) => ({ id: c.id, name: c.name }))} />
+              <CategoryRail
+                categories={categories.map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  imageUrl: c.imageUrl ?? null,
+                }))}
+              />
             </div>
           </section>
         ) : null}

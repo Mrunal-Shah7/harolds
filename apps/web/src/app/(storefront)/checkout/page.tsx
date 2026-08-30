@@ -47,7 +47,10 @@ export default function CheckoutPage() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [smsConsent, setSmsConsent] = useState(false);
+  // SMS is switched off for now, so nothing collects consent and nothing is texted. The field
+  // is still SENT — the order contract and the notify package are unchanged and expect it — it
+  // is simply always false. Re-enabling SMS means restoring the checkbox, not a schema change.
+  const smsConsent = false;
 
   const [customTip, setCustomTip] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -106,7 +109,7 @@ export default function CheckoutPage() {
       await submitOrder(token);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [firstName, lastName, phone, email, smsConsent],
+    [firstName, lastName, phone, email],
   );
 
   const handleTokenError = useCallback((message: string) => {
@@ -163,7 +166,7 @@ export default function CheckoutPage() {
             // PAYMENT_FAILED is emitted ONLY on the ambiguous class (transport failure /
             // timeout), where the system cannot know whether money moved.
             message:
-              "We couldn't confirm that payment. Don't try again just yet — check your texts in a minute, or call the store.",
+              "We couldn't confirm that payment. Don't try again just yet — call the store to check before retrying.",
             retryable: true,
           });
           startLockout();
@@ -286,7 +289,7 @@ export default function CheckoutPage() {
                       autoComplete="tel"
                       placeholder="(708) 555-1234"
                     />
-                    <p className="help">We text this number when your order is ready.</p>
+                    <p className="help">In case we need to reach you about this order.</p>
                   </div>
 
                   <div className="field" style={{ marginBottom: 0 }}>
@@ -302,16 +305,6 @@ export default function CheckoutPage() {
                     <p className="help">Receipt only. No marketing, no account.</p>
                   </div>
 
-                  <label className="mrow" style={{ marginTop: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={smsConsent}
-                      onChange={(e) => setSmsConsent(e.target.checked)}
-                    />
-                    <span className="nm">
-                      Text me when my order is ready. Message and data rates may apply.
-                    </span>
-                  </label>
                 </div>
 
                 {/* Presets are configuration, not code. "No tip" carries the same visual weight
@@ -454,11 +447,10 @@ export default function CheckoutPage() {
                   server.
                 </p>
 
+                {/* Card only, for now — the wallet methods are hidden in SquarePaymentForm,
+                    and advertising a method the form does not offer is worse than not listing it. */}
                 <div className="paywith">
                   <span className="paychip">Card</span>
-                  <span className="paychip">Apple&nbsp;Pay</span>
-                  <span className="paychip">Google&nbsp;Pay</span>
-                  <span className="paychip">Cash&nbsp;App</span>
                 </div>
 
                 {/* The payment outcome announces through a polite live region. */}

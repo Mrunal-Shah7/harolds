@@ -149,15 +149,21 @@ describe("sales report", () => {
       toDate: "2099-08-15",
       timeZone: "America/Chicago",
     });
-    const expectedGross = a.totalCents + bAfter.totalCents;
+    // Gross is food + tax and EXCLUDES tips; net is gross - tax, i.e. the food subtotal.
+    // Tips and refunds live only in their own buckets and never move gross or net.
+    const expectedSubtotal = a.subtotalCents + bAfter.subtotalCents;
     const expectedTax = a.taxCents + bAfter.taxCents;
+    const expectedGross = expectedSubtotal + expectedTax;
     const expectedTip = a.tipCents + bAfter.tipCents;
     const expectedRefunds = bAfter.refundedCents;
     assert.equal(report.totals.grossSalesCents, expectedGross);
     assert.equal(report.totals.taxCollectedCents, expectedTax);
     assert.equal(report.totals.tipsCollectedCents, expectedTip);
     assert.equal(report.totals.refundsIssuedCents, expectedRefunds);
-    assert.equal(report.totals.netCents, expectedGross - expectedRefunds);
+    assert.equal(report.totals.netCents, expectedSubtotal);
+    assert.equal(report.totals.netCents, expectedGross - expectedTax);
+    // The defect this replaces: with no refunds, gross and net printed the same number.
+    assert.notEqual(report.totals.grossSalesCents, report.totals.netCents);
     const mixed = report.items.find((i) => i.itemName === item.name);
     assert.equal(mixed?.quantity, 3);
     const csv = salesReportToCsv(report);

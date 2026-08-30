@@ -2,11 +2,12 @@
 
 // SPRINT-8: admin application shell and screens — role nav, dense tables, confirmation.
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCents } from "@harolds/pricing";
 import { adminApi } from "@/components/admin/admin-api";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { AdminForm, SaveBar } from "@/components/admin/SaveBar";
 import { useAdminSession } from "@/components/admin/AdminShell";
 import {
   AdminDashboardSkeleton,
@@ -36,9 +37,11 @@ export function AdminApp() {
   return (
     <>
       {section === "" && <DashboardView timezone={timezone} />}
+      {section === "categories" && <CategoriesView />}
       {section === "menu" && !id && <MenuView />}
       {section === "menu" && id === "curation" && <CurationView />}
-      {section === "menu" && id && id !== "curation" && <ItemView id={id} />}
+      {section === "menu" && id === "new" && <NewItemView />}
+      {section === "menu" && id && id !== "curation" && id !== "new" && <ItemView id={id} />}
       {section === "modifiers" && !id && <ModifiersView />}
       {section === "modifiers" && id && <GroupView id={id} />}
       {section === "store" && <StoreView role={user.role} />}
@@ -168,10 +171,193 @@ function DashboardView({ timezone }: { timezone: string }) {
   );
 }
 
+type AdminCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrl?: string | null;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
+/**
+ * Categories, on their own screen.
+ *
+ * They used to sit in a collapsed accordion above the item filters, which meant the Menu screen
+ * carried two unrelated tables and a create form. A category is its own thing — it has a name, a
+ * storefront rail image, an order and an active flag — so it gets its own screen and the Menu
+ * screen is left to do one job.
+ */
+function CategoriesView() {
+  const [categories, setCategories] = useState<AdminCategory[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [flash, setFlash] = useFlash();
+
+  const load = useCallback(() => {
+    adminApi<AdminCategory[]>("/api/internal/admin/menu/categories")
+      .then(setCategories)
+      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }))
+      .finally(() => setLoaded(true));
+  }, [setFlash]);
+  useEffect(load, [load]);
+
+  /**
+   * The storefront's category rail tile. Uploaded through the same content-addressed pipeline as
+   * a menu item's photograph, so there is one set of size and format limits, not two. Removing
+   * detaches the image; the bytes go when the retention sweeper runs.
+   */
+  async function setCategoryImage(categoryId: string, file: File | null) {
+    try {
+      if (file) {
+        const body = new FormData();
+        body.append("file", file);
+        await adminApi(`/api/internal/admin/menu/categories/${categoryId}/image`, { method: "POST", body });
+        setFlash({ kind: "ok", text: "Category image set. The storefront rail shows it now." });
+      } else {
+        await adminApi(`/api/internal/admin/menu/categories/${categoryId}/image`, { method: "DELETE" });
+        setFlash({
+          kind: "ok",
+          text: "Category image removed. The rail falls back to the category's initial.",
+        });
+      }
+      load();
+    } catch (e) {
+      setFlash({ kind: "err", text: e instanceof Error ? e.message : "Not saved." });
+    }
+  }
+
+  if (!loaded) return <AdminTableSkeleton rows={6} cols={5} />;
+
+  return (
+    <>
+      <div className="adm-top">
+        <h2>Categories</h2>
+        <div className="right">
+          <Link className="adm-btn adm-btn-ghost" href="/admin/menu">Menu items</Link>
+        </div>
+      </div>
+      <p className="adm-lead">
+        The sections the storefront groups items into, and the order they appear in. A category
+        with no rail image falls back to its first initial, which is the design&apos;s placeholder.
+      </p>
+      <FlashBar flash={flash} />
+
+      <AdminForm
+        title="New category"
+        description="Slug is derived from the name unless you set one. It appears in the storefront URL."
+        label="Create category"
+        onSubmit={async (formEl) => {
+          const form = new FormData(formEl);
+          try {
+            await adminApi("/api/internal/admin/menu/categories", {
+              method: "POST",
+              body: JSON.stringify({ name: form.get("name"), slug: form.get("slug") || undefined }),
+            });
+            setFlash({ kind: "ok", text: "Category created." });
+            formEl.reset();
+            load();
+          } catch (err) {
+            setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
+          }
+        }}
+      >
+        <label className="adm-field">Name<input name="name" required placeholder="Wings" /></label>
+        <label className="adm-field">Slug (optional)<input name="slug" placeholder="wings" /></label>
+      </AdminForm>
+
+      <h2>All categories</h2>
+      <div className="adm-table-wrap">
+        <table className="adm-table">
+          <thead>
+            <tr><th>Name</th><th>Slug</th><th>Rail image</th><th>Active</th><th></th></tr>
+          </thead>
+          <tbody>
+            {categories.map((c) => (
+              <tr key={c.id}>
+                <td style={{ fontWeight: 600 }}>{c.name}</td>
+                <td className="adm-muted">{c.slug}</td>
+                <td>
+                  <div className="adm-imgcell">
+                    {c.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- admin preview of local media
+                      <img src={c.imageUrl} alt="" className="adm-thumb" />
+                    ) : (
+                      <span className="adm-thumb adm-thumb-empty" aria-hidden="true">
+                        {c.name.trim().charAt(0)}
+                      </span>
+                    )}
+                    <label className="adm-btn adm-btn-ghost">
+                      {c.imageUrl ? "Replace" : "Upload"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] ?? null;
+                          e.target.value = "";
+                          if (f) void setCategoryImage(c.id, f);
+                        }}
+                      />
+                    </label>
+                    {c.imageUrl ? (
+                      <button
+                        type="button"
+                        className="adm-btn adm-btn-ghost"
+                        onClick={() => void setCategoryImage(c.id, null)}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+                <td>
+                  {c.isActive === false ? (
+                    <span className="adm-badge">inactive</span>
+                  ) : (
+                    <span className="adm-badge adm-badge-ok">active</span>
+                  )}
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="adm-btn adm-btn-ghost"
+                    onClick={async () => {
+                      try {
+                        await adminApi(`/api/internal/admin/menu/categories/${c.id}`, {
+                          method: "PATCH",
+                          body: JSON.stringify({ isActive: c.isActive === false, confirmDeactivate: true }),
+                        });
+                        setFlash({
+                          kind: "ok",
+                          text:
+                            c.isActive === false
+                              ? "Category reactivated."
+                              : "Category deactivated. Active items in it are hidden from the storefront.",
+                        });
+                        load();
+                      } catch (err) {
+                        setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
+                      }
+                    }}
+                  >
+                    {c.isActive === false ? "Reactivate" : "Deactivate"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
 function MenuView() {
   const [items, setItems] = useState<Array<Record<string, unknown>>>([]);
   const [loaded, setLoaded] = useState(false);
-  const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; slug: string; imageUrl?: string | null }>
+  >([]);
   const [filters, setFilters] = useState({ categoryId: "", isSoldOut: "", isUnverifiedPrice: "", q: "" });
   const [flash, setFlash] = useFlash();
   // The storefront's "Most ordered" band, in display order.
@@ -194,7 +380,11 @@ function MenuView() {
       .finally(() => setLoaded(true));
   }, [filters, setFlash]);
   useEffect(() => {
-    adminApi<Array<{ id: string; name: string; slug: string }>>("/api/internal/admin/menu/categories").then(setCategories).catch(() => undefined);
+    adminApi<Array<{ id: string; name: string; slug: string; imageUrl?: string | null }>>(
+      "/api/internal/admin/menu/categories",
+    )
+      .then(setCategories)
+      .catch(() => undefined);
     adminApi<{ mostOrdered: Array<{ id: string }> }>("/api/internal/admin/menu/curation")
       .then((d) => setMostOrderedIds(d.mostOrdered.map((i) => i.id)))
       .catch(() => undefined);
@@ -244,70 +434,21 @@ function MenuView() {
 
   return (
     <>
-      <h1 className="adm-h1">Menu</h1>
+      <div className="adm-top">
+        <h2>Menu items</h2>
+        <div className="right">
+          <Link className="adm-btn adm-btn-save" href="/admin/menu/new">Add item</Link>
+          <Link className="adm-btn adm-btn-ghost" href="/admin/categories">Categories</Link>
+          <Link className="adm-btn adm-btn-ghost" href="/admin/menu/curation">Featured</Link>
+        </div>
+      </div>
       <p className="adm-lead">
         Sold-out is one tap. Price edits use dollars and store cents. &ldquo;Most ordered&rdquo; puts
         an item in the storefront home page&apos;s band of the same name &mdash; it is a hand-picked
         list, not a sales figure, and an empty list hides the section entirely.
       </p>
       <FlashBar flash={flash} />
-      <details>
-        <summary>Categories</summary>
-        <form
-          className="adm-form"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const form = new FormData(e.currentTarget);
-            try {
-              await adminApi("/api/internal/admin/menu/categories", {
-                method: "POST",
-                body: JSON.stringify({ name: form.get("name"), slug: form.get("slug") || undefined }),
-              });
-              setFlash({ kind: "ok", text: "Category created." });
-              e.currentTarget.reset();
-            } catch (err) {
-              setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
-            }
-          }}
-        >
-          <label className="adm-field">Name<input name="name" required /></label>
-          <label className="adm-field">Slug (optional)<input name="slug" /></label>
-          <div className="adm-form-wide"><button className="adm-btn" type="submit">Create category</button></div>
-        </form>
-        <div className="adm-table-wrap">
-          <table className="adm-table">
-            <thead><tr><th>Name</th><th>Slug</th><th>Active</th><th></th></tr></thead>
-            <tbody>
-              {categories.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td>{c.slug}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="adm-btn adm-btn-ghost"
-                      onClick={async () => {
-                        try {
-                          await adminApi(`/api/internal/admin/menu/categories/${c.id}`, {
-                            method: "PATCH",
-                            body: JSON.stringify({ isActive: false, confirmDeactivate: true }),
-                          });
-                          setFlash({ kind: "ok", text: "Category deactivated. Active items in it are hidden from the storefront." });
-                        } catch (err) {
-                          setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
-                        }
-                      }}
-                    >
-                      Deactivate
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
-      <div className="adm-toolbar">
+      <div className="adm-filters">
         <label className="adm-field">
           Category
           <select value={filters.categoryId} onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}>
@@ -352,7 +493,6 @@ function MenuView() {
         >
           Clear all sold-out
         </button>
-        <Link className="adm-btn" href="/admin/menu/curation">Featured</Link>
       </div>
       <div className="adm-table-wrap">
         <table className="adm-table">
@@ -431,6 +571,10 @@ function CurationView() {
   const [items, setItems] = useState<Array<{ id: string; name: string }>>([]);
   const [loaded, setLoaded] = useState(false);
   const [featured, setFeatured] = useState<string[]>([]);
+  // The list as the server last gave it to us. This screen is a controlled listbox rather than a
+  // form, so `useFormSaveBar` has nothing to watch — dirty is "the selection differs from saved".
+  const [saved, setSaved] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useFlash();
   useEffect(() => {
     adminApi<Array<{ id: string; name: string }>>("/api/internal/admin/menu/items")
@@ -438,18 +582,28 @@ function CurationView() {
       .catch(() => undefined)
       .finally(() => setLoaded(true));
     adminApi<{ featured: Array<{ id: string }> }>("/api/internal/admin/menu/curation")
-      .then((d) => setFeatured(d.featured.map((i) => i.id)))
+      .then((d) => {
+        const ids = d.featured.map((i) => i.id);
+        setFeatured(ids);
+        setSaved(ids);
+      })
       .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }));
   }, [setFlash]);
+  // Order matters — the list is "top to bottom" — so this is a positional compare, not a set one.
+  const dirty = featured.length !== saved.length || featured.some((id, i) => id !== saved[i]);
   async function save(ids: string[]) {
+    setBusy(true);
     try {
       await adminApi("/api/internal/admin/menu/curation", {
         method: "PUT",
         body: JSON.stringify({ kind: "featured", itemIds: ids }),
       });
+      setSaved(ids);
       setFlash({ kind: "ok", text: "Featured list saved." });
     } catch (e) {
       setFlash({ kind: "err", text: e instanceof Error ? e.message : "Not saved." });
+    } finally {
+      setBusy(false);
     }
   }
   // §12: skeleton on the first load only.
@@ -467,25 +621,105 @@ function CurationView() {
       <div className="adm-panel" style={{ maxWidth: 560 }}>
         <h3>Featured (top to bottom)</h3>
         <select
+          className="adm-select"
           multiple
           size={8}
           value={featured}
           onChange={(e) => setFeatured([...e.target.selectedOptions].map((o) => o.value))}
-          style={{ width: "100%", minHeight: "10rem" }}
         >
           {items.map((i) => (
             <option key={i.id} value={i.id}>{i.name}</option>
           ))}
         </select>
-        <button
-          type="button"
-          className="adm-btn"
-          style={{ marginTop: "0.75rem" }}
-          onClick={() => void save(featured)}
-        >
-          Save featured
-        </button>
       </div>
+      <SaveBar
+        open={dirty}
+        busy={busy}
+        label="Save featured"
+        onSave={() => void save(featured)}
+        onDiscard={() => setFeatured(saved)}
+      >
+        {featured.length === 0
+          ? "The featured band will be hidden — nothing is selected."
+          : `${featured.length} item${featured.length === 1 ? "" : "s"} selected.`}
+      </SaveBar>
+    </>
+  );
+}
+
+function NewItemView() {
+  const router = useRouter();
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [flash, setFlash] = useFlash();
+  useEffect(() => {
+    adminApi<Array<{ id: string; name: string }>>("/api/internal/admin/menu/categories")
+      .then(setCategories)
+      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }))
+      .finally(() => setLoaded(true));
+  }, [setFlash]);
+  if (!loaded) return <AdminFormSkeleton fields={6} />;
+  return (
+    <>
+      <div className="adm-top">
+        <h1 className="adm-h1">New menu item</h1>
+        <div className="right">
+          <Link className="adm-btn adm-btn-ghost" href="/admin/menu">Back to menu</Link>
+        </div>
+      </div>
+      <p className="adm-lead">
+        Name, category, and price are enough to create the item. You can add a photo, description,
+        and modifier groups on the next screen.
+      </p>
+      <FlashBar flash={flash} />
+      {categories.length === 0 ? (
+        <p className="adm-warn">
+          Create a category first — items must belong to one.{" "}
+          <Link className="adm-link" href="/admin/categories">Go to Categories</Link>
+        </p>
+      ) : (
+        <AdminForm
+          title="Item details"
+          description="Slug is derived from the name unless you set one."
+          label="Create item"
+          onSubmit={async (formEl) => {
+            const form = new FormData(formEl);
+            try {
+              const created = await adminApi<{ id: string }>("/api/internal/admin/menu/items", {
+                method: "POST",
+                body: JSON.stringify({
+                  name: form.get("name"),
+                  categoryId: form.get("categoryId"),
+                  price: form.get("price"),
+                  boardLabel: form.get("boardLabel") || null,
+                  description: form.get("description") || null,
+                  slug: form.get("slug") || undefined,
+                }),
+              });
+              router.push(`/admin/menu/${created.id}`);
+            } catch (err) {
+              setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
+            }
+          }}
+        >
+          <label className="adm-field">Name<input name="name" required placeholder="6 wing dinner" /></label>
+          <label className="adm-field">Board label<input name="boardLabel" placeholder="Optional kitchen label" /></label>
+          <label className="adm-field">Price (USD)<input name="price" required placeholder="13.99" /></label>
+          <label className="adm-field">
+            Category
+            <select name="categoryId" required defaultValue={categories[0]?.id ?? ""}>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="adm-field">Slug (optional)<input name="slug" placeholder="6-wing-dinner" /></label>
+          <label className="adm-field adm-form-wide">
+            Description
+            <textarea name="description" placeholder="Optional customer-facing description" />
+          </label>
+        </AdminForm>
+      )}
     </>
   );
 }
@@ -511,11 +745,12 @@ function ItemView({ id }: { id: string }) {
     <>
       <h1 className="adm-h1">{String(item.name)}</h1>
       <FlashBar flash={flash} />
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
+      <AdminForm
+        title="Item details"
+        label="Save item"
+        onSubmit={async (formEl) => {
+          
+          const form = new FormData(formEl);
           try {
             await adminApi(`/api/internal/admin/menu/items/${id}`, {
               method: "PATCH",
@@ -608,14 +843,14 @@ function ItemView({ id }: { id: string }) {
         <label className="adm-field">Featured<input type="checkbox" name="isFeatured" defaultChecked={Boolean(item.isFeatured)} /></label>
         <label className="adm-field">Most ordered<input type="checkbox" name="isMostOrdered" defaultChecked={Boolean(item.isMostOrdered)} /></label>
         {item.isUnverifiedPrice ? <p className="adm-warn">Placeholder price. Saving a new price clears this flag.</p> : null}
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Save item</button></div>
-      </form>
+      </AdminForm>
       <h2>Modifier groups on this item</h2>
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const selected = [...e.currentTarget.querySelectorAll<HTMLInputElement>("input[name=group]:checked")].map((el, i) => ({
+      <AdminForm
+        title="Modifier groups on this item"
+        label="Save bindings"
+        onSubmit={async (formEl) => {
+          
+          const selected = [...formEl.querySelectorAll<HTMLInputElement>("input[name=group]:checked")].map((el, i) => ({
             groupId: el.value,
             sortOrder: i,
           }));
@@ -636,8 +871,7 @@ function ItemView({ id }: { id: string }) {
             <input type="checkbox" name="group" value={g.id} defaultChecked={bound.includes(g.id)} />
           </label>
         ))}
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Save bindings</button></div>
-      </form>
+      </AdminForm>
     </>
   );
 }
@@ -662,11 +896,12 @@ function ModifiersView() {
     <>
       <h1 className="adm-h1">Modifiers</h1>
       <FlashBar flash={flash} />
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
+      <AdminForm
+        title="New modifier group"
+        label="Create group"
+        onSubmit={async (formEl) => {
+          
+          const form = new FormData(formEl);
           try {
             await adminApi("/api/internal/admin/modifiers", {
               method: "POST",
@@ -679,7 +914,7 @@ function ModifiersView() {
               }),
             });
             setFlash({ kind: "ok", text: "Group created." });
-            e.currentTarget.reset();
+            formEl.reset();
             load();
           } catch (err) {
             setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
@@ -691,8 +926,7 @@ function ModifiersView() {
         <label className="adm-field">Min<input name="minSelect" type="number" defaultValue={0} /></label>
         <label className="adm-field">Max<input name="maxSelect" type="number" defaultValue={1} /></label>
         <label className="adm-field">Required<input type="checkbox" name="isRequired" /></label>
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Create group</button></div>
-      </form>
+      </AdminForm>
       <div className="adm-table-wrap">
         <table className="adm-table">
           <thead><tr><th>Name</th><th>Prompt</th><th>Select</th><th>Items</th><th></th></tr></thead>
@@ -735,11 +969,12 @@ function GroupView({ id }: { id: string }) {
       <p className="adm-warn">
         This group is on {offering.length} item{offering.length === 1 ? "" : "s"}. Saving changes those items together.
       </p>
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
+      <AdminForm
+        title="Group details"
+        label="Save group"
+        onSubmit={async (formEl) => {
+          
+          const form = new FormData(formEl);
           try {
             await adminApi(`/api/internal/admin/modifiers/${id}`, {
               method: "PATCH",
@@ -765,20 +1000,20 @@ function GroupView({ id }: { id: string }) {
         <label className="adm-field">Max<input name="maxSelect" type="number" defaultValue={Number(group.maxSelect)} /></label>
         <label className="adm-field">Required<input type="checkbox" name="isRequired" defaultChecked={Boolean(group.isRequired)} /></label>
         <label className="adm-field">Active<input type="checkbox" name="isActive" defaultChecked={Boolean(group.isActive)} /></label>
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Save group</button></div>
-      </form>
+      </AdminForm>
       <h2>Options</h2>
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
+      <AdminForm
+        title="New option"
+        label="Add option"
+        onSubmit={async (formEl) => {
+          
+          const form = new FormData(formEl);
           try {
             await adminApi(`/api/internal/admin/modifiers/${id}/options`, {
               method: "POST",
               body: JSON.stringify({ name: form.get("name"), price: form.get("price") || "0" }),
             });
-            e.currentTarget.reset();
+            formEl.reset();
             load();
           } catch (err) {
             setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
@@ -787,8 +1022,7 @@ function GroupView({ id }: { id: string }) {
       >
         <label className="adm-field">Name<input name="name" required /></label>
         <label className="adm-field">Price delta<input name="price" defaultValue="0.00" /></label>
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Add option</button></div>
-      </form>
+      </AdminForm>
       <div className="adm-table-wrap">
         <table className="adm-table">
           <thead><tr><th>Name</th><th>Delta</th><th></th></tr></thead>
@@ -818,11 +1052,12 @@ function GroupView({ id }: { id: string }) {
         </table>
       </div>
       <h2>Items offering this group</h2>
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const selected = [...e.currentTarget.querySelectorAll<HTMLInputElement>("input[name=item]:checked")].map((el, i) => ({
+      <AdminForm
+        title="Items offering this group"
+        label="Save offering items"
+        onSubmit={async (formEl) => {
+          
+          const selected = [...formEl.querySelectorAll<HTMLInputElement>("input[name=item]:checked")].map((el, i) => ({
             itemId: el.value,
             sortOrder: i,
           }));
@@ -843,8 +1078,7 @@ function GroupView({ id }: { id: string }) {
             <input type="checkbox" name="item" value={it.id} defaultChecked={offering.includes(it.id)} />
           </label>
         ))}
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Save offering items</button></div>
-      </form>
+      </AdminForm>
     </>
   );
 }
@@ -865,17 +1099,76 @@ function StoreView({ role }: { role: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- load on mount
   useEffect(load, []);
 
+  /**
+   * The storefront hero's background image. Same content-addressed pipeline as menu-item and
+   * category images. Absent, the hero is the plain paper band the design draws; present, the
+   * storefront lays a paper-tinted scrim over it so the poster headline stays readable.
+   */
+  async function setHeroImage(file: File | null) {
+    try {
+      if (file) {
+        const body = new FormData();
+        body.append("file", file);
+        await adminApi("/api/internal/admin/store/hero-image", { method: "POST", body });
+        setFlash({ kind: "ok", text: "Hero banner set. The storefront home page shows it now." });
+      } else {
+        await adminApi("/api/internal/admin/store/hero-image", { method: "DELETE" });
+        setFlash({ kind: "ok", text: "Hero banner removed. The hero falls back to plain paper." });
+      }
+      load();
+    } catch (e) {
+      setFlash({ kind: "err", text: e instanceof Error ? e.message : "Not saved." });
+    }
+  }
+
   if (!data) return <AdminFormSkeleton fields={12} />;
   const c = data.config;
+  const heroImageUrl = (c.heroImageUrl as string | null) ?? null;
   return (
     <>
       <h1 className="adm-h1">Store</h1>
       <FlashBar flash={flash} />
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
+
+      <div className="adm-panel" style={{ marginBottom: "1.25rem" }}>
+        <h3>Hero banner</h3>
+        <p className="adm-lead" style={{ marginBottom: 12 }}>
+          The image behind the headline on the storefront home page. Landscape reads best &mdash;
+          it is cropped to fill. With no banner the hero is plain paper, which is the design&apos;s
+          default.
+        </p>
+        {heroImageUrl ? (
+          <img src={heroImageUrl} alt="" className="adm-hero-preview" />
+        ) : (
+          <p className="adm-muted" style={{ marginBottom: 12 }}>No banner set.</p>
+        )}
+        <div className="adm-toolbar" style={{ marginBottom: 0 }}>
+          <label className="adm-btn">
+            {heroImageUrl ? "Replace banner" : "Upload banner"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                if (f) void setHeroImage(f);
+              }}
+            />
+          </label>
+          {heroImageUrl ? (
+            <button type="button" className="adm-btn adm-btn-ghost" onClick={() => void setHeroImage(null)}>
+              Remove banner
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <AdminForm
+        title="Store details"
+        label="Save store"
+        onSubmit={async (formEl) => {
+          
+          const form = new FormData(formEl);
           const payload: Record<string, unknown> = {
             storeName: form.get("storeName"),
             addressLine1: form.get("addressLine1"),
@@ -954,16 +1247,16 @@ function StoreView({ role }: { role: string }) {
         ) : (
           <p className="adm-muted adm-form-wide">Tax and tip settings are owner-only.</p>
         )}
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Save store</button></div>
-      </form>
+      </AdminForm>
       <h2>Weekly hours</h2>
       <HoursEditor hours={data.hours} onSaved={load} setFlash={setFlash} />
       <h2>Closure dates</h2>
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
+      <AdminForm
+        title="New closure"
+        label="Add closure"
+        onSubmit={async (formEl) => {
+          
+          const form = new FormData(formEl);
           try {
             await adminApi("/api/internal/admin/store/closures", {
               method: "POST",
@@ -977,8 +1270,7 @@ function StoreView({ role }: { role: string }) {
       >
         <label className="adm-field">Date<input name="date" type="date" required /></label>
         <label className="adm-field">Reason<input name="reason" /></label>
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Add closure</button></div>
-      </form>
+      </AdminForm>
       <ul>
         {data.closures.map((cl) => (
           <li key={String(cl.id)}>
@@ -1017,11 +1309,12 @@ function TradingOverridesPanel({ setFlash }: { setFlash: (f: Flash) => void }) {
         Overrides expire by themselves at the end of the business date. Precedence: accepting-orders switch
         beats override; override beats the weekly schedule.
       </p>
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
+      <AdminForm
+        title="New override"
+        label="Apply override"
+        onSubmit={async (formEl) => {
+          
+          const form = new FormData(formEl);
           try {
             await adminApi("/api/internal/admin/store/overrides", {
               method: "POST",
@@ -1034,7 +1327,7 @@ function TradingOverridesPanel({ setFlash }: { setFlash: (f: Flash) => void }) {
               }),
             });
             setFlash({ kind: "ok", text: "Override applied." });
-            e.currentTarget.reset();
+            formEl.reset();
             load();
           } catch (err) {
             setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
@@ -1054,8 +1347,7 @@ function TradingOverridesPanel({ setFlash }: { setFlash: (f: Flash) => void }) {
         <label className="adm-field">Open / late-open time<input name="openTime" placeholder="11:00" /></label>
         <label className="adm-field">Close / early-close time<input name="closeTime" placeholder="19:00" /></label>
         <label className="adm-field adm-form-wide">Customer message<input name="customerMessage" maxLength={280} /></label>
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Apply override</button></div>
-      </form>
+      </AdminForm>
       <ul>
         {rows.map((o) => (
           <li key={String(o.id)} className="adm-warn" style={{ marginBottom: "0.5rem" }}>
@@ -1090,13 +1382,14 @@ function HoursEditor({
 }) {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return (
-    <form
-      className="adm-form"
-      onSubmit={async (e) => {
-        e.preventDefault();
+    <AdminForm
+        title="Weekly hours"
+        label="Save hours"
+        onSubmit={async (formEl) => {
+        
         const rows = hours.map((h) => {
           const d = Number(h.dayOfWeek);
-          const form = e.currentTarget;
+          const form = formEl;
           const closed = (form.elements.namedItem(`closed-${d}`) as HTMLInputElement).checked;
           return {
             dayOfWeek: d,
@@ -1113,7 +1406,7 @@ function HoursEditor({
           setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
         }
       }}
-    >
+      >
       {hours.map((h) => {
         const d = Number(h.dayOfWeek);
         return (
@@ -1125,8 +1418,7 @@ function HoursEditor({
           </div>
         );
       })}
-      <div className="adm-form-wide"><button className="adm-btn" type="submit">Save hours</button></div>
-    </form>
+    </AdminForm>
   );
 }
 
@@ -1405,11 +1697,12 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
         ))}
       </ul>
       <h2>Manual status correction</h2>
-      <form
-        className="adm-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
+      <AdminForm
+        title="Manual status correction"
+        label="Correct status"
+        onSubmit={async (formEl) => {
+          
+          const form = new FormData(formEl);
           const to = String(form.get("to"));
           const reason = String(form.get("reason"));
           setConfirm({
@@ -1432,8 +1725,7 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
           </select>
         </label>
         <label className="adm-field adm-form-wide">Reason<input name="reason" required minLength={3} /></label>
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Correct status</button></div>
-      </form>
+      </AdminForm>
     </>
   );
 }
@@ -1462,7 +1754,11 @@ function ReportsView() {
   return (
     <>
       <h1 className="adm-h1">Reports</h1>
-      <p className="adm-lead">Figures are the cents stored on each order. Tax is never recalculated.</p>
+      <p className="adm-lead">
+        Figures are the cents stored on each order; tax is never recalculated. Gross is food plus
+        tax and Net is gross less tax, so tips &mdash; which belong to staff, not the store &mdash;
+        and refunds are reported on their own and never move either figure.
+      </p>
       <FlashBar flash={flash} />
       <div className="adm-toolbar">
         <label className="adm-field">From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
@@ -1471,13 +1767,15 @@ function ReportsView() {
         <a className="adm-btn adm-btn-ghost" href={`/api/internal/admin/reports/export?from=${from}&to=${to}`}>Export CSV</a>
       </div>
       {totals ? (
+        /* Each tile states its own definition, because "gross" and "net" mean different things
+           in different shops and the difference here is exactly one line of tax. */
         <div className="adm-cards">
-          <div className="adm-card"><h2>Orders</h2><div className="adm-stat">{totals.orderCount ?? 0}</div></div>
-          <div className="adm-card"><h2>Gross</h2><div className="adm-stat adm-money">{money(Number(totals.grossSalesCents ?? 0))}</div></div>
-          <div className="adm-card"><h2>Tax</h2><div className="adm-stat adm-money">{money(Number(totals.taxCollectedCents ?? 0))}</div></div>
-          <div className="adm-card"><h2>Tips</h2><div className="adm-stat adm-money">{money(Number(totals.tipsCollectedCents ?? 0))}</div></div>
-          <div className="adm-card"><h2>Refunds</h2><div className="adm-stat adm-money">{money(Number(totals.refundsIssuedCents ?? 0))}</div></div>
-          <div className="adm-card"><h2>Net</h2><div className="adm-stat adm-money">{money(Number(totals.netCents ?? 0))}</div></div>
+          <div className="adm-card"><h2>Orders</h2><div className="adm-stat">{totals.orderCount ?? 0}</div><p className="adm-muted">paid in range</p></div>
+          <div className="adm-card"><h2>Gross</h2><div className="adm-stat adm-money">{money(Number(totals.grossSalesCents ?? 0))}</div><p className="adm-muted">food + tax</p></div>
+          <div className="adm-card"><h2>Tax</h2><div className="adm-stat adm-money">{money(Number(totals.taxCollectedCents ?? 0))}</div><p className="adm-muted">collected</p></div>
+          <div className="adm-card"><h2>Tips</h2><div className="adm-stat adm-money">{money(Number(totals.tipsCollectedCents ?? 0))}</div><p className="adm-muted">to staff, not sales</p></div>
+          <div className="adm-card"><h2>Refunds</h2><div className="adm-stat adm-money">{money(Number(totals.refundsIssuedCents ?? 0))}</div><p className="adm-muted">issued</p></div>
+          <div className="adm-card"><h2>Net</h2><div className="adm-stat adm-money">{money(Number(totals.netCents ?? 0))}</div><p className="adm-muted">gross &minus; tax</p></div>
         </div>
       ) : null}
       <h2>By item</h2>
@@ -1614,11 +1912,12 @@ function StaffView() {
       <p className="adm-lead">Owner only. PINs are shown once. Deactivate test accounts rather than deleting them.</p>
       <FlashBar flash={flash} />
       {pinOnce ? <div className="adm-ok">New PIN (write it down, it will not be shown again): <strong>{pinOnce}</strong></div> : null}
-      <form
-        className="adm-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
+      <AdminForm
+        title="New account"
+        label="Create account"
+        onSubmit={async (formEl) => {
+          
+          const form = new FormData(formEl);
           try {
             const created = await adminApi<{ user: { displayName: string }; pinOnce: string | null }>("/api/internal/admin/staff", {
               method: "POST",
@@ -1632,7 +1931,7 @@ function StaffView() {
             });
             setPinOnce(created.pinOnce);
             setFlash({ kind: "ok", text: `Created ${created.user.displayName}.` });
-            e.currentTarget.reset();
+            formEl.reset();
             load();
           } catch (err) {
             setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
@@ -1651,8 +1950,7 @@ function StaffView() {
         </label>
         <label className="adm-field">Password<input name="password" type="password" required minLength={10} /></label>
         <label className="adm-field">PIN (optional)<input name="pin" pattern="[0-9]{4,8}" /></label>
-        <div className="adm-form-wide"><button className="adm-btn" type="submit">Create account</button></div>
-      </form>
+      </AdminForm>
       <div className="adm-table-wrap">
         <table className="adm-table">
           <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead>

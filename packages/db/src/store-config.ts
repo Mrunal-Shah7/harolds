@@ -37,6 +37,7 @@ function toData(row: {
   announcementEndsAt: Date | null;
   managerAlertPhone: string | null;
   managerAlertEmail: string | null;
+  heroImageUrl: string | null;
 }): StoreConfigData {
   return {
     id: row.id,
@@ -69,6 +70,7 @@ function toData(row: {
     announcementEndsAt: row.announcementEndsAt,
     managerAlertPhone: row.managerAlertPhone,
     managerAlertEmail: row.managerAlertEmail,
+    heroImageUrl: row.heroImageUrl,
   };
 }
 

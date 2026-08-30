@@ -1,7 +1,7 @@
 {
   "name": "Harold's Kitchen",
   "short_name": "Kitchen",
-  "description": "Kitchen display for Harold's Chicken Oak Lawn",
+  "description": "Kitchen display for Harold's Chicken Burnham",
   "start_url": "/kitchen",
   "scope": "/kitchen",
   "display": "standalone",

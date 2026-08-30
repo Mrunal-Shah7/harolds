@@ -272,8 +272,14 @@ export async function recordProcessorPaymentId(
  * email receipt). All in one DB transaction so a crash between steps cannot leave a PAID order
  * with no number, or a numbered order with no print jobs queued.
  *
- * Idempotent: if the order is already PAID with an allocated number, returns it unchanged (webhook
- * and sync path convergence).
+ * Idempotent: an order that already carries a CAPTURED payment and an allocated number is
+ * returned unchanged (webhook and sync path convergence).
+ *
+ * The idempotency key here is deliberately the PAYMENT state, not the order status. It used to
+ * also require `status === PAID`, which quietly stopped protecting the order the moment the
+ * kitchen advanced it: a redelivered `payment.updated` webhook then fell through, allocated a
+ * SECOND order number, and reset a READY order back to PAID. Fulfilment progress must never
+ * decide whether a payment is re-applied.
  */
 export async function markOrderPaidAndAllocate(
   orderId: string,
@@ -287,11 +293,8 @@ export async function markOrderPaidAndAllocate(
       include: { lines: true },
     });
 
-    if (
-      existing.status === OrderStatus.PAID &&
-      existing.paymentStatus === PaymentStatus.CAPTURED &&
-      existing.orderNumber
-    ) {
+    // Captured and numbered means done, however far the kitchen has taken it since.
+    if (existing.paymentStatus === PaymentStatus.CAPTURED && existing.orderNumber) {
       return existing;
     }
 

@@ -106,6 +106,9 @@ model Category {
   description String?
   sortOrder   Int
   isActive    Boolean  @default(true)
+  /// Content-addressed media URL (/api/v1/media/<sha256>) shown in the storefront's category
+  /// rail. Null falls back to the category's first initial, which is the design's placeholder.
+  imageUrl    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -555,6 +558,10 @@ model StoreConfig {
   announcementText     String?
   announcementStartsAt DateTime?
   announcementEndsAt   DateTime?
+
+  /// Content-addressed media URL (/api/v1/media/<sha256>) used as the storefront hero's
+  /// full-bleed background. Null renders the plain paper hero, which is the design's default.
+  heroImageUrl String?
 
   // SPRINT-2: manager alert contacts
   managerAlertPhone String?

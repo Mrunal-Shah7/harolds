@@ -174,7 +174,7 @@ function Showcase() {
 
         <Section title="Forms">
           <div className="max-w-[560px] space-y-4">
-            <Field label="Mobile number" htmlFor="ds-phone" hint="We text you when it's ready.">
+            <Field label="Mobile number" htmlFor="ds-phone" hint="In case we need to reach you about this order.">
               <Input id="ds-phone" placeholder="(708) 555-1234" />
             </Field>
             <Field label="Mobile number" htmlFor="ds-phone-err" error="Enter a 10-digit mobile number">

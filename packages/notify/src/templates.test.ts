@@ -13,10 +13,10 @@ import { renderReceiptHtml, renderReceiptText, type ReceiptEmailInput } from "./
 import { renderOrderConfirmationSms, renderOrderReadySms, smsContainsMoney } from "./templates-sms";
 
 const RICH: ReceiptEmailInput = {
-  storeName: "Harold's Chicken Oak Lawn",
+  storeName: "Harold's Chicken Burnham",
   addressLine1: "4709 W 95th St",
   addressLine2: null,
-  city: "Oak Lawn",
+  city: "Burnham",
   state: "IL",
   postalCode: "60453-2515",
   orderNumber: "HC-042",
@@ -56,12 +56,12 @@ describe("SMS copy", () => {
   it("confirmation has order number, store name, local ready time, and no money", () => {
     const readyAt = new Date("2026-08-15T22:20:00.000Z");
     const body = renderOrderConfirmationSms({
-      storeName: "Harold's Chicken Oak Lawn",
+      storeName: "Harold's Chicken Burnham",
       orderNumber: "HC-042",
       estimatedReadyAt: readyAt,
       timeZone: "America/Chicago",
     });
-    assert.match(body, /Harold's Chicken Oak Lawn/);
+    assert.match(body, /Harold's Chicken Burnham/);
     assert.match(body, /HC-042/);
     const local = formatStoreLocalTime(readyAt, "America/Chicago");
     assert.ok(body.includes(local));

@@ -41,6 +41,7 @@ const WEAK_EXACT = new Set([
   "harolds123",
   "chicken123",
   "oaklawn123",
+  "burnham123",
 ]);
 
 export class PasswordTooWeakError extends Error {

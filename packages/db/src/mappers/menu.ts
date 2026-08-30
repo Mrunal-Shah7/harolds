@@ -45,6 +45,8 @@ export type DbCategory = {
   name: string;
   description: string | null;
   sortOrder: number;
+  /** Content-addressed media URL for the storefront rail tile; null falls back to the initial. */
+  imageUrl?: string | null;
 };
 
 export function mapModifierOption(row: DbModifierOption): MenuModifierOption {
@@ -96,7 +98,9 @@ export function mapMenuItemSummary(row: DbMenuItem): MenuItemSummary {
 }
 
 /** SPRINT-12: derive public derivative URLs from a content-addressed media URL. */
-function derivativesFromImageUrl(imageUrl: string | null): MenuItemSummary["imageDerivatives"] {
+export function derivativesFromImageUrl(
+  imageUrl: string | null,
+): MenuItemSummary["imageDerivatives"] {
   if (!imageUrl) return null;
   const m = /^\/api\/v1\/media\/([a-f0-9]{64})/.exec(imageUrl);
   if (!m) return null;
@@ -132,6 +136,8 @@ export function mapMenuCategory(
     name: category.name,
     description: category.description,
     sortOrder: category.sortOrder,
+    imageUrl: category.imageUrl ?? null,
+    imageDerivatives: derivativesFromImageUrl(category.imageUrl ?? null),
     items: items.map(({ item, modifierGroups }) => ({
       ...mapMenuItemSummary(item),
       modifierGroups,
@@ -150,5 +156,7 @@ export function mapCategorySummary(
     description: category.description,
     sortOrder: category.sortOrder,
     activeItemCount,
+    imageUrl: category.imageUrl ?? null,
+    imageDerivatives: derivativesFromImageUrl(category.imageUrl ?? null),
   };
 }

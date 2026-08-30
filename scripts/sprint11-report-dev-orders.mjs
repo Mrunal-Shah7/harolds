@@ -41,7 +41,9 @@ if (orders.length > 0) {
   const fromDate = first.toISOString().slice(0, 10);
   const toDate = last.toISOString().slice(0, 10);
   const report = await salesReport({ fromDate: "2020-01-01", toDate: "2099-12-31", timeZone: "America/Chicago" });
-  const storedGross = orders.reduce((n, o) => n + o.totalCents, 0);
+  // Gross is food + tax; tips are not sales. Net is the food subtotal.
+  const storedGross = orders.reduce((n, o) => n + o.subtotalCents + o.taxCents, 0);
+  const storedNet = orders.reduce((n, o) => n + o.subtotalCents, 0);
   const storedTax = orders.reduce((n, o) => n + o.taxCents, 0);
   const storedTip = orders.reduce((n, o) => n + o.tipCents, 0);
   const storedRefunds = orders.reduce((n, o) => n + o.refundedCents, 0);
@@ -49,7 +51,7 @@ if (orders.length > 0) {
     `report totals gross=${report.totals.grossSalesCents} tax=${report.totals.taxCollectedCents} tip=${report.totals.tipsCollectedCents} refunds=${report.totals.refundsIssuedCents} net=${report.totals.netCents}`,
   );
   console.log(
-    `stored sums  gross=${storedGross} tax=${storedTax} tip=${storedTip} refunds=${storedRefunds} net=${storedGross - storedRefunds}`,
+    `stored sums  gross=${storedGross} tax=${storedTax} tip=${storedTip} refunds=${storedRefunds} net=${storedNet}`,
   );
   if (
     report.totals.grossSalesCents !== storedGross ||

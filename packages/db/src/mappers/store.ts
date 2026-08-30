@@ -74,6 +74,7 @@ export function mapStoreStatus(args: MapStoreStatusArgs): StoreStatus {
     estimatedReadyAt: estimatedReadyAt.toISOString(),
     taxRateBps: config.taxRateBps,
     taxAppliedPreDiscount: config.taxAppliedPreDiscount,
+    heroImageUrl: config.heroImageUrl,
     tippingEnabled: config.tippingEnabled,
     tipPresetsBps: [...config.tipPresetsBps],
     defaultTipPresetIndex: config.defaultTipPresetIndex,

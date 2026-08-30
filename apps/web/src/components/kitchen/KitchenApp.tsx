@@ -290,7 +290,7 @@ export function KitchenApp() {
     return (
       <div className="kds-signin">
         <div className="kds-signin-card">
-          <p className="kds-kicker">Harold&apos;s Oak Lawn</p>
+          <p className="kds-kicker">Harold&apos;s Burnham</p>
           <h1 className="kds-title">Kitchen</h1>
         </div>
       </div>

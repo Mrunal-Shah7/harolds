@@ -124,6 +124,8 @@ export async function updateCategory(
     sortOrder?: number;
     isActive?: boolean;
     confirmDeactivate?: boolean;
+    /** Content-addressed media URL for the storefront rail tile; null detaches it. */
+    imageUrl?: string | null;
   },
   userId: string,
 ) {
@@ -142,6 +144,7 @@ export async function updateCategory(
     description?: string | null;
     sortOrder?: number;
     isActive?: boolean;
+    imageUrl?: string | null;
   } = {};
   if (patch.name !== undefined) {
     const name = patch.name.trim();
@@ -155,6 +158,7 @@ export async function updateCategory(
   if (patch.description !== undefined) data.description = patch.description?.trim() || null;
   if (patch.sortOrder !== undefined) data.sortOrder = patch.sortOrder;
   if (patch.isActive !== undefined) data.isActive = patch.isActive;
+  if (patch.imageUrl !== undefined) data.imageUrl = patch.imageUrl;
 
   const row = await prisma.category.update({ where: { id }, data });
   invalidateMenuCache();

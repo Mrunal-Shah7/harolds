@@ -1,19 +1,20 @@
 "use client";
 
-// Design v1.1 — the storefront header. Four elements in one 64px row on a surface band:
-// the poster wordmark with its mono subline, the store status pill, the labelled theme toggle,
-// and the cart button with its mono count.
+// Design v1.1 — the storefront header. Three elements in one 64px row on a surface band:
+// the logo, the store status pill, and the cart button with its mono count.
 //
-// The wordmark is the text placeholder pending the logo SVG, set in the poster face in
-// Harold's Red. It is a deliberate placeholder, not a design choice.
+// The logo replaces the text wordmark that stood in for it. `.wordmark` is kept as the class
+// so the header's layout rules (flex-none, the 44px tap floor, the mobile sizing) still apply
+// to the link; only its contents changed from type to an image.
 //
-// SCREEN FIT ONLY: below 768px the four elements cannot share one 64px row, so the status pill
-// renders in a sub-row directly beneath. Same element, same styling — see globals.css.
+// The theme toggle that used to sit here is hidden — light only, for now. See app/layout.tsx.
+//
+// SCREEN FIT ONLY: below 768px the status pill renders in a sub-row beneath the logo and cart,
+// because the three cannot share one 64px row at 390px. Same element, same styling.
 import Link from "next/link";
 import type { StoreStatus } from "@harolds/types";
 import { useCart } from "@/lib/cart-context";
 import { StoreStatusPill } from "@/components/storefront/store-status-pill";
-import { ThemeToggle } from "@/components/storefront/theme-toggle";
 
 export function StorefrontHeader({
   status,
@@ -27,13 +28,12 @@ export function StorefrontHeader({
   return (
     <header className="sf-header" role="banner">
       <div className="container">
-        <Link href="/" className="wordmark" aria-label="Harold's, home">
-          Harold&apos;s<small>Chicken · Oak Lawn</small>
+        <Link href="/" className="wordmark" aria-label="Harold's Chicken Burnham, home">
+          {/* Intrinsic size given so the row reserves its space before the image decodes. */}
+          <img src="/logo.jpeg" alt="Harold's Chicken" width={1320} height={588} />
         </Link>
 
         {status ? <StoreStatusPill status={status} /> : null}
-
-        <ThemeToggle />
 
         <button
           type="button"

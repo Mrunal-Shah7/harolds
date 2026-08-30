@@ -158,7 +158,10 @@ async function reconcilePaymentEvent(
       return { outcome: "AMOUNT_MISMATCH", orderId: order.id };
     }
 
-    if (order.status === OrderStatus.PAID && order.paymentStatus === PaymentStatus.CAPTURED) {
+    // Keyed on the PAYMENT, not the order status. Square redelivers `payment.updated`, and by
+    // the time a retry lands the kitchen may have moved the order to PRINTED/IN_PROGRESS/READY.
+    // Testing `status === PAID` here let those retries through to re-allocate the order number.
+    if (order.paymentStatus === PaymentStatus.CAPTURED && order.orderNumber) {
       return { outcome: "ALREADY_PAID", orderId: order.id };
     }
 
@@ -174,7 +177,10 @@ async function reconcilePaymentEvent(
   }
 
   if (payment.status === "failed" || payment.status === "canceled" || payment.status === "cancelled") {
-    if (order.status === OrderStatus.PAID) {
+    // Same reasoning as the capture guard above: key on the payment, not the order status.
+    // A captured order that the kitchen has already moved to PRINTED/IN_PROGRESS/READY must not
+    // be flipped to payment-failed by a redelivered `payment.failed` for a superseded attempt.
+    if (order.paymentStatus === PaymentStatus.CAPTURED || order.status === OrderStatus.PAID) {
       return { outcome: "FAILED_AFTER_PAID", orderId: order.id };
     }
     await markOrderPaymentFailed(order.id, {

@@ -98,6 +98,10 @@ export type MenuCategory = {
   name: string;
   description: string | null;
   sortOrder: number;
+  /** Additive: operator-set rail image. Null falls back to the category's first initial. */
+  imageUrl?: string | null;
+  /** Additive: derivative URLs for `imageUrl`, same convention as a menu item's. */
+  imageDerivatives?: MenuItemSummary["imageDerivatives"];
   items: MenuItemWithModifiers[];
 };
 
@@ -113,6 +117,10 @@ export type CategorySummary = {
   description: string | null;
   sortOrder: number;
   activeItemCount: number;
+  /** Additive: operator-set rail image. Null falls back to the category's first initial. */
+  imageUrl?: string | null;
+  /** Additive: derivative URLs for `imageUrl`, same convention as a menu item's. */
+  imageDerivatives?: MenuItemSummary["imageDerivatives"];
 };
 
 export type CategoriesPayload = {
@@ -159,6 +167,8 @@ export type StoreStatus = {
   estimatedReadyAt: string;
   taxRateBps: number;
   taxAppliedPreDiscount: boolean;
+  /** Additive: operator-set storefront hero background. Null renders the plain paper hero. */
+  heroImageUrl?: string | null;
   tippingEnabled: boolean;
   tipPresetsBps: number[];
   defaultTipPresetIndex: number;

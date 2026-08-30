@@ -45,6 +45,8 @@ export type StoreConfigPatch = {
   announcementEndsAt?: string | Date | null;
   managerAlertPhone?: string | null;
   managerAlertEmail?: string | null;
+  /** Storefront hero background, as a content-addressed media URL; null detaches it. */
+  heroImageUrl?: string | null;
 };
 
 export async function updateStoreConfig(patch: StoreConfigPatch, actor: { userId: string; role: string }) {

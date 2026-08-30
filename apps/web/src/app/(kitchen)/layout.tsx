@@ -7,9 +7,9 @@ import type { ReactNode } from "react";
 import "./kitchen.css";
 
 export const metadata: Metadata = {
-  title: "Kitchen — Harold's Chicken Oak Lawn",
+  title: "Kitchen — Harold's Chicken Burnham",
   applicationName: "Harold's Kitchen",
-  description: "Kitchen display for Harold's Chicken Oak Lawn",
+  description: "Kitchen display for Harold's Chicken Burnham",
   manifest: "/kitchen/manifest.webmanifest",
   appleWebApp: {
     capable: true,

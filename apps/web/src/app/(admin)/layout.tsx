@@ -10,7 +10,7 @@ import "./admin.css";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 export const metadata: Metadata = {
-  title: "Back office — Harold's Chicken Oak Lawn",
+  title: "Back office — Harold's Chicken Burnham",
   robots: { index: false, follow: false },
 };
 

@@ -3,14 +3,29 @@ import { DateTime } from "luxon";
 import { prisma } from "./client";
 import { OrderStatus } from "@harolds/types";
 
+/**
+ * Money is reported in four independent buckets plus two derived figures.
+ *
+ * `grossSalesCents` is what the store billed for FOOD, tax included: subtotal + tax. Tips are
+ * deliberately NOT in it — a tip is collected on the store's card reader but it is the staff's
+ * money, and folding it into sales overstates revenue. `netCents` is the same figure with the
+ * tax stripped, i.e. the subtotal: what the food itself earned.
+ *
+ * Tips and refunds therefore appear ONLY in their own fields; neither distorts gross or net.
+ * The previous version set gross = order total (which included tips) and net = total - refunds,
+ * so with no refunds the two tiles printed the same number.
+ */
 export type SalesDayRow = {
   date: string;
   orderCount: number;
   countsByStatus: Record<string, number>;
+  /** Subtotal + tax. Excludes tips. */
   grossSalesCents: number;
   taxCollectedCents: number;
+  /** Collected on behalf of staff; not part of gross or net. */
   tipsCollectedCents: number;
   refundsIssuedCents: number;
+  /** gross - tax, i.e. the food subtotal. */
   netCents: number;
 };
 
@@ -79,6 +94,7 @@ export async function salesReport(args: {
       status: true,
       paidAt: true,
       createdAt: true,
+      subtotalCents: true,
       totalCents: true,
       taxCents: true,
       tipCents: true,
@@ -105,11 +121,13 @@ export async function salesReport(args: {
     day.orderCount += 1;
     day.countsByStatus[order.status] = (day.countsByStatus[order.status] ?? 0) + 1;
     if (order.paidAt) {
-      day.grossSalesCents += order.totalCents;
+      // Gross is food + tax. `order.totalCents` also carries the tip, so it is not the right
+      // base here — subtotal + tax is computed from the two stored components instead.
+      day.grossSalesCents += order.subtotalCents + order.taxCents;
       day.taxCollectedCents += order.taxCents;
       day.tipsCollectedCents += order.tipCents;
       day.refundsIssuedCents += order.refundedCents;
-      day.netCents += order.totalCents - order.refundedCents;
+      day.netCents += order.subtotalCents;
       for (const line of order.lines) {
         const prev = itemMap.get(line.itemName) ?? { itemName: line.itemName, quantity: 0, lineTotalCents: 0 };
         prev.quantity += line.quantity;

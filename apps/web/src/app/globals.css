@@ -763,6 +763,13 @@ a.wordmark {
   text-decoration: none;
   flex: none;
 }
+/* The logo is a 2.24:1 lockup, so it is sized by HEIGHT and lets width follow. Anything that
+   sets a width here would squash it at some breakpoint. */
+.wordmark img {
+  height: 40px;
+  width: auto;
+  max-width: none;
+}
 @media (max-width: 767px) {
   .sf-header .container {
     gap: 10px;
@@ -776,6 +783,9 @@ a.wordmark {
   }
   .wordmark small {
     letter-spacing: 0.16em;
+  }
+  .wordmark img {
+    height: 34px;
   }
 }
 .wordmark {
@@ -890,6 +900,45 @@ a.wordmark {
   cursor: pointer;
 }
 
+/* -----------------------------------------------------------------------------
+   Hero banner — an operator-set image behind the poster lines.
+   Absent (the default), the hero is the plain paper band the design draws. Present,
+   it needs a SCRIM: the headline is 4.5rem of ink on an arbitrary photograph, and
+   without one the type is unreadable over a light or busy image. The scrim is a
+   paper-tinted wash, not a black one, so the band still reads as paper.
+   ----------------------------------------------------------------------------- */
+.hero.has-banner {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.hero.has-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--paper) 92%, transparent) 0%,
+    color-mix(in srgb, var(--paper) 78%, transparent) 55%,
+    color-mix(in srgb, var(--paper) 46%, transparent) 100%
+  );
+  pointer-events: none;
+}
+/* The banner replaces the weave; two textures on one band is noise. */
+.hero.has-banner.textured {
+  background-image: none;
+}
+.hero.has-banner > .container {
+  position: relative;
+}
+@media (max-width: 767px) {
+  /* On a phone the text spans the full width, so the scrim has to be even, not directional. */
+  .hero.has-banner::before {
+    background: color-mix(in srgb, var(--paper) 86%, transparent);
+  }
+}
+
 .hero h1 {
   font-family: var(--font-poster);
   font-weight: 400;
@@ -907,6 +956,13 @@ a.wordmark {
   color: var(--ink-muted);
   max-width: 520px;
   margin: 20px 0 32px;
+}
+/* Pickup and delivery sit side by side, wrapping rather than shrinking on a narrow screen. */
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 .hero-meta {
   display: flex;
@@ -952,6 +1008,12 @@ a.wordmark {
   transition:
     transform var(--t-fast) var(--ease),
     box-shadow var(--t-fast) var(--ease);
+}
+.cat-tile .circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 .cat-tile:hover .circle {
   transform: translateY(-2px);
@@ -1791,8 +1853,10 @@ html[data-theme="dark"] .sf-root .sf-header {
 .sf-header .theme-toggle {
   margin-left: auto;
 }
+/* The toggle is hidden for now, so the cart button is once again the element that pushes to
+   the right. This rule reverts the override that handed that job to the toggle. */
 .sf-header .cart-btn {
-  margin-left: 0;
+  margin-left: auto;
 }
 
 /* =============================================================================

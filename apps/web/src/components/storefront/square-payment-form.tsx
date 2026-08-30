@@ -46,6 +46,16 @@ type SquareCardInstance = {
   destroy: () => Promise<void>;
 };
 
+/**
+ * Card only, for now.
+ *
+ * Apple Pay / Google Pay / Cash App are hidden rather than deleted: the probe, the mount
+ * containers and the wallet row below are all still here and still correct, and every one of
+ * them needs domain registration and a secure origin that this deployment does not yet have.
+ * Flipping this back to `true` restores them; nothing else has to change.
+ */
+const WALLETS_ENABLED = false;
+
 const SDK_SRC =
   process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT === "production"
     ? "https://web.squarecdn.com/v1/square.js"
@@ -92,6 +102,12 @@ export function SquarePaymentForm({
   const [probeDone, setProbeDone] = useState(false);
   const cardRef = useRef<SquareCardInstance | null>(null);
   const tokenizing = useRef(false);
+  // The display total is read ONCE, when the payment request is built. It is held in a ref
+  // rather than a dependency because it changes every time the customer picks a tip, and having
+  // it in the effect's dependency array tore the card down and re-attached it on every change —
+  // which is how the card field vanished mid-checkout. Mount the card once; never re-run on price.
+  const displayTotalRef = useRef(displayTotalCents);
+  displayTotalRef.current = displayTotalCents;
 
   const appId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID ?? "";
   const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ?? "";
@@ -124,10 +140,12 @@ export function SquarePaymentForm({
 
         // Wallet methods need a secure origin + domain registration. Probe and record blocks.
         const notes: string[] = [];
-        const amount =
-          displayTotalCents != null && displayTotalCents > 0
-            ? (displayTotalCents / 100).toFixed(2)
-            : "1.00";
+        if (!WALLETS_ENABLED) {
+          if (!cancelled) setProbeDone(true);
+          return;
+        }
+        const total = displayTotalRef.current;
+        const amount = total != null && total > 0 ? (total / 100).toFixed(2) : "1.00";
         try {
           if (typeof payments.paymentRequest !== "function") {
             notes.push("Wallet PaymentRequest API unavailable in this SDK build.");
@@ -215,7 +233,9 @@ export function SquarePaymentForm({
       void cardRef.current?.destroy();
       cardRef.current = null;
     };
-  }, [sdkLoaded, appId, locationId, onError, displayTotalCents]);
+    // `displayTotalCents` is deliberately NOT a dependency — see displayTotalRef above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sdkLoaded, appId, locationId]);
 
   useEffect(() => {
     const el = document.getElementById("square-card-container");

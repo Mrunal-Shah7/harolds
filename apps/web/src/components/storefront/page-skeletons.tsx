@@ -21,11 +21,10 @@ function HeaderSkeleton() {
     <header className="sf-header">
       <div className="container">
         <div className="wordmark">
-          Harold&apos;s<small>Chicken · Oak Lawn</small>
+          <img src="/logo.jpeg" alt="" width={1320} height={588} />
         </div>
         <Bar style={{ height: 40, width: 240, borderRadius: 999 }} />
-        <Bar style={{ height: 44, width: 104, borderRadius: 999, marginLeft: "auto" }} />
-        <Bar style={{ height: 44, width: 110, borderRadius: 999 }} />
+        <Bar style={{ height: 44, width: 110, borderRadius: 999, marginLeft: "auto" }} />
       </div>
       <div className="subrow">
         <Bar style={{ height: 36, width: 220, borderRadius: 999 }} />

@@ -12,6 +12,10 @@ function normaliseAdminPath(pathname: string): string {
     .replace(/\/api\/internal\/admin\/menu\/items\/[^/]+\/sold-out$/, "/api/internal/admin/menu/items/[id]/sold-out")
     .replace(/\/api\/internal\/admin\/menu\/items\/[^/]+\/bindings$/, "/api/internal/admin/menu/items/[id]/bindings")
     .replace(/\/api\/internal\/admin\/menu\/items\/[^/]+$/, "/api/internal/admin/menu/items/[id]")
+    .replace(
+      /\/api\/internal\/admin\/menu\/categories\/[^/]+\/image$/,
+      "/api/internal/admin/menu/categories/[id]/image",
+    )
     .replace(/\/api\/internal\/admin\/menu\/categories\/[^/]+$/, "/api/internal/admin/menu/categories/[id]")
     .replace(/\/api\/internal\/admin\/modifiers\/options\/[^/]+$/, "/api/internal/admin/modifiers/options/[id]")
     .replace(/\/api\/internal\/admin\/modifiers\/[^/]+\/options$/, "/api/internal/admin/modifiers/[id]/options")

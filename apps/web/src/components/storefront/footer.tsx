@@ -24,10 +24,10 @@ export function StorefrontFooter({ status }: { status: StoreStatus }) {
           <div>
             <div className="wordmark" style={{ color: "var(--ink-on-roast)" }}>
               Harold&apos;s
-              <small style={{ color: "var(--ink-on-roast-muted)" }}>Chicken · Oak Lawn</small>
+              <small style={{ color: "var(--ink-on-roast-muted)" }}>Chicken · Burnham</small>
             </div>
             <p style={{ marginTop: 16, maxWidth: 320, color: "var(--ink-on-roast-muted)" }}>
-              One location. One street. Pickup only, paid online, ready when we text you.
+              One location. One street.
             </p>
           </div>
 

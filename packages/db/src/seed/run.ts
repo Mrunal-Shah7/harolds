@@ -6,13 +6,13 @@ import { hashPin } from "../pin";
 import { hashPassword } from "../password";
 import { AdminRole } from "@harolds/types";
 
-/** Agreed store configuration values for Harold's Chicken Oak Lawn. */
+/** Agreed store configuration values for Harold's Chicken Burnham. */
 export const STORE_SEED = {
   id: "default",
-  storeName: "Harold's Chicken Oak Lawn",
+  storeName: "Harold's Chicken Burnham",
   addressLine1: "4709 W 95th St",
   addressLine2: null as string | null,
-  city: "Oak Lawn",
+  city: "Burnham",
   state: "IL",
   postalCode: "60453-2515",
   contactPhone: "TODO: CONFIRM PHONE",

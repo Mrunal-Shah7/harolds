@@ -15,6 +15,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { adminApi, AdminApiError } from "@/components/admin/admin-api";
 import { AdminNavSkeleton, AdminViewSkeleton } from "@/components/admin/AdminSkeletons";
+import { SAVEBAR_HOST_ID } from "@/components/admin/SaveBar";
 
 export type SessionUser = { id: string; email: string; displayName: string; role: string };
 
@@ -24,6 +25,7 @@ const NAV = [
   { href: "/admin", label: "Dashboard", ownerOnly: false },
   { href: "/admin/orders", label: "Orders", ownerOnly: false },
   { href: "/admin/menu", label: "Menu", ownerOnly: false },
+  { href: "/admin/categories", label: "Categories", ownerOnly: false },
   { href: "/admin/modifiers", label: "Modifiers", ownerOnly: false },
   { href: "/admin/store", label: "Store", ownerOnly: false },
   { href: "/admin/reports", label: "Reports", ownerOnly: false },
@@ -157,6 +159,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <main className="adm-main">{children}</main>
         </div>
       </div>
+
+      {/* One host for every floating save bar on the page, so a screen with several forms
+          stacks them in a column instead of piling them at the same fixed offset. */}
+      <div id={SAVEBAR_HOST_ID} className="adm-savebar" />
     </AdminSessionContext.Provider>
   );
 }

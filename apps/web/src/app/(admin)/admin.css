@@ -480,6 +480,57 @@ table.adm th.num,
   gap: 12px;
 }
 
+/* ---------- brand media ----------
+   The rail thumbnail is round because the storefront tile is; seeing it square here would
+   hide a bad crop until it reached the customer. */
+.adm-imgcell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.adm-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  flex: none;
+}
+.adm-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper-sunk);
+  font-family: var(--font-poster);
+  font-size: 1.1rem;
+  color: var(--ink-faint);
+}
+.adm-hero-preview {
+  width: 100%;
+  max-width: 520px;
+  aspect-ratio: 21 / 9;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+/* A file input hidden behind a label still has to be reachable, so it is visually hidden
+   rather than display:none. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.adm-btn > input[type="file"] {
+  display: none;
+}
+
 /* ---------- forms ---------- */
 .adm-form,
 .adm-form-wide {
@@ -512,7 +563,8 @@ table.adm th.num,
 .adm-field textarea,
 .adm-form input,
 .adm-form select,
-.adm-form textarea {
+.adm-form textarea,
+.adm-select {
   display: block;
   width: 100%;
   height: 44px;
@@ -535,6 +587,56 @@ table.adm th.num,
   padding: 12px 14px;
   resize: vertical;
 }
+/* ---------- selects ----------
+   A bare <select> renders with the OS control: a grey chrome box that ignores every token in
+   this file. These give it the same body, border and radius as a text input, hide the native
+   arrow, and draw one chevron in ink so the two field types finally look related. The chevron
+   is a background image rather than a pseudo-element because a replaced element cannot host
+   ::after. */
+.adm-field select,
+.adm-form select,
+.adm-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b5a50' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 38px;
+  cursor: pointer;
+  /* Long option text must not push the control wider than its column. */
+  text-overflow: ellipsis;
+}
+.adm-field select:hover,
+.adm-form select:hover,
+.adm-select:hover {
+  border-color: var(--line-strong);
+}
+.adm-field select:disabled,
+.adm-form select:disabled {
+  background-color: var(--paper-sunk);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+/* The dropdown list itself is drawn by the OS; only its colours are ours to set. */
+.adm-field select option,
+.adm-form select option,
+.adm-select option {
+  background: var(--surface);
+  color: var(--ink);
+}
+/* A multi-select is a list, not a control with an arrow. */
+.adm-field select[multiple],
+.adm-form select[multiple],
+select[multiple] {
+  appearance: auto;
+  -webkit-appearance: auto;
+  background-image: none;
+  padding-right: 14px;
+  height: auto;
+  cursor: default;
+}
+
 .adm-field input[type="checkbox"],
 .adm-form input[type="checkbox"] {
   width: 20px;
@@ -641,6 +743,165 @@ table.adm th.num,
 .adm-link .chip {
   color: var(--ink);
   text-decoration: none;
+}
+
+/* ---------- filter bar ----------
+   The Menu screen's filters used to be a bare row of controls sharing a line with two action
+   buttons, so it read as one undifferentiated strip. Wrapping them in a sunk panel says "these
+   narrow the table below" without a heading having to say it. */
+.adm-filters {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  background: var(--paper-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.adm-filters .adm-field {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+/* The buttons stay together at the end of the row. `margin-left:auto` on the first one alone
+   pushed it right and let the next wrap to a line of its own, which read as two unrelated
+   controls; grouping them keeps the pair intact however the fields wrap. */
+.adm-filters > .adm-btn {
+  flex: none;
+}
+.adm-filters > .adm-btn:first-of-type {
+  margin-left: auto;
+}
+@media (max-width: 767px) {
+  .adm-filters > .adm-btn {
+    flex: 1 1 auto;
+  }
+  .adm-filters > .adm-btn:first-of-type {
+    margin-left: 0;
+  }
+}
+
+/* ---------- floating save bar ----------
+   Pinned to the viewport so it is reachable from any scroll position in a long form. It sits
+   ABOVE the dialog overlay's stacking neighbours but below the overlay itself, so a confirm
+   dialog still covers it. */
+.adm-savebar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-cart-bar);
+  padding: 0 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+/* An empty host must not eat clicks on the page behind it. */
+.adm-savebar:empty {
+  display: none;
+}
+
+/* The form panel each bar belongs to. */
+.adm-formcard {
+  margin-bottom: 20px;
+}
+.adm-formcard > h3 {
+  margin-bottom: 4px;
+}
+.adm-formcard-desc {
+  color: var(--ink-muted);
+  margin-bottom: 16px;
+  max-width: 68ch;
+}
+.adm-formcard .adm-form,
+.adm-formcard .adm-form-wide {
+  margin-bottom: 0;
+}
+.adm-savebar-inner {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: var(--container);
+  background: var(--roast);
+  color: var(--ink-on-roast);
+  border-radius: var(--r-pill);
+  box-shadow: var(--ev-overlay);
+  padding: 12px 12px 12px 24px;
+}
+.adm-savebar-msg {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+.adm-savebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+/* On roast, the ghost button needs on-roast ink or it disappears. */
+.adm-savebar .adm-btn-ghost {
+  color: var(--ink-on-roast-muted);
+  border-color: transparent;
+}
+.adm-savebar .adm-btn-ghost:hover {
+  color: var(--ink-on-roast);
+  background: rgb(247 240 225 / 0.1);
+}
+/* The save button is the one thing on this bar that must be unmissable. */
+.adm-btn-save {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  height: 44px;
+  padding: 0 24px;
+  font-size: var(--display-sm);
+}
+.adm-btn-save:hover {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .adm-savebar-inner {
+    animation: adm-savebar-in var(--t-slow) var(--ease) both;
+  }
+  @keyframes adm-savebar-in {
+    from {
+      transform: translateY(16px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+@media (max-width: 767px) {
+  .adm-savebar-inner {
+    border-radius: var(--r-md);
+    padding: 12px 12px 12px 16px;
+  }
+  .adm-savebar-msg {
+    flex-basis: 100%;
+    font-size: var(--body-sm);
+  }
+  .adm-savebar-actions {
+    width: 100%;
+  }
+  .adm-btn-save {
+    flex: 1;
+  }
+}
+/* The bar overlaps the foot of the page; this keeps the last field reachable. */
+.adm-main {
+  padding-bottom: 96px;
 }
 
 /* ---------- confirm dialog ---------- */

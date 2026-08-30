@@ -11,7 +11,7 @@ function sampleOrder(overrides: Partial<TicketOrderInput> = {}): TicketOrderInpu
     orderNumber: "HC-003",
     paidAt: PAID_AT,
     timeZone: "America/Chicago",
-    storeName: "Harold's Chicken Oak Lawn",
+    storeName: "Harold's Chicken Burnham",
     customerFirstName: "Jamal",
     customerLastName: "Wright",
     paymentStatus: "CAPTURED",
@@ -53,7 +53,7 @@ describe("kitchen ticket layout", () => {
     assert.match(preview, / {2}ADD FRIES/);
     assert.match(preview, /NOTE: Extra crispy if possible/);
     assert.match(preview, /2 X MAYO PACKETS/);
-    assert.match(preview, /Harold's Chicken Oak Lawn/);
+    assert.match(preview, /Harold's Chicken Burnham/);
     assert.doesNotMatch(preview, /\$/);
     assert.doesNotMatch(preview, /SUBTOTAL/);
     assert.doesNotMatch(preview, /TAX/);
@@ -84,7 +84,7 @@ describe("kitchen ticket layout", () => {
       "2 X MAYO PACKETS",
       "------------------------------------------",
       "                  HC-003",
-      "        Harold's Chicken Oak Lawn",
+      "         Harold's Chicken Burnham",
     ].join("\n");
     assert.equal(preview, expected);
   });
