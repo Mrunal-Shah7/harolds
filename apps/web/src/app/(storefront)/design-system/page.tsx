@@ -180,16 +180,12 @@ function Showcase() {
             <Field label="Mobile number" htmlFor="ds-phone-err" error="Enter a 10-digit mobile number">
               <Input id="ds-phone-err" defaultValue="708" />
             </Field>
-            <div>
-              <Label htmlFor="ds-note" className="mb-1">
-                Special instructions
-              </Label>
+            <div className="field">
+              <Label htmlFor="ds-note">Special instructions</Label>
               <Textarea id="ds-note" rows={2} placeholder="Optional, for example extra crispy" />
             </div>
-            <div>
-              <Label htmlFor="ds-disabled" className="mb-1">
-                Disabled
-              </Label>
+            <div className="field">
+              <Label htmlFor="ds-disabled">Disabled</Label>
               <Input id="ds-disabled" disabled placeholder="Disabled" />
             </div>
           </div>

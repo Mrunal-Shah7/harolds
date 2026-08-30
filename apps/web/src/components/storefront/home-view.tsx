@@ -22,6 +22,7 @@ import { CartAnnouncer } from "@/components/storefront/cart-announcer";
 import { ErrorState } from "@/components/ui/feedback";
 import { storeStatusLabel } from "@/components/storefront/store-status-pill";
 import { useCart } from "@/lib/cart-context";
+import { useHeaderHeight } from "@/components/storefront/use-header-height";
 
 export function HomeView({
   menu,
@@ -35,6 +36,9 @@ export function HomeView({
   const { addLine } = useCart();
   const [selected, setSelected] = useState<MenuItemSummary | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+  // Publishes --sf-header-h; nothing on this page pins to it, but the value is shared with the
+  // menu page's tab bar and measuring it here keeps the two pages consistent.
+  useHeaderHeight();
 
   // Error: what failed, in plain words, plus a retry that retries. No status codes.
   if (!menu || !status) {

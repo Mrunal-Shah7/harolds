@@ -754,7 +754,29 @@ h2.poster,
   display: flex;
   align-items: center;
   gap: 16px;
-  height: 64px;
+  min-height: 64px;
+}
+a.wordmark {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-decoration: none;
+  flex: none;
+}
+@media (max-width: 767px) {
+  .sf-header .container {
+    gap: 10px;
+  }
+  /* 44 is the minimum tap target; the wordmark is the link home. */
+  a.wordmark {
+    min-height: 44px;
+  }
+  .wordmark {
+    font-size: 1.3rem;
+  }
+  .wordmark small {
+    letter-spacing: 0.16em;
+  }
 }
 .wordmark {
   font-family: var(--font-poster);
@@ -771,6 +793,9 @@ h2.poster,
   letter-spacing: 0.24em;
   color: var(--ink-muted);
   margin-top: 2px;
+  /* At 390px this wrapped to two lines and pushed the header past its 64px row, which in turn
+     left the sticky tab bar pinned too high. It is a wordmark: it never wraps. */
+  white-space: nowrap;
 }
 .status-pill {
   display: inline-flex;
@@ -1057,7 +1082,10 @@ h2.poster,
 
 .sticky-tabs {
   position: sticky;
-  top: 64px;
+  /* The header is 64px on desktop but taller on mobile, where the status pill takes its own row.
+     `--sf-header-h` is published from the header's real measured height (use-header-height.ts),
+     so the two can never drift apart the way two hand-kept constants did. */
+  top: var(--sf-header-h, 64px);
   z-index: var(--z-sticky-tabs);
   background: var(--surface);
   border-bottom: 1px solid var(--line);
@@ -1765,6 +1793,203 @@ html[data-theme="dark"] .sf-root .sf-header {
 }
 .sf-header .cart-btn {
   margin-left: 0;
+}
+
+/* =============================================================================
+   TOUCH AND SMALL SCREENS
+   Layout adaptations only — no colour, type scale, radius or component anatomy
+   changes.
+
+   The two axes are deliberately separate:
+     (pointer: coarse) — a finger is driving, so 44px minimum tap targets and no
+       hover affordances. Keyed off input, not width, so a 768px+ tablet gets
+       them and a narrow desktop window does not.
+     (max-width: …)    — there is less room, so things reflow.
+   ============================================================================= */
+
+@media (pointer: coarse) {
+  /* The design's own 44px minimum. On a phone these measured 19–36. */
+  .btn-sm {
+    height: 44px;
+    padding: 0 18px;
+  }
+  .status-pill {
+    min-height: 44px;
+  }
+  a.wordmark {
+    min-height: 44px;
+  }
+  /* An item with no description is a single 25px line; the card's copy is a tap target too. */
+  .pcard .body .tap {
+    min-height: 44px;
+  }
+  /* The store's address and phone are the two things someone on a phone actually taps. */
+  .sf-footer li a,
+  .sf-footer li {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0;
+  }
+}
+
+@media (hover: none) {
+  /* A lift with no pointer to leave leaves the card stuck in the raised state after a tap. */
+  .pcard:hover,
+  .cat-tile:hover .circle {
+    transform: none;
+    box-shadow: var(--ev-card);
+  }
+}
+
+@media (max-width: 767px) {
+  .sf-header .container {
+    gap: 10px;
+  }
+
+  /* The card's copy block, as a button, must fill its column. */
+  .pcard .tap {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  /* The rail runs to the screen edge, so a half-cut tile reads as "this scrolls". */
+  .cat-rail {
+    margin-inline: -16px;
+    padding-inline: 16px;
+    scroll-snap-type: x proximity;
+  }
+  .cat-tile {
+    scroll-snap-align: start;
+  }
+
+  /* NOTE: the checkout summary is deliberately NOT reordered above the form. `order` moves a
+     grid item visually without moving it in the DOM, so a keyboard or screen-reader user would
+     traverse a payment form in a different order than they see it. Form, then summary, then the
+     Pay button inside that summary, is both the DOM order and the right reading order. */
+
+  /* Overlays own the whole screen at this width. */
+  .sheet {
+    max-width: none;
+  }
+  .modal {
+    max-height: 88dvh;
+  }
+  .modal .inner {
+    padding: 20px 16px;
+  }
+  .modal-foot {
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    gap: 12px;
+  }
+  .sheet-head,
+  .sheet-foot {
+    padding: 16px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .sheet-body {
+    padding: 8px 16px;
+  }
+  .co-card {
+    padding: 20px 16px;
+  }
+
+  /* A `1fr` grid track will not shrink below its content's min-content width. The four payment
+     chips carry non-breaking labels ("Apple Pay"), so at 320px they held the checkout column
+     310px wide inside a 288px container. Two rows of two, and the column may shrink. */
+  .co-grid,
+  .co-grid > * {
+    min-width: 0;
+  }
+  .paywith {
+    flex-wrap: wrap;
+  }
+  .paychip {
+    flex: 1 1 calc(50% - 4px);
+  }
+  .footer-deep .container {
+    gap: 4px;
+  }
+
+  /* `.btn` is `white-space: nowrap`, and the poster button's label is a sentence — "Review your
+     order · 2 items" has a min-content width wider than a 320px screen, so the band it sits in
+     pushed the whole document out and dragged every fixed element with it. A call to action
+     should wrap rather than truncate, so it grows a second line instead. */
+  .btn-poster {
+    white-space: normal;
+    min-width: 0;
+    height: auto;
+    min-height: 60px;
+    padding: 12px 20px;
+    line-height: 1.15;
+  }
+
+  /* Same shape of problem in the cart bar: two labels that would not shrink. The count line
+     truncates; the action never does. */
+  .cart-bar {
+    padding: 0 18px;
+    gap: 12px;
+  }
+  .cart-bar > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cart-bar > span:last-child {
+    flex: none;
+  }
+}
+
+/* --- 320–400px: the header's four elements stop fitting one 64px row. ---
+   Nothing is dropped: the wordmark keeps its name and loses only its mono subline, and the
+   gaps and paddings tighten. Measured to fit at 320px, the narrowest phone still in use. */
+@media (max-width: 400px) {
+  .wordmark small {
+    display: none;
+  }
+  .wordmark {
+    font-size: 1.15rem;
+  }
+  .sf-header .container {
+    gap: 8px;
+    padding: 0 12px;
+  }
+  .sf-header .subrow {
+    padding: 0 12px 12px;
+  }
+  .theme-toggle {
+    gap: 6px;
+    padding: 0 10px;
+  }
+  .cart-btn {
+    gap: 6px;
+    padding: 0 12px;
+  }
+  /* The payment-method badge is a sentence at this width, not a chip. */
+  .hero-meta .badge {
+    white-space: normal;
+  }
+}
+
+/* The floating cart bar is fixed, so it would sit on top of the last card and the footer. This
+   spacer takes its place in the flow — rendered by CartBar itself, so the room only exists when
+   the bar does. */
+.cart-bar-spacer {
+  height: 0;
+}
+@media (max-width: 767px) {
+  .cart-bar-spacer {
+    height: calc(56px + 24px + env(safe-area-inset-bottom));
+  }
 }
 
 /* Skeletons — the loading shape of each surface, drawn in the design's own sunk paper. */

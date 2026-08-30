@@ -18,20 +18,18 @@ import { CartBar } from "@/components/storefront/cart-bar";
 import { CartAnnouncer } from "@/components/storefront/cart-announcer";
 import { EmptyState, ErrorState } from "@/components/ui/feedback";
 import { useCart } from "@/lib/cart-context";
-
-import {
-  MD_BREAKPOINT,
-  SCROLL_OFFSET_DESKTOP,
-  SCROLL_OFFSET_MOBILE,
-  TABS_TOP_DESKTOP,
-  TABS_TOP_MOBILE,
-} from "@/components/storefront/sticky-metrics";
+import { TAB_BAR_HEIGHT, useHeaderHeight } from "@/components/storefront/use-header-height";
 
 export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: StoreStatus | null }) {
   const { addLine, totalItems } = useCart();
   const [selected, setSelected] = useState<MenuItemSummary | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  // The header's real height. The tab bar pins to it (via --sf-header-h) and the scroll handler
+  // stops short by it, so scroll-spy and scroll-to can never disagree about where a section
+  // starts — which is exactly what two hand-kept constants let happen.
+  const headerHeight = useHeaderHeight();
+  const scrollOffset = headerHeight + TAB_BAR_HEIGHT;
 
   const categories = useMemo(
     () => (menu ? menu.categories.filter((c) => c.items.length > 0) : []),
@@ -56,20 +54,22 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
       },
       // The top margin is the same sticky offset the scroll handler uses, so scroll-spy and
       // scroll-to agree about where a section "starts".
-      { rootMargin: `-${SCROLL_OFFSET_MOBILE}px 0px -70% 0px` },
+      { rootMargin: `-${scrollOffset}px 0px -70% 0px` },
     );
     Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el));
     return () => observer.disconnect();
-  }, [categories]);
+  }, [categories, scrollOffset]);
 
-  const scrollToCategory = useCallback((id: string) => {
-    setActiveId(id);
-    const el = sectionRefs.current[id];
-    if (!el) return;
-    const offset = window.innerWidth >= MD_BREAKPOINT ? SCROLL_OFFSET_DESKTOP : SCROLL_OFFSET_MOBILE;
-    const top = el.getBoundingClientRect().top + window.scrollY - offset;
-    window.scrollTo({ top, behavior: "smooth" });
-  }, []);
+  const scrollToCategory = useCallback(
+    (id: string) => {
+      setActiveId(id);
+      const el = sectionRefs.current[id];
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY - scrollOffset;
+      window.scrollTo({ top, behavior: "smooth" });
+    },
+    [scrollOffset],
+  );
 
   const quickAdd = (item: MenuItemSummary) => {
     addLine({ item, quantity: 1, selectedOptionIds: [], optionLabels: [], customerNote: null });
@@ -99,8 +99,6 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
           categories={categories.map((c) => ({ id: c.id, name: c.name }))}
           activeId={activeId}
           onSelect={scrollToCategory}
-          topMobile={TABS_TOP_MOBILE}
-          topDesktop={TABS_TOP_DESKTOP}
         />
 
         <div className="band b-paper textured" style={{ paddingTop: 32, paddingBottom: 24 }}>

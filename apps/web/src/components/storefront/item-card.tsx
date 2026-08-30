@@ -76,26 +76,17 @@ export function ItemCard({
     <div className="pcard card">
       <button
         type="button"
+        className="tap"
         onClick={() => onOpen(item)}
-        style={{ display: "block", width: "100%", textAlign: "left", padding: 0 }}
         aria-label={`${item.name}, ${formatCents(item.basePriceCents)}. Open item options`}
       >
         {frame}
       </button>
 
       <div className="body">
-        <button
-          type="button"
-          onClick={() => onOpen(item)}
-          style={{
-            display: "block",
-            width: "100%",
-            textAlign: "left",
-            padding: 0,
-            font: "inherit",
-            color: "inherit",
-          }}
-        >
+        {/* The copy block is the same tap target as the image. On a phone an item with no
+            description is a single 25px line, so the mobile layer gives it a 44px floor. */}
+        <button type="button" className="tap" tabIndex={-1} onClick={() => onOpen(item)}>
           {copy}
         </button>
 

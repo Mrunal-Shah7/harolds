@@ -4,9 +4,8 @@
 // Home variant: a scrolling row of circular initial tiles with an uppercase label, no visible
 // scrollbar. Menu variant: sticky tabs on a surface band under the header, scroll-spy driven,
 // with the active tab auto-scrolled into view horizontally.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { MD_BREAKPOINT } from "@/components/storefront/sticky-metrics";
 
 export type RailCategory = { id: string; name: string; slug?: string };
 
@@ -31,26 +30,11 @@ export function CategoryTabs({
   categories,
   activeId,
   onSelect,
-  topMobile,
-  topDesktop,
 }: {
   categories: RailCategory[];
   activeId: string | null;
   onSelect: (id: string) => void;
-  /** Pin offsets, derived once in sticky-metrics.ts so they cannot drift from the scroll offset. */
-  topMobile: number;
-  topDesktop: number;
 }) {
-  const [top, setTop] = useState(topMobile);
-
-  useEffect(() => {
-    const media = window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`);
-    const apply = () => setTop(media.matches ? topDesktop : topMobile);
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, [topMobile, topDesktop]);
-
   const scroller = useRef<HTMLDivElement | null>(null);
   const tabs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -65,7 +49,7 @@ export function CategoryTabs({
   }, [activeId]);
 
   return (
-    <div className="sticky-tabs" style={{ top }}>
+    <div className="sticky-tabs">
       <div ref={scroller} className="row" role="tablist" aria-label="Menu categories">
         {categories.map((cat) => (
           <button
