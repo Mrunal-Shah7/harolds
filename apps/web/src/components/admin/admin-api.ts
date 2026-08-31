@@ -12,7 +12,10 @@ export class AdminApiError extends Error {
 
 export async function adminApi<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
-  if (init?.body && !headers.has("content-type")) {
+  // FormData must keep the browser-set multipart boundary. Forcing application/json
+  // makes request.formData() throw on the server (hero banner, category images, etc.).
+  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  if (init?.body && !headers.has("content-type") && !isFormData) {
     headers.set("content-type", "application/json");
   }
   const res = await fetch(path, {
