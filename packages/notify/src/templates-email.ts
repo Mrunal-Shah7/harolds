@@ -21,6 +21,12 @@ export type ReceiptEmailInput = {
   estimatedReadyAt: Date | null;
   timeZone: string;
   customerNote: string | null;
+  /** Who ordered — the printed slip names them, so the emailed copy does too. */
+  customerName: string | null;
+  /** Last four of the card Square captured, when it gave us one. Never the full number. */
+  cardLast4: string | null;
+  /** When the payment was captured. The printed slip is stamped with it. */
+  paidAt: Date | null;
   lines: ReceiptLine[];
   subtotalCents: number;
   taxCents: number;
@@ -49,6 +55,8 @@ export function renderReceiptText(input: ReceiptEmailInput): string {
     storeAddressBlock(input),
     "",
     `Receipt for order ${input.orderNumber}`,
+    input.customerName ? `Ordered by: ${input.customerName}` : "",
+    input.paidAt ? `Paid: ${formatStoreLocalDateTime(input.paidAt, input.timeZone)}` : "",
     "Pickup at the counter. Give them your order number.",
     ready.trim(),
     note.trim(),
@@ -60,6 +68,7 @@ export function renderReceiptText(input: ReceiptEmailInput): string {
     `Tax       ${formatCents(input.taxCents)}`,
     `Tip       ${formatCents(input.tipCents)}`,
     `Total     ${formatCents(input.totalCents)}`,
+    input.cardLast4 ? `Card      ****${input.cardLast4}` : "",
     "",
     "This is a receipt for the order you placed. It is not a marketing message.",
   ]
@@ -101,13 +110,17 @@ export function renderReceiptHtml(input: ReceiptEmailInput): string {
   <h1 style="font-size:1.25rem">${escapeHtml(input.storeName)}</h1>
   <p>${escapeHtml(input.addressLine1)}<br>${addr2}${escapeHtml(input.city)}, ${escapeHtml(input.state)} ${escapeHtml(input.postalCode)}</p>
   <p><strong>Order ${escapeHtml(input.orderNumber)}</strong></p>
+  ${input.customerName ? `<p>Ordered by ${escapeHtml(input.customerName)}</p>` : ""}
+  ${input.paidAt ? `<p>Paid ${escapeHtml(formatStoreLocalDateTime(input.paidAt, input.timeZone))}</p>` : ""}
   <p>Pickup at the counter. Give them your order number.</p>
   ${ready}${note}
   <table style="width:100%;border-collapse:collapse">${input.lines.map(lineHtml).join("")}</table>
   <p>Subtotal ${escapeHtml(formatCents(input.subtotalCents))}<br>
   Tax ${escapeHtml(formatCents(input.taxCents))}<br>
   Tip ${escapeHtml(formatCents(input.tipCents))}<br>
-  <strong>Total ${escapeHtml(formatCents(input.totalCents))}</strong></p>
+  <strong>Total ${escapeHtml(formatCents(input.totalCents))}</strong>${
+    input.cardLast4 ? `<br>Card ****${escapeHtml(input.cardLast4)}` : ""
+  }</p>
   <p style="font-size:0.85rem;color:#444">This is a receipt for the order you placed. It is not a marketing message.</p>
 </body>
 </html>`;

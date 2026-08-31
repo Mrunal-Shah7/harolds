@@ -9,7 +9,7 @@ import type { Order, OrderLine, Prisma } from "../generated/prisma";
 import { allocateOrderNumber } from "../order-numbers";
 import { businessDateToUtcDate } from "../business-date";
 import { getStoreConfig } from "../store-config";
-import { renderPayloadsForOrder } from "../print-jobs";
+import { renderReceiptPayload } from "../print-jobs";
 
 export type OrderWithLines = Order & { lines: OrderLine[] };
 
@@ -326,27 +326,21 @@ export async function markOrderPaidAndAllocate(
 
     const existingJobs = await tx.printJob.count({ where: { orderId } });
     if (existingJobs === 0) {
-      const payloads = renderPayloadsForOrder(order, storeConfig);
+      // ONE slip per order. This used to queue two — a kitchen ticket and a counter receipt —
+      // which on a single-printer store meant two pieces of paper per order that staff had to
+      // pair up by hand. `buildOrderReceipt` merges them. The target stays KITCHEN_TICKET
+      // because acknowledging that target is what moves the order PAID -> PRINTED.
+      const payload = renderReceiptPayload(order, storeConfig);
       const maxAttempts = args.printMaxAttempts ?? 5;
-      await tx.printJob.createMany({
-        data: [
-          {
-            orderId,
-            target: PrintTarget.KITCHEN_TICKET,
-            status: PrintJobStatus.QUEUED,
-            payload: payloads.kitchen,
-            printerSerial: args.kitchenSerial,
-            maxAttempts,
-          },
-          {
-            orderId,
-            target: PrintTarget.COUNTER_RECEIPT,
-            status: PrintJobStatus.QUEUED,
-            payload: payloads.counter,
-            printerSerial: args.counterSerial,
-            maxAttempts,
-          },
-        ],
+      await tx.printJob.create({
+        data: {
+          orderId,
+          target: PrintTarget.KITCHEN_TICKET,
+          status: PrintJobStatus.QUEUED,
+          payload,
+          printerSerial: args.kitchenSerial,
+          maxAttempts,
+        },
       });
 
       await tx.backgroundJob.createMany({
@@ -439,6 +433,8 @@ export type PublicOrderView = {
   tipCents: number;
   totalCents: number;
   estimatedReadyAt: Date | null;
+  /** Set when the counter handed the order over. The status page turns it into a thank-you. */
+  pickedUpAt: Date | null;
   lines: PublicOrderLineView[];
 };
 
@@ -452,6 +448,7 @@ export function getPublicOrderView(order: OrderWithLines): PublicOrderView {
     tipCents: order.tipCents,
     totalCents: order.totalCents,
     estimatedReadyAt: order.estimatedReadyAt,
+    pickedUpAt: order.pickedUpAt,
     lines: order.lines.map((line) => ({
       itemName: line.itemName,
       boardLabel: line.boardLabel,

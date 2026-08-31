@@ -23,13 +23,21 @@ const STATUS_LABELS: Record<string, string> = {
   PRINTED: "Sent to the kitchen",
   IN_PROGRESS: "Being prepared",
   READY: "Ready for pickup",
-  COMPLETED: "Picked up",
+  // The enum value is PICKED_UP. This map said COMPLETED, which is not a status the kitchen can
+  // ever set, so a collected order fell through to the raw string — and `stepIndex` below fell
+  // through to -1, blanking the whole timeline on the one screen the customer was watching.
+  PICKED_UP: "Picked up",
   CANCELLED: "Cancelled",
 };
 
 /** The three points of the timeline, and which one each order status sits on. */
 const STEPS = ["Received", "Preparing", "Ready"] as const;
 
+/**
+ * Index of the step the order is CURRENTLY on. PICKED_UP deliberately returns one past the last
+ * step: the journey is over, so every point renders complete rather than leaving "Ready" as the
+ * pulsing current step forever.
+ */
 function stepIndex(status: string): number {
   switch (status) {
     case "AWAITING_PAYMENT":
@@ -40,8 +48,9 @@ function stepIndex(status: string): number {
     case "IN_PROGRESS":
       return 1;
     case "READY":
-    case "COMPLETED":
       return 2;
+    case "PICKED_UP":
+      return STEPS.length;
     default:
       return -1;
   }
@@ -130,6 +139,29 @@ export default function OrderStatusPage() {
 
   const active = stepIndex(order.status);
   const cancelled = order.status === "CANCELLED";
+  const pickedUp = order.status === "PICKED_UP";
+  const ready = order.status === "READY";
+
+  // The hero speaks in whichever tense the order is actually in. Three distinct moments, so
+  // three distinct headlines — a collected order must never still read "We're on it".
+  const eyebrow = cancelled
+    ? "Order cancelled"
+    : pickedUp
+      ? "Order complete · picked up"
+      : ready
+        ? "Order ready · paid"
+        : "Order placed · paid";
+  const headline = cancelled
+    ? "This order was cancelled"
+    : pickedUp
+      ? "Thanks — enjoy"
+      : ready
+        ? "Come and get it"
+        : "We're on it";
+
+  const pickedUpTime = order.pickedUpAt
+    ? new Date(order.pickedUpAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    : null;
 
   return (
     <div className="sf-page">
@@ -138,11 +170,9 @@ export default function OrderStatusPage() {
       <main>
         <div className="band b-paper textured">
           <div className="container confirm-wrap">
-            <p className="eyebrow">
-              {cancelled ? "Order cancelled" : "Order placed · paid"}
-            </p>
+            <p className="eyebrow">{eyebrow}</p>
             <h2 className="poster" style={{ margin: "12px 0 32px" }}>
-              {cancelled ? "This order was cancelled" : "We're on it"}
+              {headline}
             </h2>
 
             {order.orderNumber ? (
@@ -161,13 +191,40 @@ export default function OrderStatusPage() {
                     className={i < active ? "tstep done" : i === active ? "tstep now" : "tstep"}
                   >
                     <span className="pt" aria-hidden="true" />
-                    <span className="lb">{label}</span>
+                    {/* The last point is the destination, so it is named for where the order
+                        got to: "Ready" until it is collected, "Picked up" afterwards. */}
+                    <span className="lb">
+                      {pickedUp && i === STEPS.length - 1 ? "Picked up" : label}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
 
-            {order.estimatedReadyAt && !cancelled ? (
+            {/* One line, three tenses. An estimate is only worth showing while the order is still
+                being cooked — once it is ready the estimate is behind the facts, and once it is
+                collected the only useful thing to say is thank you. */}
+            {cancelled ? null : pickedUp ? (
+              <p style={{ fontSize: "var(--body-lg)", marginTop: 24 }}>
+                {pickedUpTime ? (
+                  <>
+                    Picked up at{" "}
+                    <strong className="t-nums" style={{ fontFamily: "var(--font-display)" }}>
+                      {pickedUpTime}
+                    </strong>
+                    . Thanks for eating with us.
+                  </>
+                ) : (
+                  <>Picked up. Thanks for eating with us.</>
+                )}
+              </p>
+            ) : ready ? (
+              <p style={{ fontSize: "var(--body-lg)", marginTop: 24 }}>
+                <strong style={{ fontFamily: "var(--font-display)" }}>
+                  Your order is ready for pickup.
+                </strong>
+              </p>
+            ) : order.estimatedReadyAt ? (
               <p style={{ fontSize: "var(--body-lg)", marginTop: 24 }}>
                 Ready around{" "}
                 <strong className="t-nums" style={{ fontFamily: "var(--font-display)" }}>
@@ -181,7 +238,9 @@ export default function OrderStatusPage() {
             ) : null}
 
             <p style={{ color: "var(--ink-muted)", marginTop: 8 }}>
-              Give your order number at the counter. Receipt sent by email.
+              {pickedUp
+                ? "Receipt sent by email."
+                : "Give your order number at the counter. Receipt sent by email."}
             </p>
           </div>
         </div>

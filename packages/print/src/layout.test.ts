@@ -1,7 +1,7 @@
 // SPRINT-5: layout snapshots + edge cases — no printer, no protocol
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildCounterReceipt, buildKitchenTicket, renderPlainText } from "./layout";
+import { buildOrderReceipt, renderPlainText } from "./layout";
 import type { TicketOrderInput } from "./ticket-model";
 
 const PAID_AT = new Date("2026-08-09T18:59:34.836Z");
@@ -40,9 +40,9 @@ function sampleOrder(overrides: Partial<TicketOrderInput> = {}): TicketOrderInpu
   };
 }
 
-describe("kitchen ticket layout", () => {
-  it("matches the in-store structure with online deltas and no prices", () => {
-    const preview = renderPlainText(buildKitchenTicket(sampleOrder()));
+describe("order receipt layout", () => {
+  it("carries every field the one slip must show: identity, items and money", () => {
+    const preview = renderPlainText(buildOrderReceipt(sampleOrder()));
     assert.match(preview, /HC-003/);
     assert.match(preview, /ONLINE PICKUP/);
     assert.match(preview, /\*\* PAID \*\*/);
@@ -54,10 +54,13 @@ describe("kitchen ticket layout", () => {
     assert.match(preview, /NOTE: Extra crispy if possible/);
     assert.match(preview, /2 X MAYO PACKETS/);
     assert.match(preview, /Harold's Chicken Burnham/);
-    assert.doesNotMatch(preview, /\$/);
-    assert.doesNotMatch(preview, /SUBTOTAL/);
-    assert.doesNotMatch(preview, /TAX/);
-    assert.doesNotMatch(preview, /2\.49|22\.65|2494/);
+    // There is one slip now, so the money that used to sit on a separate counter receipt
+    // is on this one.
+    assert.match(preview, /SUBTOTAL/);
+    assert.match(preview, /TAX/);
+    assert.match(preview, /TIP/);
+    assert.match(preview, /TOTAL/);
+    assert.match(preview, /CARD {2}\*\*\*\*1111/);
     // Order number at top and foot
     const occurrences = preview.split("HC-003").length - 1;
     assert.ok(occurrences >= 2, "order number must repeat at the foot");
@@ -67,7 +70,7 @@ describe("kitchen ticket layout", () => {
   });
 
   it("renders a stable realistic preview", () => {
-    const preview = renderPlainText(buildKitchenTicket(sampleOrder()));
+    const preview = renderPlainText(buildOrderReceipt(sampleOrder()));
     const expected = [
       "                  HC-003",
       "------------------------------------------",
@@ -83,6 +86,13 @@ describe("kitchen ticket layout", () => {
       "  NOTE: Extra crispy if possible",
       "2 X MAYO PACKETS",
       "------------------------------------------",
+      "SUBTOTAL                            $22.65",
+      "TAX                                  $2.29",
+      "TIP                                  $0.00",
+      "TOTAL                               $24.94",
+      "PAYMENT  CAPTURED",
+      "CARD  ****1111",
+      "------------------------------------------",
       "                  HC-003",
       "         Harold's Chicken Burnham",
     ].join("\n");
@@ -91,7 +101,7 @@ describe("kitchen ticket layout", () => {
 
   it("wraps a long item name without breaking modifier indentation", () => {
     const preview = renderPlainText(
-      buildKitchenTicket(
+      buildOrderReceipt(
         sampleOrder({
           lines: [
             {
@@ -118,7 +128,7 @@ describe("kitchen ticket layout", () => {
   it("renders eight or more modifiers", () => {
     const mods = ["Mild", "Hot", "Lemon Pepper", "BBQ", "Garlic", "Cajun", "No Salt", "Extra Sauce"];
     const preview = renderPlainText(
-      buildKitchenTicket(
+      buildOrderReceipt(
         sampleOrder({
           lines: [
             {
@@ -141,7 +151,7 @@ describe("kitchen ticket layout", () => {
     const note =
       "Please make sure the chicken is well done, extra crispy, sauce on the side, no pickles, and call when ready at the side door.";
     const preview = renderPlainText(
-      buildKitchenTicket(
+      buildOrderReceipt(
         sampleOrder({
           lines: [
             {
@@ -168,7 +178,7 @@ describe("kitchen ticket layout", () => {
       customerNote: null,
       selectedModifiers: [] as { optionName: string }[],
     }));
-    const preview = renderPlainText(buildKitchenTicket(sampleOrder({ lines })));
+    const preview = renderPlainText(buildOrderReceipt(sampleOrder({ lines })));
     for (let i = 1; i <= 20; i++) {
       assert.match(preview, new RegExp(`ITEM ${i}`));
     }
@@ -176,7 +186,7 @@ describe("kitchen ticket layout", () => {
 
   it("keeps ampersands in the model text (escaping is the XML renderer's job)", () => {
     const preview = renderPlainText(
-      buildKitchenTicket(
+      buildOrderReceipt(
         sampleOrder({
           lines: [
             {
@@ -196,7 +206,7 @@ describe("kitchen ticket layout", () => {
 
   it("shows a double-digit quantity prefix", () => {
     const preview = renderPlainText(
-      buildKitchenTicket(
+      buildOrderReceipt(
         sampleOrder({
           lines: [
             {
@@ -214,21 +224,21 @@ describe("kitchen ticket layout", () => {
   });
 });
 
-describe("counter receipt layout", () => {
+describe("order receipt money block", () => {
   it("prints stored money figures exactly and optional card last four", () => {
-    const preview = renderPlainText(buildCounterReceipt(sampleOrder()));
+    const preview = renderPlainText(buildOrderReceipt(sampleOrder()));
     assert.match(preview, /SUBTOTAL\s+\$22\.65/);
     assert.match(preview, /TAX\s+\$2\.29/);
     assert.match(preview, /TIP\s+\$0\.00/);
     assert.match(preview, /TOTAL\s+\$24\.94/);
     assert.match(preview, /PAYMENT {2}CAPTURED/);
     assert.match(preview, /CARD {2}\*\*\*\*1111/);
-    assert.match(preview, /COUNTER RECEIPT/);
+    assert.match(preview, /ONLINE PICKUP/);
     assert.match(preview, /Jamal W\./);
   });
 
   it("omits card data when Square did not supply last four", () => {
-    const preview = renderPlainText(buildCounterReceipt(sampleOrder({ cardLast4: null })));
+    const preview = renderPlainText(buildOrderReceipt(sampleOrder({ cardLast4: null })));
     assert.doesNotMatch(preview, /CARD/);
     assert.doesNotMatch(preview, /\*\*\*\*/);
   });

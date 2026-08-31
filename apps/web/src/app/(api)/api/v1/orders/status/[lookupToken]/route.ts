@@ -28,6 +28,7 @@ export async function GET(request: Request, ctx: Ctx) {
       {
         ...view,
         estimatedReadyAt: view.estimatedReadyAt?.toISOString() ?? null,
+        pickedUpAt: view.pickedUpAt?.toISOString() ?? null,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

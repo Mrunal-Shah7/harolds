@@ -182,7 +182,8 @@ describe("claim + complete", () => {
 
   it("never hands the same job to two concurrent polls", async () => {
     await paidOrder({ payload: "concurrent" });
-    // One kitchen + one counter. Twenty callers; each job claimed at most once.
+    // The fixture seeds two rows on purpose — a live order queues one receipt, but legacy rows
+    // and reprints mean the queue must still hand out multiple rows for one order safely.
     const results = await Promise.all(Array.from({ length: 20 }, () => claimNextPrintJob(SERIAL)));
     const ids = results.filter(Boolean).map((j) => j!.id);
     assert.equal(ids.length, 2);
@@ -345,7 +346,8 @@ describe("sweep / reprint / ops", () => {
       counterSerial: SERIAL,
       maxAttempts: 5,
     });
-    assert.equal(created.length, 2);
+    // One order, one receipt — the repair path queues the same single slip a payment would.
+    assert.equal(created.length, 1);
     assert.ok(created.every((j) => j.payload.length > 0));
   });
 

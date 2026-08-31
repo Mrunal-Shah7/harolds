@@ -1610,13 +1610,14 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
         >
           Cancel
         </button>
+        {/* One slip per order, so one reprint button. */}
         <button
           type="button"
           className="adm-btn"
           onClick={() =>
             setConfirm({
-              title: "Reprint kitchen ticket",
-              body: "This re-queues the stored ticket with a reprint marker. Staff may cook it twice if they miss the marker.",
+              title: "Reprint receipt",
+              body: "This re-queues the stored receipt with a reprint marker. Staff may cook it twice if they miss the marker.",
               run: () =>
                 adminApi(`/api/internal/admin/orders/${id}/reprint`, {
                   method: "POST",
@@ -1625,24 +1626,7 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
             })
           }
         >
-          Reprint kitchen
-        </button>
-        <button
-          type="button"
-          className="adm-btn adm-btn-ghost"
-          onClick={() =>
-            setConfirm({
-              title: "Reprint counter receipt",
-              body: "Re-queues the stored counter receipt with a reprint marker.",
-              run: () =>
-                adminApi(`/api/internal/admin/orders/${id}/reprint`, {
-                  method: "POST",
-                  body: JSON.stringify({ target: "COUNTER_RECEIPT", confirmed: true }),
-                }),
-            })
-          }
-        >
-          Reprint counter
+          Reprint receipt
         </button>
       </div>
       <h2>Lines</h2>

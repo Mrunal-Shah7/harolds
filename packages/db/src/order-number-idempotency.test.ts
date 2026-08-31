@@ -129,9 +129,9 @@ describe("markOrderPaidAndAllocate is idempotent past PAID", () => {
       assert.equal(fresh.orderNumber, originalNumber);
       assert.equal(fresh.status, advanced);
 
-      // And no second pair of print jobs was queued for the same order.
+      // And no second receipt was queued for the same order.
       const jobs = await prisma.printJob.count({ where: { orderId: order.id } });
-      assert.equal(jobs, 2, "a replay must not enqueue another kitchen ticket and receipt");
+      assert.equal(jobs, 1, "a replay must not enqueue a second receipt");
     });
   }
 });

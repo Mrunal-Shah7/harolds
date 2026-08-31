@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { escapeXml, foldToPrintableAscii, preparePrintText } from "./encoding";
 import { documentHasCut, renderEposPrintXml, withReprintBanner } from "./epos-xml";
-import { buildKitchenTicket } from "./layout";
+import { buildOrderReceipt } from "./layout";
 import { wrapPrintRequest } from "./sdp";
 import type { TicketOrderInput } from "./ticket-model";
 
@@ -43,7 +43,7 @@ describe("encoding", () => {
 
 describe("ePOS-Print XML", () => {
   it("is well-formed, cuts, emphasises, and escapes order data", () => {
-    const xml = renderEposPrintXml(buildKitchenTicket(order));
+    const xml = renderEposPrintXml(buildOrderReceipt(order));
     assert.match(xml, /^<\?xml version="1.0" encoding="utf-8"\?>/);
     assert.match(xml, /xmlns="http:\/\/www.epson-pos.com\/schemas\/2011\/03\/epos-print"/);
     assert.equal(documentHasCut(xml), true);
@@ -57,11 +57,11 @@ describe("ePOS-Print XML", () => {
     assert.match(xml, /Jose N\./);
     assert.doesNotMatch(xml, /José|Nuñez/);
     // Stored payload is byte-identical across repeats
-    assert.equal(xml, renderEposPrintXml(buildKitchenTicket(order)));
+    assert.equal(xml, renderEposPrintXml(buildOrderReceipt(order)));
   });
 
   it("wraps a print job id into PrintRequestInfo 2.00", () => {
-    const inner = renderEposPrintXml(buildKitchenTicket(order));
+    const inner = renderEposPrintXml(buildOrderReceipt(order));
     const wrapped = wrapPrintRequest({ printJobId: "abc123", eposXml: inner });
     assert.match(wrapped, /PrintRequestInfo Version="2.00"/);
     assert.match(wrapped, /<printjobid>abc123<\/printjobid>/);
@@ -71,11 +71,11 @@ describe("ePOS-Print XML", () => {
   });
 
   it("reprint banner is applied at send time without changing stored bytes", () => {
-    const stored = renderEposPrintXml(buildKitchenTicket(order));
+    const stored = renderEposPrintXml(buildOrderReceipt(order));
     const sent = withReprintBanner(stored);
     assert.notEqual(sent, stored);
     assert.match(sent, /\*\*\* REPRINT \*\*\*/);
-    assert.equal(renderEposPrintXml(buildKitchenTicket(order)), stored);
+    assert.equal(renderEposPrintXml(buildOrderReceipt(order)), stored);
   });
 });
 

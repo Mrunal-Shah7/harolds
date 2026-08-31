@@ -39,6 +39,9 @@ export function toPublicStatus(order: CheckoutOrderResponse): PublicOrderStatusR
     tipCents: order.tipCents,
     totalCents: order.totalCents,
     estimatedReadyAt: order.estimatedReadyAt,
+    // The mock has no kitchen to hand an order over, so a mocked order is picked up exactly when
+    // its status says so — enough for the status page's picked-up state to be exercised.
+    pickedUpAt: order.status === "PICKED_UP" ? new Date().toISOString() : null,
     lines: order.lines.map((l) => ({
       itemName: l.itemName,
       boardLabel: l.boardLabel,

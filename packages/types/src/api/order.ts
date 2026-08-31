@@ -63,6 +63,8 @@ export type PublicOrderStatusResponse = {
   tipCents: number;
   totalCents: number;
   estimatedReadyAt: string | null;
+  /** ISO timestamp of handover, or null while the order is still in the kitchen. */
+  pickedUpAt: string | null;
   lines: Array<{
     itemName: string;
     boardLabel: string | null;

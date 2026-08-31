@@ -133,18 +133,16 @@ function sharedFooter(order: TicketOrderInput): TicketLine[] {
   ];
 }
 
-/** Kitchen ticket — no money anywhere. Matches the in-store layout with online-order deltas. */
-export function buildKitchenTicket(order: TicketOrderInput): TicketModel {
-  const lines: TicketLine[] = [
-    ...sharedHeader(order, "ONLINE PICKUP"),
-    ...order.lines.flatMap(itemBlock),
-    ...sharedFooter(order),
-  ];
-  return { kind: "kitchen", orderNumber: order.orderNumber, lines };
-}
-
-/** Counter receipt — same identity + items, plus stored money (never recomputed). */
-export function buildCounterReceipt(order: TicketOrderInput): TicketModel {
+/**
+ * The order receipt — the ONE slip printed per order.
+ *
+ * There used to be two: a kitchen ticket with no money on it, and a counter receipt with the
+ * money. Both went to the same physical printer, so every order produced two slips that had to be
+ * matched up by hand. This is the merger: the kitchen's identity block and item detail, plus the
+ * stored money and the card that paid. Figures are the ones stored on the order and are never
+ * recomputed here.
+ */
+export function buildOrderReceipt(order: TicketOrderInput): TicketModel {
   const money: TicketLine[] = [
     rule(),
     moneyRow("SUBTOTAL", order.subtotalCents),
@@ -157,12 +155,12 @@ export function buildCounterReceipt(order: TicketOrderInput): TicketModel {
     money.push({ text: `CARD  ****${order.cardLast4}`, align: "left", role: "money" });
   }
   const lines: TicketLine[] = [
-    ...sharedHeader(order, "COUNTER RECEIPT"),
+    ...sharedHeader(order, "ONLINE PICKUP"),
     ...order.lines.flatMap(itemBlock),
     ...money,
     ...sharedFooter(order),
   ];
-  return { kind: "counter", orderNumber: order.orderNumber, lines };
+  return { kind: "receipt", orderNumber: order.orderNumber, lines };
 }
 
 /** Plain-text preview for tests and notes — not sent to the printer. */

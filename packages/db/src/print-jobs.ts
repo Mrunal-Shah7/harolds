@@ -9,8 +9,7 @@ import {
   type SelectedModifierSnapshot,
 } from "@harolds/types";
 import {
-  buildCounterReceipt,
-  buildKitchenTicket,
+  buildOrderReceipt,
   formatLastError,
   renderEposPrintXml,
   type TicketOrderInput,
@@ -98,15 +97,16 @@ export function toTicketOrderInput(
   };
 }
 
-export function renderPayloadsForOrder(
+/**
+ * The ePOS-Print XML for an order's receipt. One order, one slip — see `buildOrderReceipt`.
+ * Rows written when there were still two targets re-render as this same receipt, so a legacy
+ * COUNTER_RECEIPT job that is retried today prints what a new order would.
+ */
+export function renderReceiptPayload(
   order: Order & { lines: OrderLine[] },
   store: { timezone: string; storeName: string },
-): { kitchen: string; counter: string } {
-  const input = toTicketOrderInput(order, store);
-  return {
-    kitchen: renderEposPrintXml(buildKitchenTicket(input)),
-    counter: renderEposPrintXml(buildCounterReceipt(input)),
-  };
+): string {
+  return renderEposPrintXml(buildOrderReceipt(toTicketOrderInput(order, store)));
 }
 
 type ClaimedJobRow = {
@@ -173,8 +173,7 @@ async function fillEmptyPayload(jobId: string): Promise<PrintJob | null> {
   });
   if (!job) return null;
   const store = await getStoreConfig();
-  const payloads = renderPayloadsForOrder(job.order, store);
-  const payload = job.target === PrintTarget.KITCHEN_TICKET ? payloads.kitchen : payloads.counter;
+  const payload = renderReceiptPayload(job.order, store);
   return prisma.printJob.update({ where: { id: jobId }, data: { payload } });
 }
 
@@ -526,23 +525,17 @@ export async function repairMissingPrintJobs(args: {
     return order.printJobs;
   }
   const store = await getStoreConfig();
-  const payloads = renderPayloadsForOrder(order, store);
+  const payload = renderReceiptPayload(order, store);
   await prisma.printJob.createMany({
     data: [
       {
         orderId: order.id,
+        // KITCHEN_TICKET is the target the single receipt keeps: acknowledging it is what moves
+        // the order PAID -> PRINTED, and that is the kitchen's signal that the slip is out.
         target: PrintTarget.KITCHEN_TICKET,
         status: PrintJobStatus.QUEUED,
-        payload: payloads.kitchen,
+        payload,
         printerSerial: args.kitchenSerial,
-        maxAttempts: args.maxAttempts,
-      },
-      {
-        orderId: order.id,
-        target: PrintTarget.COUNTER_RECEIPT,
-        status: PrintJobStatus.QUEUED,
-        payload: payloads.counter,
-        printerSerial: args.counterSerial,
         maxAttempts: args.maxAttempts,
       },
     ],

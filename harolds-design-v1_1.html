@@ -4376,17 +4376,26 @@ select[multiple] {
       <main>
         <div class="band b-paper textured">
           <div class="container confirm-wrap">
-            <p class="eyebrow">Order placed &middot; paid</p>
-            <h2 class="poster" style="margin:12px 0 32px">We're on it</h2>
+            <p class="eyebrow" id="cf-eyebrow">Order placed &middot; paid</p>
+            <h2 class="poster" style="margin:12px 0 32px" id="cf-headline">We're on it</h2>
             <span class="chip chip-lg">HC-047</span>
-            <div class="timeline">
+            <div class="timeline" id="cf-timeline">
               <div class="tstep done"><span class="pt" aria-hidden="true"></span><span class="lb">Received</span></div>
               <div class="tstep now"><span class="pt" aria-hidden="true"></span><span class="lb">Preparing</span></div>
               <div class="tstep"><span class="pt" aria-hidden="true"></span><span class="lb">Ready</span></div>
             </div>
-            <p style="font-size:var(--body-lg);margin-top:24px">Ready around
+            <p style="font-size:var(--body-lg);margin-top:24px" id="cf-status">Ready around
               <strong class="t-nums" style="font-family:var(--font-display)">6:42 PM</strong>.</p>
-            <p style="color:var(--ink-muted);margin-top:8px">Give your order number at the counter. Receipt sent by email.</p>
+            <p style="color:var(--ink-muted);margin-top:8px" id="cf-counter">Give your order number at the counter. Receipt sent by email.</p>
+
+            <!-- One page, three tenses. The live page derives these from the order status; the
+                 mockup switches them by hand so all three can be seen without three screens. -->
+            <div class="dev-card" style="margin-top:28px;display:inline-flex;gap:8px;align-items:center">
+              <span class="eyebrow" style="margin:0">Order state</span>
+              <button type="button" class="btn" onclick="cfState('preparing')">Preparing</button>
+              <button type="button" class="btn" onclick="cfState('ready')">Ready</button>
+              <button type="button" class="btn" onclick="cfState('picked')">Picked up</button>
+            </div>
           </div>
         </div>
 
@@ -4786,7 +4795,7 @@ select[multiple] {
             <div class="adm-toolbar">
               <button type="button" class="adm-btn adm-btn-danger" onclick="openRefund()">Full refund $37.03</button>
               <button type="button" class="adm-btn adm-btn-warn">Partial refund</button>
-              <button type="button" class="adm-btn">Reprint ticket</button>
+              <button type="button" class="adm-btn">Reprint receipt</button>
             </div>
             <h2>Lines</h2>
             <div class="adm-table-wrap">
@@ -5363,7 +5372,25 @@ select[multiple] {
     <li><strong>6. Storefront dark scheme.</strong> Shipped, opt-in, light by default, behind the labelled header toggle. Admin stays light; the KDS scope shares no token with it.</li>
 
     <h2>Latest round — a re-numbering bug, and the back office</h2>
-    <li><strong>An order could be re-numbered after the kitchen finished it.</strong> The capture
+    <li><b>Two slips became one, and the receipt email started arriving.</b> Every order queued a
+      kitchen ticket <i>and</i> a counter receipt. Both went to the same physical printer &mdash;
+      <code>kitchenSerial</code> and <code>counterSerial</code> both fall back to the one configured
+      serial &mdash; so each order produced two pieces of paper that staff paired up by hand. They are
+      now a single receipt carrying the kitchen&rsquo;s identity block and items plus the money and the
+      card that paid it. It keeps the <code>KITCHEN_TICKET</code> target because acknowledging that
+      target is what moves an order PAID &rarr; PRINTED. Separately, receipt email was never
+      arriving: the pipeline was built and the job was being queued, but
+      <code>EMAIL_FROM_ADDRESS</code> was a gmail.com address and Resend only sends from a domain
+      you have verified, so every send came back 403.</li>
+    <li><b>A collected order still said &ldquo;We&rsquo;re on it&rdquo;.</b> The status page branched on a
+      status called <code>COMPLETED</code> &mdash; a value the enum does not contain and the kitchen
+      can never set. The real one is <code>PICKED_UP</code>, so a collected order fell through
+      <code>stepIndex</code>&rsquo;s default arm to &minus;1 and blanked every point on the timeline: the
+      customer watched their finished order revert to three empty circles. The page now speaks in
+      three tenses &mdash; preparing, ready, picked up &mdash; with the last timeline point named for
+      where the order actually got to, and <code>pickedUpAt</code> carried through the public
+      contract so the thank-you can name the time.</li>
+      <li><strong>An order could be re-numbered after the kitchen finished it.</strong> The capture
       path short-circuited only when <code>status === PAID</code>, so once the kitchen moved an
       order on, a redelivered Square <code>payment.updated</code> webhook fell through the guard,
       allocated a SECOND order number and reset the order to PAID &mdash; a customer watching the
@@ -5538,6 +5565,50 @@ function pickTip(el){
 }
 
 /* ---- admin ---- */
+/* Confirmation hero, in each of the three tenses the real page renders. The live page picks the
+   branch from the order status (PICKED_UP fills every timeline point and swaps the last label). */
+function cfState(which){
+  var eyebrow = document.getElementById('cf-eyebrow');
+  var headline = document.getElementById('cf-headline');
+  var status = document.getElementById('cf-status');
+  var counter = document.getElementById('cf-counter');
+  var steps = document.querySelectorAll('#cf-timeline .tstep');
+  var copy = {
+    preparing: {
+      eyebrow: 'Order placed · paid',
+      headline: "We're on it",
+      status: 'Ready around <strong class="t-nums" style="font-family:var(--font-display)">6:42 PM</strong>.',
+      counter: 'Give your order number at the counter. Receipt sent by email.',
+      cls: ['done', 'now', ''],
+      last: 'Ready'
+    },
+    ready: {
+      eyebrow: 'Order ready · paid',
+      headline: 'Come and get it',
+      status: '<strong style="font-family:var(--font-display)">Your order is ready for pickup.</strong>',
+      counter: 'Give your order number at the counter. Receipt sent by email.',
+      cls: ['done', 'done', 'now'],
+      last: 'Ready'
+    },
+    picked: {
+      eyebrow: 'Order complete · picked up',
+      headline: 'Thanks — enjoy',
+      status: 'Picked up at <strong class="t-nums" style="font-family:var(--font-display)">6:58 PM</strong>. Thanks for eating with us.',
+      counter: 'Receipt sent by email.',
+      cls: ['done', 'done', 'done'],
+      last: 'Picked up'
+    }
+  }[which];
+  eyebrow.innerHTML = copy.eyebrow;
+  headline.innerHTML = copy.headline;
+  status.innerHTML = copy.status;
+  counter.innerHTML = copy.counter;
+  for (var i = 0; i < steps.length; i += 1){
+    steps[i].className = 'tstep' + (copy.cls[i] ? ' ' + copy.cls[i] : '');
+  }
+  steps[steps.length - 1].querySelector('.lb').textContent = copy.last;
+}
+
 function toggleSaveBar(){
   var host = document.getElementById('adm-savebar-host');
   if (host.firstChild) { host.innerHTML = ''; return; }

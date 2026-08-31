@@ -14,7 +14,7 @@ export type {
 export { TICKET_COLUMNS } from "./ticket-model";
 
 export { foldToPrintableAscii, escapeXml, preparePrintText } from "./encoding";
-export { buildKitchenTicket, buildCounterReceipt, renderPlainText } from "./layout";
+export { buildOrderReceipt, renderPlainText } from "./layout";
 export { renderEposPrintXml, withReprintBanner, documentHasCut } from "./epos-xml";
 export {
   wrapPrintRequest,

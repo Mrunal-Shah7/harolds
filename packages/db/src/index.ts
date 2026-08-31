@@ -94,7 +94,7 @@ export {
   reportPrintQueue,
   isLegalPrintTransition,
   printRetryBackoffMs,
-  renderPayloadsForOrder,
+  renderReceiptPayload,
   toTicketOrderInput,
   IllegalPrintTransitionError,
 } from "./print-jobs";

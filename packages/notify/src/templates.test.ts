@@ -23,6 +23,9 @@ const RICH: ReceiptEmailInput = {
   estimatedReadyAt: new Date("2026-08-15T22:20:00.000Z"),
   timeZone: "America/Chicago",
   customerNote: "Extra mild sauce on the side please, and knock because the dog barks.",
+  customerName: "Jamal W.",
+  cardLast4: "1111",
+  paidAt: new Date("2026-08-15T22:00:00.000Z"),
   lines: [
     {
       quantity: 2,
@@ -77,6 +80,22 @@ describe("SMS copy", () => {
 });
 
 describe("email receipt", () => {
+  it("names the customer, the paid time and the card, matching the printed slip", () => {
+    const text = renderReceiptText(RICH);
+    assert.match(text, /Ordered by: Jamal W\./);
+    assert.match(text, /Card {6}\*\*\*\*1111/);
+    assert.match(text, /Paid: /);
+    const html = renderReceiptHtml(RICH);
+    assert.match(html, /Ordered by Jamal W\./);
+    assert.match(html, /Card \*\*\*\*1111/);
+  });
+
+  it("omits the card line entirely when Square gave no last four", () => {
+    const text = renderReceiptText({ ...RICH, cardLast4: null });
+    assert.doesNotMatch(text, /Card/);
+    assert.doesNotMatch(renderReceiptHtml({ ...RICH, cardLast4: null }), /Card /);
+  });
+
   it("plain text and HTML carry stored cents exactly and stay legible with many lines", () => {
     const text = renderReceiptText(RICH);
     const html = renderReceiptHtml(RICH);

@@ -14,7 +14,10 @@ export type TicketLine = {
   role?: TicketRole;
 };
 
-export type TicketKind = "kitchen" | "counter";
+// One order, one slip. The kitchen ticket and the counter receipt used to be separate
+// documents printed back-to-back on the same machine; they are now a single receipt that
+// carries both the cook-from detail and the money.
+export type TicketKind = "receipt";
 
 /**
  * Protocol-free ticket. Renderers (plain text, ePOS-Print XML) consume this and nothing else.
