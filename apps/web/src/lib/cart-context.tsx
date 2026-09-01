@@ -18,6 +18,16 @@ export type CartLine = CartLineRequest & {
   key: string;
   item: MenuItemSummary;
   optionLabels: string[];
+  /**
+   * Base price plus the selected option deltas, computed when the line was added.
+   *
+   * This is a DISPLAY figure and never leaves the browser: `toCartRequest` omits it, so the
+   * "client never sends money fields" rule is intact. It exists so the cart bar can show a
+   * running item total the instant something is added, which a server quote cannot do without a
+   * round trip. It is the estimate half of an estimate-then-reconcile pair: whenever a real
+   * quote lands, the quote's figure replaces this one.
+   */
+  unitPriceCents: number;
 };
 
 const STORAGE_KEY = "harolds.cart.v1";
@@ -36,7 +46,9 @@ function newSessionNonce(): string {
 }
 
 type StoredCart = {
-  lines: Array<CartLineRequest & { item: MenuItemSummary; optionLabels: string[] }>;
+  lines: Array<
+    CartLineRequest & { item: MenuItemSummary; optionLabels: string[]; unitPriceCents?: number }
+  >;
   tip?: TipRequest;
   /** SPRINT-16: minted once per shopping session; see lib/order-key.ts. */
   sessionNonce?: string;
@@ -46,7 +58,9 @@ function lineKey(itemId: string, selectedOptionIds: string[], customerNote: stri
   return `${itemId}::${[...selectedOptionIds].sort().join(",")}::${customerNote ?? ""}`;
 }
 
-function omitKey(line: CartLine): CartLineRequest & { item: MenuItemSummary; optionLabels: string[] } {
+function omitKey(
+  line: CartLine,
+): CartLineRequest & { item: MenuItemSummary; optionLabels: string[]; unitPriceCents: number } {
   return {
     itemId: line.itemId,
     quantity: line.quantity,
@@ -54,6 +68,7 @@ function omitKey(line: CartLine): CartLineRequest & { item: MenuItemSummary; opt
     customerNote: line.customerNote,
     item: line.item,
     optionLabels: line.optionLabels,
+    unitPriceCents: line.unitPriceCents,
   };
 }
 
@@ -67,9 +82,32 @@ type CartContextValue = {
     selectedOptionIds: string[];
     optionLabels: string[];
     customerNote?: string | null;
+    /** Base + selected option deltas. Display only; see CartLine.unitPriceCents. */
+    unitPriceCents?: number;
   }) => void;
   updateQuantity: (key: string, quantity: number) => void;
   removeLine: (key: string) => void;
+  /**
+   * Estimated cost of the items alone — no tax, no tip. Summed in the browser so the cart bar
+   * can react immediately; superseded by the server quote wherever one is available.
+   */
+  subtotalCents: number;
+  /** How many of one item the cart holds, summed over every line of it. */
+  quantityForItem: (itemId: string) => number;
+  /**
+   * Menu-card stepper. "+" repeats the most recently added configuration of the item rather than
+   * guessing a new one, and "-" takes one off that same line, so the pair is symmetric and the
+   * customer's last choice is the one that repeats.
+   */
+  incrementItem: (itemId: string) => void;
+  decrementItem: (itemId: string) => void;
+  /**
+   * True when one more of this item would exceed the admin's per-order ceiling for it.
+   * The server enforces the same limit; this only stops the UI from offering the impossible.
+   */
+  isAtItemLimit: (item: MenuItemSummary) => boolean;
+  /** Edit a line's kitchen note in place, merging if that makes it identical to another line. */
+  updateLineNote: (key: string, note: string | null) => void;
   setTip: (tip: TipRequest | undefined) => void;
   /** SPRINT-14 (design.md §7.7, Phase 6.3): removal is cheap to undo and expensive to
    *  interrupt, so it is never a confirmation dialog. Client state only — no request. */
@@ -110,6 +148,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           parsed.lines.map((l) => ({
             ...l,
             key: lineKey(l.itemId, l.selectedOptionIds, l.customerNote),
+            // Carts stored before this field existed fall back to the base price. The figure is
+            // an estimate that the next quote corrects, so an old cart is never wrong for long.
+            unitPriceCents: l.unitPriceCents ?? l.item.basePriceCents,
           })),
         );
         setTipState(parsed.tip);
@@ -151,6 +192,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           customerNote: input.customerNote ?? null,
           item: input.item,
           optionLabels: input.optionLabels,
+          unitPriceCents: input.unitPriceCents ?? input.item.basePriceCents,
         },
       ];
     });
@@ -174,6 +216,88 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const removed = index >= 0 ? prev[index] : undefined;
       if (removed) setLastRemoved({ line: removed, index });
       return prev.filter((l) => l.key !== key);
+    });
+  }, []);
+
+  /**
+   * Change one line's kitchen note.
+   *
+   * The note is PART of a line's identity (`lineKey`), because two of the same item with
+   * different instructions are two different things to the kitchen. That means editing a note
+   * re-keys the line, and the new key can collide with a line that already exists — add wings
+   * with "extra crispy", add plain wings, then type "extra crispy" on the plain one. Merging the
+   * quantities is the only answer that does not silently drop one of them.
+   */
+  const updateLineNote = useCallback((key: string, note: string | null) => {
+    setLines((prev) => {
+      const index = prev.findIndex((l) => l.key === key);
+      if (index < 0) return prev;
+      const line = prev[index]!;
+      const cleaned = note && note.trim().length > 0 ? note.trim() : null;
+      if ((line.customerNote ?? null) === cleaned) return prev;
+      const nextKey = lineKey(line.itemId, line.selectedOptionIds, cleaned);
+      const twinIndex = prev.findIndex((l, i) => i !== index && l.key === nextKey);
+      if (twinIndex >= 0) {
+        const twin = prev[twinIndex]!;
+        return prev
+          .map((l, i) =>
+            i === twinIndex ? { ...twin, quantity: twin.quantity + line.quantity } : l,
+          )
+          .filter((_, i) => i !== index);
+      }
+      return prev.map((l, i) =>
+        i === index ? { ...l, key: nextKey, customerNote: cleaned } : l,
+      );
+    });
+  }, []);
+
+  const quantityForItem = useCallback(
+    (itemId: string) =>
+      lines.reduce((sum, l) => (l.itemId === itemId ? sum + l.quantity : sum), 0),
+    [lines],
+  );
+
+  const isAtItemLimit = useCallback(
+    (item: MenuItemSummary) => {
+      const ceiling = item.maxQuantityPerOrder;
+      if (typeof ceiling !== "number" || ceiling <= 0) return false;
+      return lines.reduce((sum, l) => (l.itemId === item.id ? sum + l.quantity : sum), 0) >= ceiling;
+    },
+    [lines],
+  );
+
+  /** The line the stepper acts on: the most recently added configuration of this item. */
+  const newestIndexOf = (all: CartLine[], itemId: string): number => {
+    for (let i = all.length - 1; i >= 0; i -= 1) {
+      if (all[i]!.itemId === itemId) return i;
+    }
+    return -1;
+  };
+
+  const incrementItem = useCallback((itemId: string) => {
+    setLines((prev) => {
+      const index = newestIndexOf(prev, itemId);
+      if (index < 0) return prev;
+      const line = prev[index]!;
+      const ceiling = line.item.maxQuantityPerOrder;
+      if (typeof ceiling === "number" && ceiling > 0) {
+        const held = prev.reduce((sum, l) => (l.itemId === itemId ? sum + l.quantity : sum), 0);
+        if (held >= ceiling) return prev;
+      }
+      return prev.map((l, i) => (i === index ? { ...l, quantity: l.quantity + 1 } : l));
+    });
+  }, []);
+
+  const decrementItem = useCallback((itemId: string) => {
+    setLines((prev) => {
+      const index = newestIndexOf(prev, itemId);
+      if (index < 0) return prev;
+      const line = prev[index]!;
+      if (line.quantity > 1) {
+        return prev.map((l, i) => (i === index ? { ...l, quantity: l.quantity - 1 } : l));
+      }
+      setLastRemoved({ line, index });
+      return prev.filter((_, i) => i !== index);
     });
   }, []);
 
@@ -231,6 +355,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const totalItems = useMemo(() => lines.reduce((sum, l) => sum + l.quantity, 0), [lines]);
 
+  // Items only: no tax, no tip. See CartLine.unitPriceCents for why a client figure exists here.
+  const subtotalCents = useMemo(
+    () => lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0),
+    [lines],
+  );
+
   const value = useMemo<CartContextValue>(
     () => ({
       lines,
@@ -239,6 +369,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addLine,
       updateQuantity,
       removeLine,
+      subtotalCents,
+      quantityForItem,
+      incrementItem,
+      decrementItem,
+      isAtItemLimit,
+      updateLineNote,
       setTip,
       clear,
       toCartRequest,
@@ -255,6 +391,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addLine,
       updateQuantity,
       removeLine,
+      subtotalCents,
+      quantityForItem,
+      incrementItem,
+      decrementItem,
+      isAtItemLimit,
+      updateLineNote,
       setTip,
       clear,
       toCartRequest,

@@ -36,6 +36,7 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
     [menu],
   );
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     setActiveId((current) => current ?? categories[0]?.id ?? null);
@@ -71,6 +72,33 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
     [scrollOffset],
   );
 
+  /**
+   * Live filter over the menu already in memory. Every category's items are on the client from
+   * the initial payload, so this is a substring match and NOT a request per keystroke -- results
+   * are on the same frame as the typing, and the search costs the store nothing.
+   *
+   * Categories that end up empty are dropped rather than shown as empty headings.
+   */
+  const visibleCategories = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return categories;
+    return categories
+      .map((category) => ({
+        ...category,
+        items: category.items.filter((item) => {
+          const haystack = `${item.name} ${item.description ?? ""}`.toLowerCase();
+          return haystack.includes(needle);
+        }),
+      }))
+      .filter((category) => category.items.length > 0);
+  }, [categories, query]);
+
+  const matchCount = useMemo(
+    () => visibleCategories.reduce((sum, c) => sum + c.items.length, 0),
+    [visibleCategories],
+  );
+  const searching = query.trim().length > 0;
+
   const quickAdd = (item: MenuItemSummary) => {
     addLine({ item, quantity: 1, selectedOptionIds: [], optionLabels: [], customerNote: null });
   };
@@ -78,7 +106,7 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
   if (!menu || !status) {
     return (
       <div className="sf-page">
-        <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} />
+        <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} compactStatus />
         <main>
           <ErrorState
             message="We couldn't load the menu. Try again."
@@ -91,7 +119,7 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
 
   return (
     <div className="sf-page">
-      <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} />
+      <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} compactStatus />
       <AnnouncementStrip announcement={status.announcement} />
 
       <main>
@@ -108,13 +136,45 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
               Every dinner comes with fries under, sauce over, and white bread on top — unless you
               say otherwise.
             </p>
+
+            <div className="menu-search">
+              <label htmlFor="menu-search" className="sr-only">
+                Search the menu
+              </label>
+              <input
+                id="menu-search"
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search the menu"
+                autoComplete="off"
+              />
+              {searching ? (
+                <button
+                  type="button"
+                  className="menu-search-clear"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                >
+                  &times;
+                </button>
+              ) : null}
+            </div>
+            {/* Announced politely so a screen reader hears the count settle, not every keystroke. */}
+            <p className="menu-search-count" role="status" aria-live="polite">
+              {searching
+                ? `${matchCount} ${matchCount === 1 ? "item" : "items"} matching “${query.trim()}”`
+                : ""}
+            </p>
           </div>
         </div>
 
         {categories.length === 0 ? (
           <EmptyState message="The menu isn't available right now. Please check back soon." />
+        ) : visibleCategories.length === 0 ? (
+          <EmptyState message={`Nothing on the menu matches “${query.trim()}”.`} />
         ) : (
-          categories.map((category, index) => (
+          visibleCategories.map((category, index) => (
             <section
               key={category.id}
               id={`cat-${category.id}`}
@@ -122,7 +182,7 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
                 sectionRefs.current[category.id] = el;
               }}
               className="menu-section"
-              style={index === categories.length - 1 ? { paddingBottom: 48 } : undefined}
+              style={index === visibleCategories.length - 1 ? { paddingBottom: 48 } : undefined}
             >
               <div className="container">
                 <h2>{category.name}</h2>
@@ -133,7 +193,7 @@ export function MenuBrowser({ menu, status }: { menu: FullMenu | null; status: S
                     <ItemCard
                       key={item.id}
                       item={item}
-                      priority={i === 0 && category.id === categories[0]?.id}
+                      priority={i === 0 && category.id === visibleCategories[0]?.id}
                       onOpen={setSelected}
                       onQuickAdd={hasRequiredGroups(item) ? undefined : quickAdd}
                     />

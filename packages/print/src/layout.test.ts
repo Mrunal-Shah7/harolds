@@ -224,6 +224,33 @@ describe("order receipt layout", () => {
   });
 });
 
+describe("whole-order kitchen instruction", () => {
+  it("prints above the items, ruled off, so the cook reads it before starting", () => {
+    const preview = renderPlainText(
+      buildOrderReceipt(sampleOrder({ orderNote: "Allergy: no shellfish anywhere near this" })),
+    );
+    assert.match(preview, /ORDER NOTE/);
+    assert.match(preview, /Allergy: no shellfish anywhere near this/);
+    // Above the first item, not appended at the foot.
+    assert.ok(preview.indexOf("ORDER NOTE") < preview.indexOf("1/2 CHICKEN"));
+  });
+
+  it("prints nothing at all when the customer left it blank", () => {
+    assert.doesNotMatch(renderPlainText(buildOrderReceipt(sampleOrder({ orderNote: null }))), /ORDER NOTE/);
+    assert.doesNotMatch(renderPlainText(buildOrderReceipt(sampleOrder({ orderNote: "   " }))), /ORDER NOTE/);
+    assert.doesNotMatch(renderPlainText(buildOrderReceipt(sampleOrder())), /ORDER NOTE/);
+  });
+
+  it("wraps a long instruction instead of running off the roll", () => {
+    const long = "Please make sure everything is extra crispy and put the sauce on the side " +
+      "in a separate container because the last two orders arrived completely soaked through";
+    const preview = renderPlainText(buildOrderReceipt(sampleOrder({ orderNote: long })));
+    for (const row of preview.split(String.fromCharCode(10))) {
+      assert.ok(row.length <= 42, `row exceeds ticket width: ${row.length}`);
+    }
+  });
+});
+
 describe("order receipt money block", () => {
   it("prints stored money figures exactly and optional card last four", () => {
     const preview = renderPlainText(buildOrderReceipt(sampleOrder()));

@@ -16,7 +16,7 @@ import {
   getStoreStatus,
   type OrderWithLines,
 } from "@harolds/db";
-import { parseCartRequest, quoteCart, toMenuCatalog } from "@harolds/pricing";
+import { parseCartRequest, quoteCart, sanitizeKitchenNote, toMenuCatalog } from "@harolds/pricing";
 import { createPayment } from "@harolds/square";
 import {
   ApiErrorCode,
@@ -272,10 +272,9 @@ function parseCreateOrderBody(body: unknown):
     },
     paymentToken: raw.paymentToken,
     idempotencyKey: raw.idempotencyKey.trim(),
-    customerNote:
-      typeof raw.customerNote === "string" || raw.customerNote === null
-        ? (raw.customerNote as string | null)
-        : null,
+    // Free text that ends up on a thermal printer. `sanitizeKitchenNote` caps the length and
+    // strips control bytes, which ESC/POS would otherwise read as printer commands.
+    customerNote: sanitizeKitchenNote(raw.customerNote),
   };
 
   return { ok: true, request, fingerprint: cartFingerprint(request.cart) };

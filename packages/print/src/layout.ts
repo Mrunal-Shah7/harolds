@@ -125,6 +125,25 @@ function sharedHeader(order: TicketOrderInput, emphasis: string): TicketLine[] {
   ];
 }
 
+/**
+ * The whole-order instruction, printed once above the items so the cook sees it before starting.
+ * Emphasised and ruled off, because an order note that reads like an item is an order note that
+ * gets missed. Wrapped to the ticket width; absent when the customer left it blank.
+ */
+function orderNoteBlock(order: TicketOrderInput): TicketLine[] {
+  const note = order.orderNote?.trim();
+  if (!note) return [];
+  const body = foldToPrintableAscii(note);
+  const out: TicketLine[] = [
+    { text: "ORDER NOTE", align: "left", weight: "emphasis", role: "note" },
+  ];
+  for (const w of wrap(body, TICKET_COLUMNS - 2, 2)) {
+    out.push({ text: `  ${w.trimStart()}`, align: "left", weight: "emphasis", role: "note" });
+  }
+  out.push(rule());
+  return out;
+}
+
 function sharedFooter(order: TicketOrderInput): TicketLine[] {
   return [
     rule(),
@@ -156,6 +175,7 @@ export function buildOrderReceipt(order: TicketOrderInput): TicketModel {
   }
   const lines: TicketLine[] = [
     ...sharedHeader(order, "ONLINE PICKUP"),
+    ...orderNoteBlock(order),
     ...order.lines.flatMap(itemBlock),
     ...money,
     ...sharedFooter(order),

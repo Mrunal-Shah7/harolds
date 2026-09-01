@@ -766,6 +766,10 @@ function ItemView({ id }: { id: string }) {
                 isSoldOut: form.get("isSoldOut") === "on",
                 isFeatured: form.get("isFeatured") === "on",
                 isMostOrdered: form.get("isMostOrdered") === "on",
+                // Blank means no limit, which is a real value here rather than a missing one.
+                maxQuantityPerOrder: String(form.get("maxQuantityPerOrder") ?? "").trim() === ""
+                  ? null
+                  : Number(form.get("maxQuantityPerOrder")),
               }),
             });
             setFlash({ kind: "ok", text: "Saved." });
@@ -786,6 +790,24 @@ function ItemView({ id }: { id: string }) {
           </select>
         </label>
         <label className="adm-field">Sort<input name="sortOrder" type="number" defaultValue={Number(item.sortOrder)} /></label>
+        <label className="adm-field">
+          Max per order
+          <input
+            name="maxQuantityPerOrder"
+            type="number"
+            min={1}
+            max={50}
+            placeholder="No limit"
+            defaultValue={
+              item.maxQuantityPerOrder === null || item.maxQuantityPerOrder === undefined
+                ? ""
+                : Number(item.maxQuantityPerOrder)
+            }
+          />
+          <span className="adm-field-help">
+            Most of this item one order may contain. Leave blank for no limit.
+          </span>
+        </label>
         <label className="adm-field adm-form-wide">Description<textarea name="description" defaultValue={String(item.description ?? "")} /></label>
         <div className="adm-form-wide">
           <p className="adm-muted">Photograph</p>

@@ -107,6 +107,9 @@ export function ItemModal({ item, onClose }: { item: MenuItemSummary | null; onC
       selectedOptionIds,
       optionLabels,
       customerNote: note.trim() ? note.trim() : null,
+      // The modal already knows the option deltas, so the cart gets an accurate display price
+      // rather than falling back to the bare base price.
+      unitPriceCents,
     });
     onClose();
   };

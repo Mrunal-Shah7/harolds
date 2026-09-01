@@ -83,6 +83,7 @@ export function toTicketOrderInput(
     customerLastName: order.customerLastName,
     paymentStatus: order.paymentStatus,
     cardLast4: order.cardLast4,
+    orderNote: order.customerNote,
     subtotalCents: order.subtotalCents,
     taxCents: order.taxCents,
     tipCents: order.tipCents,

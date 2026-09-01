@@ -1,4 +1,5 @@
 // SPRINT-3: structural cart parsing — identifiers/quantities only; reject client-supplied prices.
+import { sanitizeKitchenNote } from "./notes";
 import {
   CART_LIMITS,
   CartValidationReasonCode,
@@ -299,7 +300,9 @@ function parseLine(
         ),
       );
     }
-    customerNote = note as string | null;
+    // Over-length is reported above so the customer is told; what survives is also stripped of
+    // control bytes, because a line note prints on the same ESC/POS ticket as the order note.
+    customerNote = sanitizeKitchenNote(note);
   }
 
   const line: CartLineRequest = {

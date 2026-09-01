@@ -30,6 +30,8 @@ import {
 } from "@/lib/retry-lockout";
 import { formatCents } from "@/lib/money";
 import { StorefrontHeader } from "@/components/storefront/header";
+import { CartSheet } from "@/components/storefront/cart-sheet";
+import { hasAnyError, validateCheckout, validateCustomTip } from "@/lib/checkout-validation";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { SquarePaymentForm, requestTokenize } from "@/components/storefront/square-payment-form";
 
@@ -53,6 +55,23 @@ export default function CheckoutPage() {
   const smsConsent = false;
 
   const [customTip, setCustomTip] = useState("");
+  /** Whole-order instruction for the kitchen. Sent as CreateOrderRequest.customerNote. */
+  const [orderNote, setOrderNote] = useState("");
+  /** "Back to cart" reopens the cart as the sheet it is everywhere else, not a separate page. */
+  const [cartOpen, setCartOpen] = useState(false);
+  /**
+   * A field is only marked wrong once the customer has left it, so the form does not shout at
+   * someone halfway through typing their own name. Submitting touches everything at once.
+   */
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  /**
+   * Decoy field, positioned off-screen and hidden from assistive tech. A person never sees it and
+   * a scripted submitter fills it, so a non-empty value here means the submission was not typed
+   * by a human. Paired with the minimum-elapsed check below to make card testing against this
+   * Square account tedious rather than free.
+   */
+  const [decoy, setDecoy] = useState("");
+  const mountedAt = useRef<number>(Date.now());
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<{ message: string; retryable: boolean } | null>(null);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
@@ -117,9 +136,16 @@ export default function CheckoutPage() {
     setSubmitError({ message, retryable: true });
   }, []);
 
-  // Unchanged. Same fields, same required set, same expression.
-  const canSubmitForm =
-    firstName.trim() && lastName.trim() && phone.trim() && email.trim() && quote?.orderable;
+  // Every field is checked on every render so the Pay button and the messages agree about
+  // whether the form is submittable. The server re-checks all of it; see checkout-validation.ts.
+  const fieldErrors = validateCheckout({ firstName, lastName, phone, email, customTip, orderNote });
+  const formValid = !hasAnyError(fieldErrors);
+  const canSubmitForm = formValid && quote?.orderable;
+
+  /** Show a field's error only once it has been left, or once submission was attempted. */
+  const errorFor = (name: keyof typeof fieldErrors) =>
+    touched[name] ? fieldErrors[name] : null;
+  const markTouched = (name: string) => setTouched((prev) => ({ ...prev, [name]: true }));
 
   const submitOrder = async (token: string) => {
     setSubmitting(true);
@@ -133,6 +159,7 @@ export default function CheckoutPage() {
         email: email.trim(),
         smsConsent,
       };
+      const note = orderNote.trim().length > 0 ? orderNote.trim() : null;
       // Derived, not minted. The same cart + contact + session nonce always derives the same
       // key, so a reload after an ambiguous outcome replays the existing order instead of
       // creating a second chargeable one. Any change to the cart derives a different key.
@@ -142,6 +169,7 @@ export default function CheckoutPage() {
         customer,
         paymentToken: token,
         idempotencyKey,
+        customerNote: note,
       });
       // The deadline belongs to THIS order. Without this, a customer who hit an ambiguous
       // outcome, waited, paid, then started a new cart in the same tab would land on checkout
@@ -188,8 +216,35 @@ export default function CheckoutPage() {
     }
   };
 
+  /**
+   * A real person needs a few seconds to fill this in. Anything faster is a script, and card
+   * testing is the thing worth slowing down here — it costs the store a fee per attempt.
+   */
+  const MIN_FILL_MS = 3000;
+
   const handlePayClick = () => {
+    // Attempting to pay marks every field touched, so an empty form explains itself rather than
+    // leaving a dead button with no reason given.
+    setTouched({
+      firstName: true,
+      lastName: true,
+      phone: true,
+      email: true,
+      customTip: true,
+      orderNote: true,
+    });
     if (!canSubmitForm) return;
+
+    // Both checks fail closed and say the same neutral thing: naming the trap teaches whoever
+    // tripped it how to avoid the trap.
+    if (decoy.trim().length > 0 || Date.now() - mountedAt.current < MIN_FILL_MS) {
+      setSubmitError({
+        message: "We couldn't process that. Please review your details and try again.",
+        retryable: true,
+      });
+      return;
+    }
+
     setSubmitError(null);
     setSubmitting(true);
     requestTokenize();
@@ -201,7 +256,7 @@ export default function CheckoutPage() {
   if (lines.length === 0) {
     return (
       <div className="sf-page">
-        <StorefrontHeader status={status} />
+        <StorefrontHeader status={status} showCart={false} />
         <main>
           <div className="band b-paper textured">
             <div className="container">
@@ -221,11 +276,30 @@ export default function CheckoutPage() {
 
   return (
     <div className="sf-page">
-      <StorefrontHeader status={status} />
+      <StorefrontHeader status={status} showCart={false} />
 
       <main>
         <div className="band b-paper textured" style={{ paddingTop: 40 }}>
           <div className="container">
+            {/* Leaving checkout should not depend on the browser's back button, which on a
+                phone is often a gesture people do not know they have. Both ways back are one
+                tap: the cart as the sheet it already is, or the menu. */}
+            <div className="co-back">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setCartOpen(true)}
+              >
+                &larr; Back to cart
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => router.push("/menu")}
+              >
+                Keep shopping
+              </button>
+            </div>
             <h2 className="poster" style={{ marginBottom: 32 }}>
               Checkout
             </h2>
@@ -264,8 +338,16 @@ export default function CheckoutPage() {
                       id="first-name"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
+                      onBlur={() => markTouched("firstName")}
+                      aria-invalid={errorFor("firstName") ? true : undefined}
+                      aria-describedby={errorFor("firstName") ? "first-name-err" : undefined}
                       autoComplete="given-name"
                     />
+                    {errorFor("firstName") ? (
+                      <p className="field-err" id="first-name-err" role="alert">
+                        {errorFor("firstName")}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="field">
@@ -274,8 +356,16 @@ export default function CheckoutPage() {
                       id="last-name"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
+                      onBlur={() => markTouched("lastName")}
+                      aria-invalid={errorFor("lastName") ? true : undefined}
+                      aria-describedby={errorFor("lastName") ? "last-name-err" : undefined}
                       autoComplete="family-name"
                     />
+                    {errorFor("lastName") ? (
+                      <p className="field-err" id="last-name-err" role="alert">
+                        {errorFor("lastName")}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="field">
@@ -284,27 +374,83 @@ export default function CheckoutPage() {
                       id="phone"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
+                      onBlur={() => markTouched("phone")}
+                      aria-invalid={errorFor("phone") ? true : undefined}
+                      aria-describedby={errorFor("phone") ? "phone-err" : undefined}
                       type="tel"
                       inputMode="tel"
                       autoComplete="tel"
                       placeholder="(708) 555-1234"
                     />
                     <p className="help">In case we need to reach you about this order.</p>
+                    {errorFor("phone") ? (
+                      <p className="field-err" id="phone-err" role="alert">
+                        {errorFor("phone")}
+                      </p>
+                    ) : null}
                   </div>
 
-                  <div className="field" style={{ marginBottom: 0 }}>
+                  <div className="field">
                     <label htmlFor="email">Email</label>
                     <input
                       id="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() => markTouched("email")}
+                      aria-invalid={errorFor("email") ? true : undefined}
+                      aria-describedby={errorFor("email") ? "email-err" : undefined}
                       type="email"
                       inputMode="email"
                       autoComplete="email"
                     />
                     <p className="help">Receipt only. No marketing, no account.</p>
+                    {errorFor("email") ? (
+                      <p className="field-err" id="email-err" role="alert">
+                        {errorFor("email")}
+                      </p>
+                    ) : null}
                   </div>
 
+                  {/* Decoy. Off-screen and hidden from assistive tech, so only a script fills
+                      it; see `decoy` in state. Never submitted anywhere. */}
+                  <div aria-hidden="true" className="decoy-field">
+                    <label htmlFor="company-website">Company website</label>
+                    <input
+                      id="company-website"
+                      name="company_website"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={decoy}
+                      onChange={(e) => setDecoy(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="co-card card" style={{ marginBottom: 24 }}>
+                  <h3>Anything the kitchen should know?</h3>
+                  <div className="field" style={{ marginBottom: 0 }}>
+                    <label htmlFor="order-note">Instructions for this order</label>
+                    <textarea
+                      id="order-note"
+                      className="note-field"
+                      rows={3}
+                      maxLength={200}
+                      value={orderNote}
+                      onChange={(e) => setOrderNote(e.target.value)}
+                      onBlur={() => markTouched("orderNote")}
+                      placeholder="Allergies, how you'd like it cooked, anything else."
+                      aria-describedby="order-note-help"
+                    />
+                    <p className="help" id="order-note-help">
+                      This prints on the kitchen ticket for the whole order. For one item, use the
+                      note on that item in your cart.
+                    </p>
+                    {errorFor("orderNote") ? (
+                      <p className="field-err" role="alert">
+                        {errorFor("orderNote")}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
 
                 {/* Presets are configuration, not code. "No tip" carries the same visual weight
@@ -356,10 +502,31 @@ export default function CheckoutPage() {
                           inputMode="decimal"
                           className="t-nums"
                           value={customTip}
-                          onChange={(e) => setCustomTip(e.target.value)}
-                          onBlur={() => setTip({ type: "amount", amountCents: toCents(customTip) })}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setCustomTip(next);
+                            // Commit as it is typed, not on blur: the summary re-quotes from the
+                            // tip, so waiting for blur is why the total appeared to ignore it.
+                            // An unparseable or out-of-range value is left uncommitted rather
+                            // than sent as a wrong number.
+                            if (validateCustomTip(next) === null) {
+                              setTip({ type: "amount", amountCents: toCents(next) });
+                            }
+                          }}
+                          onBlur={() => {
+                            markTouched("customTip");
+                            if (validateCustomTip(customTip) === null) {
+                              setTip({ type: "amount", amountCents: toCents(customTip) });
+                            }
+                          }}
+                          aria-invalid={errorFor("customTip") ? true : undefined}
                           placeholder="0.00"
                         />
+                        {errorFor("customTip") ? (
+                          <p className="field-err" role="alert">
+                            {errorFor("customTip")}
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -489,6 +656,8 @@ export default function CheckoutPage() {
           </div>
         </div>
       </main>
+
+      <CartSheet open={cartOpen} onClose={() => setCartOpen(false)} />
     </div>
   );
 }

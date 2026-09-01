@@ -79,6 +79,12 @@ export type MenuItemSummary = {
   isFeatured: boolean;
   isMostOrdered: boolean;
   sortOrder: number;
+  /**
+   * Most of this item one order may contain. Absent or null means no item-specific ceiling.
+   * The storefront stops its stepper here; `validateCart` enforces the same number server-side,
+   * because the stepper is only a courtesy to anyone using the UI.
+   */
+  maxQuantityPerOrder?: number | null;
 };
 
 export type MenuItemDetail = MenuItemSummary & {

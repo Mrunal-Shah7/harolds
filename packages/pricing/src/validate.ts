@@ -64,6 +64,16 @@ function findOptionOnItem(
 export function validateCart(cart: CartRequest, catalog: MenuCatalog): CartValidationReason[] {
   const reasons: CartValidationReason[] = [];
 
+  // Per-item ceilings are summed across the whole cart before the per-line pass. Counting per
+  // line would let the same item be split over several lines and walk straight past the limit,
+  // which is exactly what a client that ignores the UI would do.
+  const quantityByItem = new Map<string, number>();
+  for (const line of cart.lines) {
+    const quantity = typeof line.quantity === "number" ? line.quantity : 0;
+    quantityByItem.set(line.itemId, (quantityByItem.get(line.itemId) ?? 0) + quantity);
+  }
+  const limitReported = new Set<string>();
+
   cart.lines.forEach((line, lineIndex) => {
     const item = catalog.itemsById.get(line.itemId);
 
@@ -85,6 +95,22 @@ export function validateCart(cart: CartRequest, catalog: MenuCatalog): CartValid
           itemId: item.id,
         }),
       );
+    }
+
+    // One reason per item, not per line — the customer has one thing to fix.
+    const ceiling = item.maxQuantityPerOrder;
+    if (typeof ceiling === "number" && ceiling > 0 && !limitReported.has(item.id)) {
+      const wanted = quantityByItem.get(item.id) ?? 0;
+      if (wanted > ceiling) {
+        limitReported.add(item.id);
+        reasons.push(
+          makeReason(
+            CartValidationReasonCode.ITEM_QUANTITY_LIMIT,
+            `Limit ${ceiling} per order for this item`,
+            { lineIndex, itemId: item.id },
+          ),
+        );
+      }
     }
 
     const seenOptionIds = new Set<string>();

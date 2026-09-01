@@ -142,6 +142,9 @@ model MenuItem {
   mostOrderedSortOrder Int?
   /// True when workbook flag is PLACEHOLDER — invented price, needs admin correction.
   isUnverifiedPrice    Boolean  @default(false)
+  /// Most of this item one order may contain, summed across lines. Null = no item-specific
+  /// ceiling, in which case the structural CART_LIMITS still apply.
+  maxQuantityPerOrder  Int?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

@@ -52,6 +52,8 @@ export const CartValidationReasonCode = {
   // Modifier / item (Phase 4) — customer-fixable unless marked availability
   ITEM_NOT_FOUND: "ITEM_NOT_FOUND",
   ITEM_SOLD_OUT: "ITEM_SOLD_OUT",
+  /** More of one item than the admin allows in a single order (MenuItem.maxQuantityPerOrder). */
+  ITEM_QUANTITY_LIMIT: "ITEM_QUANTITY_LIMIT",
   OPTION_NOT_FOUND: "OPTION_NOT_FOUND",
   OPTION_INACTIVE: "OPTION_INACTIVE",
   OPTION_SOLD_OUT: "OPTION_SOLD_OUT",

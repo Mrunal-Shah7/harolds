@@ -37,6 +37,7 @@ export type DbMenuItem = {
   isFeatured: boolean;
   isMostOrdered: boolean;
   sortOrder: number;
+  maxQuantityPerOrder?: number | null;
 };
 
 export type DbCategory = {
@@ -88,6 +89,7 @@ export function mapMenuItemSummary(row: DbMenuItem): MenuItemSummary {
     name: row.name,
     description: row.description,
     basePriceCents: row.basePriceCents,
+    maxQuantityPerOrder: row.maxQuantityPerOrder ?? null,
     imageUrl: row.imageUrl,
     imageDerivatives,
     isSoldOut: row.isSoldOut,

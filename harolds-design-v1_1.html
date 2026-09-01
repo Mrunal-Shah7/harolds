@@ -127,10 +127,6 @@ html.embedded::-webkit-scrollbar{display:none}
 </style>
 
 <style>
-/* ============================================================================
-   STOREFRONT + SHARED PRIMITIVES + TOKENS
-   Lifted verbatim from apps/web/src/app/globals.css.
-   ============================================================================ */
 /* =============================================================================
    Design v1.1 — the single token declaration for every surface.
    Ported from harolds-design-v1_1.html: the token block, the shared primitives,
@@ -945,6 +941,10 @@ a.wordmark {
   background: var(--paper-sunk);
   border-radius: var(--r-pill);
   padding: 8px 14px;
+  /* The face the category tabs use (.mtab), so store state reads as part of the same voice
+     rather than as body copy that happens to sit in a pill. */
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--body-sm);
   color: var(--ink);
   border: none;
@@ -2291,12 +2291,414 @@ html[data-theme="dark"] .sf-root .sf-header {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* ---------- menu search, card stepper, cart-bar total (Sprint 17) ---------- */
+
+/* Live filter over the menu already in memory — see menu-browser.tsx. */
+.menu-search {
+  position: relative;
+  margin-top: 20px;
+  max-width: 420px;
+}
+.menu-search input {
+  width: 100%;
+  height: 48px;
+  padding: 0 40px 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--body);
+}
+.menu-search input::placeholder {
+  color: var(--ink-faint);
+}
+.menu-search input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+/* The type=search clear affordance is inconsistent across browsers, so the button is ours. */
+.menu-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+.menu-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.menu-search-clear:hover {
+  background: var(--paper-sunk);
+  color: var(--ink);
+}
+.menu-search-count {
+  margin-top: 8px;
+  min-height: 1.25em;
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+}
+
+/* Replaces "Add +" once the item is in the cart. */
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  padding: 2px;
+}
+.qty-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--brand-text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--dur-fast, 120ms) ease, transform var(--dur-fast, 120ms) ease;
+}
+.qty-btn:hover:not(:disabled) {
+  background: var(--brand-tint);
+}
+.qty-btn:active:not(:disabled) {
+  transform: scale(0.88);
+}
+.qty-btn:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.qty-count {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The cart bar's two-line left column: count above the running item total. */
+.cart-bar-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.cart-bar-sub {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* ---------- cart sheet: line notes, prices, suggestions step ---------- */
+
+.cline-main {
+  min-width: 0;
+}
+.cline-price {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The instruction is a link-weight affordance until it is used, so an unused one is quiet. */
+.cline-note-btn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.cline-note-btn.add {
+  color: var(--brand-text);
+  font-weight: 600;
+}
+.cline-note-btn:hover {
+  text-decoration: underline;
+}
+.cline-note-edit {
+  font-weight: 600;
+  color: var(--brand-text);
+}
+.cline-note-edit-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.cline-note-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--body-sm);
+}
+.cline-note-input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+/* Items-only estimate in the sheet foot. Labelled "Items", never "Total". */
+.cart-total-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.cart-total-row .amt {
+  font-weight: 800;
+  font-size: var(--body-lg);
+}
+
+.sug-lead {
+  color: var(--ink-muted);
+  margin-bottom: 16px;
+}
+.sug-loading {
+  color: var(--ink-muted);
+  padding: 12px 0;
+}
+.sug-grid {
+  display: grid;
+  gap: 10px;
+}
+.sug-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.sug-copy {
+  flex: 1;
+  min-width: 0;
+}
+.sug-copy .nm {
+  font-weight: 600;
+}
+.sug-copy .pr {
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+}
+.sug-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ---------- checkout: inline errors, back row, decoy ---------- */
+
+.field-err {
+  margin-top: 6px;
+  font-size: var(--body-sm);
+  font-weight: 600;
+  color: var(--danger);
+}
+.field input[aria-invalid="true"],
+.field textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.co-back {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* Off-screen rather than display:none, because some automation skips hidden inputs and the
+   point of the field is that automation fills it. Hidden from assistive tech at the wrapper. */
+.decoy-field {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* ---------- motion ---------- */
+/*
+ * Movement is used to explain a change, never to decorate one: a sheet slides from the edge it
+ * belongs to, a thing that arrives fades up, a thing that is pressed gives way slightly. Every
+ * duration is short enough to stay ahead of a second tap.
+ *
+ * All of it is switched off wholesale under prefers-reduced-motion below — the animations are
+ * additive, so removing them leaves the interface in its correct final state rather than a
+ * half-played one.
+ */
+:root {
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes sf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sf-slide-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sf-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sf-pop {
+  0% {
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The cart sheet arrives from the edge it lives on. */
+.sheet.on {
+  animation: sf-slide-right var(--dur-slow) var(--ease-out);
+}
+.sheet.sheet-bottom.on {
+  animation: sf-slide-up var(--dur-slow) var(--ease-out);
+}
+.overlay.on {
+  animation: sf-fade-in var(--dur-base) ease;
+}
+.modal.on,
+.dialog.on {
+  animation: sf-fade-up var(--dur-base) var(--ease-out);
+}
+
+/* The cart bar is the one element that appears because of something the customer just did. */
+.cart-bar.on {
+  animation: sf-fade-up var(--dur-base) var(--ease-out);
+}
+/* The count changing is the feedback that the tap landed. */
+.qty-count {
+  animation: sf-pop var(--dur-base) var(--ease-out);
+}
+
+/* Cards settle in as the menu renders. */
+.pcard {
+  animation: sf-fade-up var(--dur-base) var(--ease-out) both;
+}
+
+/* Anything pressable gives way under the press. */
+.btn,
+.cart-btn,
+.tip,
+.status-pill,
+.cline-note-btn {
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+.btn:active:not(:disabled),
+.cart-btn:active,
+.tip:active,
+.status-pill:active {
+  transform: scale(0.97);
+}
+.cart-bar:active {
+  transform: translateY(1px);
+}
+
+/* Filtering the menu is a change of content, so the new list arrives rather than snapping in. */
+.menu-section {
+  animation: sf-fade-in var(--dur-base) ease;
+}
+.sug-card {
+  animation: sf-fade-up var(--dur-base) var(--ease-out) both;
+}
+
+/*
+ * Reduced motion: honour it completely. Not "shorter" — off. Someone who asks for this may be
+ * asking because motion makes them ill.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .sheet.on,
+  .sheet.sheet-bottom.on,
+  .overlay.on,
+  .modal.on,
+  .dialog.on,
+  .cart-bar.on,
+  .qty-count,
+  .pcard,
+  .menu-section,
+  .sug-card {
+    animation: none;
+  }
+  .btn,
+  .cart-btn,
+  .tip,
+  .status-pill,
+  .cline-note-btn {
+    transition: none;
+  }
+  .btn:active:not(:disabled),
+  .cart-btn:active,
+  .tip:active,
+  .status-pill:active,
+  .cart-bar:active,
+  .qty-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
 </style>
 <style>
-/* ============================================================================
-   ADMIN SCOPE
-   Lifted verbatim from apps/web/src/app/(admin)/admin.css.
-   ============================================================================ */
 /* =============================================================================
    ADMIN SCOPE — design v1.1, ported from harolds-design-v1_1.html.
 
@@ -3338,12 +3740,19 @@ select[multiple] {
     }
   }
 }
+
+/* Sub-label under a field, for a limit that needs a sentence to be unambiguous. */
+.adm-field-help {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--body-sm);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink-muted);
+}
 </style>
 <style>
-/* ============================================================================
-   KITCHEN SCOPE
-   Lifted verbatim from apps/web/src/app/(kitchen)/kitchen.css.
-   ============================================================================ */
 /* =============================================================================
    KITCHEN SCOPE — design v1.1, ported from harolds-design-v1_1.html.
 
@@ -3873,13 +4282,13 @@ select[multiple] {
         <div class="container">
           <a href="#" class="wordmark" aria-label="Harold's Chicken Burnham, home"><img src="logo.jpeg" alt="Harold's Chicken" width="1320" height="588"></a>
           <button class="status-pill" aria-haspopup="dialog" onclick="openHours()">
-            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in about 20 min</span>
+            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in 20 min</span>
           </button>
           <button class="cart-btn" aria-label="Cart, 3 items" onclick="openCart()">Cart<span class="cart-count">3</span></button>
         </div>
         <div class="subrow">
           <button class="status-pill" aria-haspopup="dialog" onclick="openHours()">
-            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in about 20 min</span>
+            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in 20 min</span>
           </button>
         </div>
       </header>
@@ -4032,7 +4441,7 @@ select[multiple] {
 
       <div class="cart-bar-spacer" aria-hidden="true"></div>
       <button type="button" class="cart-bar on" onclick="openCart()">
-        <span>3 items in your order</span><span>View cart</span>
+        <span class="cart-bar-count">3 items<span class="cart-bar-sub t-nums">$28.98</span></span><span>View cart</span>
       </button>
     </div>
   </div>
@@ -4043,15 +4452,12 @@ select[multiple] {
       <header class="sf-header" role="banner">
         <div class="container">
           <a href="#" class="wordmark" aria-label="Harold's Chicken Burnham, home"><img src="logo.jpeg" alt="Harold's Chicken" width="1320" height="588"></a>
-          <button class="status-pill" aria-haspopup="dialog" onclick="openHours()">
-            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in about 20 min</span>
+          <!-- Menu page only: the state collapses to a dot and one word so the row holds the
+               logo, the state and the cart together instead of wrapping onto a second line. -->
+          <button class="status-pill compact" aria-haspopup="dialog" aria-label="Open &middot; ready in 20 min" onclick="openHours()">
+            <span class="dot" aria-hidden="true"></span><span class="tx">Open</span>
           </button>
           <button class="cart-btn" aria-label="Cart, 3 items" onclick="openCart()">Cart<span class="cart-count">3</span></button>
-        </div>
-        <div class="subrow">
-          <button class="status-pill" aria-haspopup="dialog" onclick="openHours()">
-            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in about 20 min</span>
-          </button>
         </div>
       </header>
 
@@ -4073,6 +4479,15 @@ select[multiple] {
           <div class="container">
             <h2 class="poster">Our menu</h2>
             <p style="color:var(--ink-muted);margin-top:8px">Every dinner comes with fries under, sauce over, and white bread on top &mdash; unless you say otherwise.</p>
+
+            <!-- Filters the menu already in memory, so results land on the same frame as the
+                 keystroke and the search costs the store no requests. -->
+            <div class="menu-search">
+              <label for="menu-search" class="sr-only">Search the menu</label>
+              <input id="menu-search" type="search" placeholder="Search the menu" autocomplete="off" oninput="menuFilter(this.value)">
+              <button type="button" class="menu-search-clear" aria-label="Clear search" onclick="menuFilter('')" id="menu-search-clear" hidden>&times;</button>
+            </div>
+            <p class="menu-search-count" role="status" aria-live="polite" id="menu-search-count"></p>
           </div>
         </div>
 
@@ -4105,8 +4520,15 @@ select[multiple] {
                     <p class="desc">Ten whole wings for a real appetite, fries and bread included.</p>
                     <p class="hint">Sauce</p>
                   </button>
+                  <!-- Already in the cart: the button becomes a stepper showing the count, and
+                       returns to "Add +" when it reaches zero. -->
                   <div class="foot"><span class="price">$19.49</span>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="openItem()">Add +</button></div>
+                    <div class="qty-stepper" role="group" aria-label="10 wing dinner quantity">
+                      <button type="button" class="qty-btn" aria-label="Remove one">&minus;</button>
+                      <span class="qty-count t-nums">2</span>
+                      <button type="button" class="qty-btn" aria-label="Add one more">+</button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <!-- No modifier groups bound: quick-add is wired, and there is no hint line. -->
@@ -4241,7 +4663,7 @@ select[multiple] {
 
       <div class="cart-bar-spacer" aria-hidden="true"></div>
       <button type="button" class="cart-bar on" onclick="openCart()">
-        <span>3 items in your order</span><span>View cart</span>
+        <span class="cart-bar-count">3 items<span class="cart-bar-sub t-nums">$28.98</span></span><span>View cart</span>
       </button>
     </div>
   </div>
@@ -4253,13 +4675,13 @@ select[multiple] {
         <div class="container">
           <a href="#" class="wordmark" aria-label="Harold's Chicken Burnham, home"><img src="logo.jpeg" alt="Harold's Chicken" width="1320" height="588"></a>
           <button class="status-pill" aria-haspopup="dialog" onclick="openHours()">
-            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in about 20 min</span>
+            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in 20 min</span>
           </button>
-          <button class="cart-btn" aria-label="Cart, 3 items" onclick="openCart()">Cart<span class="cart-count">3</span></button>
+          <!-- Checkout is where the cart was going, so the control that reopens it is noise. -->
         </div>
         <div class="subrow">
           <button class="status-pill" aria-haspopup="dialog" onclick="openHours()">
-            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in about 20 min</span>
+            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in 20 min</span>
           </button>
         </div>
       </header>
@@ -4267,6 +4689,12 @@ select[multiple] {
       <main>
         <div class="band b-paper textured" style="padding-top:40px">
           <div class="container">
+            <!-- Leaving checkout must not depend on the browser's back button, which on a phone
+                 is often a gesture people do not know they have. -->
+            <div class="co-back">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="openCart()">&larr; Back to cart</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="scr('sf','sf-menu')">Keep shopping</button>
+            </div>
             <h2 class="poster" style="margin-bottom:32px">Checkout</h2>
 
             <div class="co-grid">
@@ -4281,15 +4709,32 @@ select[multiple] {
                     <label for="f-last">Last name</label>
                     <input id="f-last" value="Bell" autocomplete="family-name">
                   </div>
+                  <!-- Validation state, drawn: the message replaces nothing and appears under
+                       the field only once it has been left. -->
                   <div class="field">
                     <label for="f-phone">Mobile number</label>
-                    <input id="f-phone" inputmode="tel" value="(708) 555-0192">
+                    <input id="f-phone" inputmode="tel" value="(708) 555-019" aria-invalid="true" aria-describedby="f-phone-err">
                     <p class="help">In case we need to reach you about this order.</p>
+                    <p class="field-err" id="f-phone-err" role="alert">Enter a 10-digit US mobile number.</p>
                   </div>
                   <div class="field" style="margin-bottom:0">
                     <label for="f-email">Email</label>
                     <input id="f-email" inputmode="email" value="marcus@example.com">
                     <p class="help">Receipt only. No marketing, no account.</p>
+                  </div>
+                  <!-- Decoy: off-screen and hidden from assistive tech, so only a script fills it. -->
+                  <div aria-hidden="true" class="decoy-field">
+                    <label for="company-website">Company website</label>
+                    <input id="company-website" name="company_website" tabindex="-1" autocomplete="off">
+                  </div>
+                </div>
+
+                <div class="co-card card" style="margin-bottom:24px">
+                  <h3>Anything the kitchen should know?</h3>
+                  <div class="field" style="margin-bottom:0">
+                    <label for="order-note">Instructions for this order</label>
+                    <textarea id="order-note" class="note-field" rows="3" maxlength="200" placeholder="Allergies, how you'd like it cooked, anything else."></textarea>
+                    <p class="help">This prints on the kitchen ticket for the whole order. For one item, use the note on that item in your cart.</p>
                   </div>
                 </div>
 
@@ -4362,13 +4807,13 @@ select[multiple] {
         <div class="container">
           <a href="#" class="wordmark" aria-label="Harold's Chicken Burnham, home"><img src="logo.jpeg" alt="Harold's Chicken" width="1320" height="588"></a>
           <button class="status-pill" aria-haspopup="dialog" onclick="openHours()">
-            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in about 20 min</span>
+            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in 20 min</span>
           </button>
           <button class="cart-btn" aria-label="Cart" onclick="openCart()">Cart</button>
         </div>
         <div class="subrow">
           <button class="status-pill" aria-haspopup="dialog" onclick="openHours()">
-            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in about 20 min</span>
+            <span class="dot" aria-hidden="true"></span><span class="tx">Open &middot; ready in 20 min</span>
           </button>
         </div>
       </header>
@@ -4580,11 +5025,14 @@ select[multiple] {
     </div>
     <div class="sheet-body">
       <div class="cline">
-        <div>
+        <div class="cline-main">
           <p class="nm">6 wing dinner</p>
           <p class="mods">Mild sauce &middot; Extra bread</p>
+          <!-- Quiet until used; opens an inline input in place. -->
+          <button type="button" class="cline-note-btn add">+ Add instructions</button>
         </div>
         <div class="right">
+          <span class="cline-price t-nums">$14.49</span>
           <div class="qty"><button type="button" aria-label="Decrease quantity of 6 wing dinner">&minus;</button><span class="n">1</span><button type="button" aria-label="Increase quantity of 6 wing dinner">+</button></div>
           <button type="button" class="btn btn-ghost btn-sm" aria-label="Remove 6 wing dinner">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
@@ -4593,12 +5041,13 @@ select[multiple] {
         </div>
       </div>
       <div class="cline">
-        <div>
+        <div class="cline-main">
           <p class="nm">Half dark dinner</p>
           <p class="mods">Hot sauce</p>
-          <p class="mods">Note: fried hard</p>
+          <button type="button" class="cline-note-btn">Note: fried hard<span class="cline-note-edit">Edit</span></button>
         </div>
         <div class="right">
+          <span class="cline-price t-nums">$11.99</span>
           <div class="qty"><button type="button" aria-label="Decrease quantity of Half dark dinner">&minus;</button><span class="n">1</span><button type="button" aria-label="Increase quantity of Half dark dinner">+</button></div>
           <button type="button" class="btn btn-ghost btn-sm" aria-label="Remove Half dark dinner">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
@@ -4607,8 +5056,17 @@ select[multiple] {
         </div>
       </div>
       <div class="cline" style="border-bottom:none">
-        <div><p class="nm">Coleslaw</p></div>
+        <div class="cline-main">
+          <p class="nm">Coleslaw</p>
+          <!-- The same control, opened. Enter saves, Escape reverts. -->
+          <div class="cline-note-edit-row">
+            <label class="sr-only" for="note-coleslaw">Kitchen instructions for Coleslaw</label>
+            <input id="note-coleslaw" class="cline-note-input" placeholder="No pickles, extra crispy..." value="on the side">
+            <button type="button" class="btn btn-secondary btn-sm">Save</button>
+          </div>
+        </div>
         <div class="right">
+          <span class="cline-price t-nums">$2.50</span>
           <div class="qty"><button type="button" aria-label="Decrease quantity of Coleslaw">&minus;</button><span class="n">1</span><button type="button" aria-label="Increase quantity of Coleslaw">+</button></div>
           <button type="button" class="btn btn-ghost btn-sm" aria-label="Remove Coleslaw">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
@@ -4617,9 +5075,25 @@ select[multiple] {
         </div>
       </div>
     </div>
+    <!-- The step between cart and checkout. Same sheet, different contents: a page here would
+         undo the point of the cart being a slider. Skippable, adds no obligation. -->
+    <div class="sheet-body" id="cart-suggest" hidden>
+      <p class="sug-lead">Sides, extras and dressings go well with what you have. Skip straight past if not.</p>
+      <div class="sug-grid">
+        <div class="sug-card"><div class="sug-copy"><p class="nm">Fries</p><p class="pr t-nums">$3.49</p></div><button type="button" class="btn btn-secondary btn-sm">Add +</button></div>
+        <div class="sug-card"><div class="sug-copy"><p class="nm">Okra</p><p class="pr t-nums">$4.29</p></div><button type="button" class="btn btn-secondary btn-sm">Add +</button></div>
+        <div class="sug-card"><div class="sug-copy"><p class="nm">Hush Puppies</p><p class="pr t-nums">$3.99</p></div><button type="button" class="btn btn-secondary btn-sm">Added (1)</button></div>
+        <div class="sug-card"><div class="sug-copy"><p class="nm">Cole Slaw</p><p class="pr t-nums">$2.50</p></div><button type="button" class="btn btn-secondary btn-sm">Add +</button></div>
+      </div>
+    </div>
     <div class="sheet-foot">
-      <p class="note">Your total is quoted at checkout &mdash; no figure here is computed on this device.</p>
-      <a href="#" class="btn btn-primary" style="width:100%;height:52px" onclick="closeCart();scr('sf','sf-checkout');return false">Go to checkout</a>
+      <div class="cart-total-row"><span>Items</span><span class="dots"></span><span class="amt t-nums">$28.98</span></div>
+      <p class="note" id="cart-foot-note">Tax and any tip are added at checkout, where the store quotes it.</p>
+      <button type="button" class="btn btn-primary" style="width:100%;height:52px" id="cart-go" onclick="cartStep('suggest')">Go to checkout</button>
+      <div class="sug-actions" id="cart-suggest-actions" hidden>
+        <button type="button" class="btn btn-ghost" onclick="cartStep('cart')">Back</button>
+        <button type="button" class="btn btn-primary" style="flex:1;height:52px" onclick="closeCart();cartStep('cart');scr('sf','sf-checkout')">Continue to checkout</button>
+      </div>
     </div>
   </div>
 
@@ -4960,6 +5434,11 @@ select[multiple] {
               <label class="adm-field">Price<input value="13.99"></label>
               <label class="adm-field">Category<select><option>Wings</option></select></label>
               <label class="adm-field">Sort order<input value="1"></label>
+              <!-- Enforced server-side in validateCart, summed across the cart so splitting one
+                   item over several lines cannot walk past it. Blank means no limit. -->
+              <label class="adm-field">Max per order<input type="number" min="1" max="50" placeholder="No limit" value="4">
+                <span class="adm-field-help">Most of this item one order may contain. Leave blank for no limit.</span>
+              </label>
               <label class="adm-field">Description<textarea>Six whole wings fried to order, fries under, white bread on top.</textarea></label>
             </div>
             <div class="adm-toolbar">
@@ -5372,6 +5851,19 @@ select[multiple] {
     <li><strong>6. Storefront dark scheme.</strong> Shipped, opt-in, light by default, behind the labelled header toggle. Admin stays light; the KDS scope shares no token with it.</li>
 
     <h2>Latest round — a re-numbering bug, and the back office</h2>
+    <li><b>The storefront learned to answer sooner.</b> A live search filters the menu already in
+      memory, so results land on the same frame as the keystroke and cost the store no requests. A
+      card whose item is in the cart shows a stepper instead of &ldquo;Add&rdquo;, and the cart bar
+      carries a running items figure. That figure is the one place the storefront shows money it
+      did not get from a quote: it is an estimate, labelled <i>Items</i> rather than
+      <i>Total</i>, excludes tax and tip, is never sent back, and is superseded by the checkout
+      quote. The cart gained per-line instructions and a skippable sides-and-extras step in the
+      same sheet, and checkout gained a whole-order instruction that prints on the ticket, a way
+      back that is not the browser&rsquo;s, inline field validation, and a custom tip that moves
+      the total as it is typed rather than on blur &mdash; which is why it appeared to be ignored.
+      Admins can cap how many of one item an order may contain; the cap is enforced in
+      <code>validateCart</code>, summed across the whole cart, because a limit only the UI honours
+      is not a limit.</li>
     <li><b>Two slips became one, and the receipt email started arriving.</b> Every order queued a
       kitchen ticket <i>and</i> a counter receipt. Both went to the same physical printer &mdash;
       <code>kitchenSerial</code> and <code>counterSerial</code> both fall back to the one configured
@@ -5607,6 +6099,52 @@ function cfState(which){
     steps[i].className = 'tstep' + (copy.cls[i] ? ' ' + copy.cls[i] : '');
   }
   steps[steps.length - 1].querySelector('.lb').textContent = copy.last;
+}
+
+/* The cart sheet's two steps: the order, then the skippable suggestions. Same sheet either way
+   -- a page here would undo the point of the cart being a slider. */
+function cartStep(which){
+  var body = document.querySelector('#cart-sheet .sheet-body');
+  var suggest = document.getElementById('cart-suggest');
+  var go = document.getElementById('cart-go');
+  var actions = document.getElementById('cart-suggest-actions');
+  var note = document.getElementById('cart-foot-note');
+  var head = document.querySelector('#cart-sheet .sheet-head h3');
+  var showing = which === 'suggest';
+  body.hidden = showing;
+  suggest.hidden = !showing;
+  go.hidden = showing;
+  actions.hidden = !showing;
+  note.hidden = showing;
+  head.textContent = showing ? 'Anything else?' : 'Your order · 3 items';
+}
+
+/* Live menu filter, the same substring match the app runs over the menu already in memory. */
+function menuFilter(value){
+  var input = document.getElementById('menu-search');
+  if (input && input.value !== value) input.value = value;
+  var needle = (value || '').trim().toLowerCase();
+  var clear = document.getElementById('menu-search-clear');
+  if (clear) clear.hidden = needle.length === 0;
+  var shown = 0;
+  var cards = document.querySelectorAll('#sf-menu .pcard');
+  for (var i = 0; i < cards.length; i += 1){
+    var text = cards[i].textContent.toLowerCase();
+    var hit = needle.length === 0 || text.indexOf(needle) >= 0;
+    cards[i].style.display = hit ? '' : 'none';
+    if (hit) shown += 1;
+  }
+  var sections = document.querySelectorAll('#sf-menu .menu-section');
+  for (var j = 0; j < sections.length; j += 1){
+    var visible = sections[j].querySelectorAll('.pcard:not([style*="display: none"])').length;
+    sections[j].style.display = (needle.length && visible === 0) ? 'none' : '';
+  }
+  var count = document.getElementById('menu-search-count');
+  if (count) {
+    count.textContent = needle.length
+      ? shown + ' ' + (shown === 1 ? 'item' : 'items') + ' matching “' + value.trim() + '”'
+      : '';
+  }
 }
 
 function toggleSaveBar(){

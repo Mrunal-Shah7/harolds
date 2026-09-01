@@ -11,6 +11,7 @@
 import type { MenuItemSummary, MenuItemWithModifiers } from "@harolds/types";
 import { MenuImage } from "@/components/storefront/menu-image";
 import { formatCents } from "@/lib/money";
+import { useCart } from "@/lib/cart-context";
 
 export function ItemCard({
   item,
@@ -30,6 +31,9 @@ export function ItemCard({
 }) {
   const soldOut = item.isSoldOut;
   const hint = modifierHint(item);
+  const { quantityForItem, incrementItem, decrementItem, isAtItemLimit } = useCart();
+  const inCart = quantityForItem(item.id);
+  const atLimit = isAtItemLimit(item);
 
   const frame = (
     <div className="img">
@@ -92,17 +96,52 @@ export function ItemCard({
 
         <div className="foot">
           <span className="price">{formatCents(item.basePriceCents)}</span>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => {
-              if (onQuickAdd) onQuickAdd(item);
-              else onOpen(item);
-            }}
-            aria-label={onQuickAdd ? `Add ${item.name} to cart` : `Choose options for ${item.name}`}
-          >
-            Add +
-          </button>
+          {/* Once the item is in the cart the button becomes a stepper, so the count is visible
+              on the card and a second one does not need the modal. Dropping to zero puts the
+              plain "Add +" back, which is the only state that can open the options again. */}
+          {inCart > 0 ? (
+            <div className="qty-stepper" role="group" aria-label={`${item.name} quantity`}>
+              <button
+                type="button"
+                className="qty-btn"
+                onClick={() => decrementItem(item.id)}
+                aria-label={`Remove one ${item.name}`}
+              >
+                &minus;
+              </button>
+              <span className="qty-count t-nums" aria-live="polite">
+                {inCart}
+              </span>
+              <button
+                type="button"
+                className="qty-btn"
+                onClick={() => incrementItem(item.id)}
+                disabled={atLimit}
+                aria-label={
+                  atLimit
+                    ? `Limit ${item.maxQuantityPerOrder} per order for ${item.name}`
+                    : `Add one more ${item.name}`
+                }
+                title={atLimit ? `Limit ${item.maxQuantityPerOrder} per order` : undefined}
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                if (onQuickAdd) onQuickAdd(item);
+                else onOpen(item);
+              }}
+              aria-label={
+                onQuickAdd ? `Add ${item.name} to cart` : `Choose options for ${item.name}`
+              }
+            >
+              Add +
+            </button>
+          )}
         </div>
       </div>
     </div>

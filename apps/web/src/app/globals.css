@@ -814,6 +814,10 @@ a.wordmark {
   background: var(--paper-sunk);
   border-radius: var(--r-pill);
   padding: 8px 14px;
+  /* The face the category tabs use (.mtab), so store state reads as part of the same voice
+     rather than as body copy that happens to sit in a pill. */
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--body-sm);
   color: var(--ink);
   border: none;
@@ -2159,5 +2163,411 @@ html[data-theme="dark"] .sf-root .sf-header {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+
+/* ---------- menu search, card stepper, cart-bar total (Sprint 17) ---------- */
+
+/* Live filter over the menu already in memory — see menu-browser.tsx. */
+.menu-search {
+  position: relative;
+  margin-top: 20px;
+  max-width: 420px;
+}
+.menu-search input {
+  width: 100%;
+  height: 48px;
+  padding: 0 40px 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--body);
+}
+.menu-search input::placeholder {
+  color: var(--ink-faint);
+}
+.menu-search input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+/* The type=search clear affordance is inconsistent across browsers, so the button is ours. */
+.menu-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+.menu-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.menu-search-clear:hover {
+  background: var(--paper-sunk);
+  color: var(--ink);
+}
+.menu-search-count {
+  margin-top: 8px;
+  min-height: 1.25em;
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+}
+
+/* Replaces "Add +" once the item is in the cart. */
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  padding: 2px;
+}
+.qty-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--brand-text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--dur-fast, 120ms) ease, transform var(--dur-fast, 120ms) ease;
+}
+.qty-btn:hover:not(:disabled) {
+  background: var(--brand-tint);
+}
+.qty-btn:active:not(:disabled) {
+  transform: scale(0.88);
+}
+.qty-btn:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.qty-count {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The cart bar's two-line left column: count above the running item total. */
+.cart-bar-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.cart-bar-sub {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* ---------- cart sheet: line notes, prices, suggestions step ---------- */
+
+.cline-main {
+  min-width: 0;
+}
+.cline-price {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The instruction is a link-weight affordance until it is used, so an unused one is quiet. */
+.cline-note-btn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.cline-note-btn.add {
+  color: var(--brand-text);
+  font-weight: 600;
+}
+.cline-note-btn:hover {
+  text-decoration: underline;
+}
+.cline-note-edit {
+  font-weight: 600;
+  color: var(--brand-text);
+}
+.cline-note-edit-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.cline-note-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--body-sm);
+}
+.cline-note-input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+/* Items-only estimate in the sheet foot. Labelled "Items", never "Total". */
+.cart-total-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.cart-total-row .amt {
+  font-weight: 800;
+  font-size: var(--body-lg);
+}
+
+.sug-lead {
+  color: var(--ink-muted);
+  margin-bottom: 16px;
+}
+.sug-loading {
+  color: var(--ink-muted);
+  padding: 12px 0;
+}
+.sug-grid {
+  display: grid;
+  gap: 10px;
+}
+.sug-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.sug-copy {
+  flex: 1;
+  min-width: 0;
+}
+.sug-copy .nm {
+  font-weight: 600;
+}
+.sug-copy .pr {
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+}
+.sug-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ---------- checkout: inline errors, back row, decoy ---------- */
+
+.field-err {
+  margin-top: 6px;
+  font-size: var(--body-sm);
+  font-weight: 600;
+  color: var(--danger);
+}
+.field input[aria-invalid="true"],
+.field textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.co-back {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* Off-screen rather than display:none, because some automation skips hidden inputs and the
+   point of the field is that automation fills it. Hidden from assistive tech at the wrapper. */
+.decoy-field {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* ---------- motion ---------- */
+/*
+ * Movement is used to explain a change, never to decorate one: a sheet slides from the edge it
+ * belongs to, a thing that arrives fades up, a thing that is pressed gives way slightly. Every
+ * duration is short enough to stay ahead of a second tap.
+ *
+ * All of it is switched off wholesale under prefers-reduced-motion below — the animations are
+ * additive, so removing them leaves the interface in its correct final state rather than a
+ * half-played one.
+ */
+:root {
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes sf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sf-slide-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sf-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sf-pop {
+  0% {
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The cart sheet arrives from the edge it lives on. */
+.sheet.on {
+  animation: sf-slide-right var(--dur-slow) var(--ease-out);
+}
+.sheet.sheet-bottom.on {
+  animation: sf-slide-up var(--dur-slow) var(--ease-out);
+}
+.overlay.on {
+  animation: sf-fade-in var(--dur-base) ease;
+}
+.modal.on,
+.dialog.on {
+  animation: sf-fade-up var(--dur-base) var(--ease-out);
+}
+
+/* The cart bar is the one element that appears because of something the customer just did. */
+.cart-bar.on {
+  animation: sf-fade-up var(--dur-base) var(--ease-out);
+}
+/* The count changing is the feedback that the tap landed. */
+.qty-count {
+  animation: sf-pop var(--dur-base) var(--ease-out);
+}
+
+/* Cards settle in as the menu renders. */
+.pcard {
+  animation: sf-fade-up var(--dur-base) var(--ease-out) both;
+}
+
+/* Anything pressable gives way under the press. */
+.btn,
+.cart-btn,
+.tip,
+.status-pill,
+.cline-note-btn {
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+.btn:active:not(:disabled),
+.cart-btn:active,
+.tip:active,
+.status-pill:active {
+  transform: scale(0.97);
+}
+.cart-bar:active {
+  transform: translateY(1px);
+}
+
+/* Filtering the menu is a change of content, so the new list arrives rather than snapping in. */
+.menu-section {
+  animation: sf-fade-in var(--dur-base) ease;
+}
+.sug-card {
+  animation: sf-fade-up var(--dur-base) var(--ease-out) both;
+}
+
+/*
+ * Reduced motion: honour it completely. Not "shorter" — off. Someone who asks for this may be
+ * asking because motion makes them ill.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .sheet.on,
+  .sheet.sheet-bottom.on,
+  .overlay.on,
+  .modal.on,
+  .dialog.on,
+  .cart-bar.on,
+  .qty-count,
+  .pcard,
+  .menu-section,
+  .sug-card {
+    animation: none;
+  }
+  .btn,
+  .cart-btn,
+  .tip,
+  .status-pill,
+  .cline-note-btn {
+    transition: none;
+  }
+  .btn:active:not(:disabled),
+  .cart-btn:active,
+  .tip:active,
+  .status-pill:active,
+  .cart-bar:active,
+  .qty-btn:active:not(:disabled) {
+    transform: none;
   }
 }

@@ -18,7 +18,11 @@ export function storeStatusLabel(status: StoreStatus): { label: string; open: bo
       /\{minutes\}/g,
       String(status.prepMinutes),
     );
-    return { label: `Open · ready in ${phrase}`, open: true };
+    // The configured phrase hedges ("about 20 min"). On the pill the hedge is noise -- the
+    // number is already an estimate -- so it is dropped here rather than in store config, which
+    // other surfaces still read verbatim.
+    const tight = phrase.replace(/^about /i, "");
+    return { label: `Open · ready in ${tight}`, open: true };
   }
   if (status.isOpen && !status.acceptingOrders) {
     return { label: status.notAcceptingMessage ?? "Not taking orders right now", open: false };
@@ -26,9 +30,21 @@ export function storeStatusLabel(status: StoreStatus): { label: string; open: bo
   return { label: status.closedMessage ?? "Not taking orders right now", open: false };
 }
 
-export function StoreStatusPill({ status }: { status: StoreStatus }) {
+export function StoreStatusPill({
+  status,
+  compact = false,
+}: {
+  status: StoreStatus;
+  /**
+   * One word and the dot, nothing else. The menu page's header has to hold the logo, the state
+   * and the cart on a single row, and the full sentence is what pushes it onto a second line.
+   * The complete state is still one tap away in the sheet.
+   */
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const { label, open: isOpen } = storeStatusLabel(status);
+  const shown = compact ? (isOpen ? "Open" : "Closed") : label;
 
   return (
     <>
@@ -36,10 +52,11 @@ export function StoreStatusPill({ status }: { status: StoreStatus }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="status-pill"
+        className={compact ? "status-pill compact" : "status-pill"}
+        aria-label={label}
       >
         <span className={isOpen ? "dot" : "dot closed"} aria-hidden="true" />
-        <span className="tx">{label}</span>
+        <span className="tx">{shown}</span>
       </button>
 
       <Sheet open={open} onClose={() => setOpen(false)} title="Hours" side="bottom">

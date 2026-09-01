@@ -52,6 +52,12 @@ export type TicketOrderInput = {
   paymentStatus: string;
   /** Last four of the card, only when the processor supplied them. */
   cardLast4: string | null;
+  /**
+   * Instruction the customer gave for the WHOLE order, as opposed to the per-line notes carried
+   * on each TicketLineInput. Printed once, above the items, where the cook reads it before
+   * starting rather than after.
+   */
+  orderNote?: string | null;
   subtotalCents: number;
   taxCents: number;
   tipCents: number;

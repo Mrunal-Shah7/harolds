@@ -33,6 +33,11 @@ export type ResolvedItem = {
   isActive: boolean;
   isSoldOut: boolean;
   sortOrder: number;
+  /**
+   * Admin-set ceiling for this item in one order. Absent or null means no item-specific limit,
+   * which is the common case, so callers that predate the field stay valid.
+   */
+  maxQuantityPerOrder?: number | null;
   groups: ResolvedGroup[];
 };
 

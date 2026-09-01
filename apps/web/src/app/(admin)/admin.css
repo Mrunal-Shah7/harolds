@@ -1039,3 +1039,14 @@ select[multiple] {
     }
   }
 }
+
+/* Sub-label under a field, for a limit that needs a sentence to be unambiguous. */
+.adm-field-help {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--body-sm);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink-muted);
+}

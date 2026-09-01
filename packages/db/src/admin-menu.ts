@@ -1,5 +1,6 @@
 // SPRINT-8: menu mutations for the back office — every write invalidates the Sprint 2 cache.
 import { randomBytes } from "node:crypto";
+import { CART_LIMITS } from "@harolds/types";
 import { prisma } from "./client";
 import { invalidateMenuCache } from "./menu-cache";
 import { dollarsToCents } from "./seed/currency";
@@ -280,6 +281,8 @@ export async function updateItem(
     isMostOrdered?: boolean;
     mostOrderedSortOrder?: number | null;
     imageUrl?: string | null;
+    /** Null clears the ceiling; a positive integer sets it. See MenuItem.maxQuantityPerOrder. */
+    maxQuantityPerOrder?: number | null;
   },
   userId: string,
 ) {
@@ -317,6 +320,21 @@ export async function updateItem(
   if (patch.isMostOrdered !== undefined) data.isMostOrdered = patch.isMostOrdered;
   if (patch.mostOrderedSortOrder !== undefined) data.mostOrderedSortOrder = patch.mostOrderedSortOrder;
   if (patch.imageUrl !== undefined) data.imageUrl = patch.imageUrl?.trim() || null;
+  if (patch.maxQuantityPerOrder !== undefined) {
+    const limit = patch.maxQuantityPerOrder;
+    if (limit === null) {
+      data.maxQuantityPerOrder = null;
+    } else {
+      // A ceiling of zero would make the item unorderable while still listing it, which is what
+      // "sold out" is for. Above the structural per-line cap the limit could never bind.
+      if (!Number.isInteger(limit) || limit < 1 || limit > CART_LIMITS.maxQuantityPerLine) {
+        throw new AdminValidationError(
+          `Limit must be a whole number between 1 and ${CART_LIMITS.maxQuantityPerLine}, or blank for no limit.`,
+        );
+      }
+      data.maxQuantityPerOrder = limit;
+    }
+  }
 
   const row = await prisma.menuItem.update({ where: { id }, data });
   invalidateMenuCache();

@@ -9,6 +9,7 @@ export type QuoteItemRow = {
   isActive: boolean;
   isSoldOut: boolean;
   sortOrder: number;
+  maxQuantityPerOrder: number | null;
   groups: {
     id: string;
     name: string;
@@ -42,6 +43,7 @@ export async function fetchItemsForQuote(itemIds: string[]): Promise<QuoteItemRo
     select: {
       id: true,
       name: true,
+      maxQuantityPerOrder: true,
       boardLabel: true,
       basePriceCents: true,
       isActive: true,
@@ -77,6 +79,7 @@ export async function fetchItemsForQuote(itemIds: string[]): Promise<QuoteItemRo
     isActive: item.isActive,
     isSoldOut: item.isSoldOut,
     sortOrder: item.sortOrder,
+    maxQuantityPerOrder: item.maxQuantityPerOrder,
     groups: (byItem.get(item.id) ?? []).map((b) => ({
       id: b.group.id,
       name: b.group.name,

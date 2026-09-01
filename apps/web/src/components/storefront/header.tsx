@@ -19,9 +19,18 @@ import { StoreStatusPill } from "@/components/storefront/store-status-pill";
 export function StorefrontHeader({
   status,
   onCartClick,
+  compactStatus = false,
+  showCart = true,
 }: {
   status?: StoreStatus | null;
   onCartClick?: () => void;
+  /**
+   * Menu page: the state collapses to a dot and one word and stays on the logo's row, instead of
+   * dropping to a second line under it. See StoreStatusPill's `compact`.
+   */
+  compactStatus?: boolean;
+  /** Checkout hides the cart button: the cart is the page, so a control that reopens it is noise. */
+  showCart?: boolean;
 }) {
   const { totalItems } = useCart();
 
@@ -33,20 +42,22 @@ export function StorefrontHeader({
           <img src="/logo.jpeg" alt="Harold's Chicken" width={1320} height={588} />
         </Link>
 
-        {status ? <StoreStatusPill status={status} /> : null}
+        {status ? <StoreStatusPill status={status} compact={compactStatus} /> : null}
 
-        <button
-          type="button"
-          className="cart-btn"
-          onClick={onCartClick}
-          aria-label={totalItems > 0 ? `Cart, ${totalItems} items` : "Cart"}
-        >
-          Cart
-          {totalItems > 0 ? <span className="cart-count">{totalItems}</span> : null}
-        </button>
+        {showCart ? (
+          <button
+            type="button"
+            className="cart-btn"
+            onClick={onCartClick}
+            aria-label={totalItems > 0 ? `Cart, ${totalItems} items` : "Cart"}
+          >
+            Cart
+            {totalItems > 0 ? <span className="cart-count">{totalItems}</span> : null}
+          </button>
+        ) : null}
       </div>
 
-      {status ? (
+      {status && !compactStatus ? (
         <div className="subrow">
           <StoreStatusPill status={status} />
         </div>

@@ -43,6 +43,10 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
       patch.featuredSortOrder = body.featuredSortOrder as number | null;
     }
     if (typeof body.isMostOrdered === "boolean") patch.isMostOrdered = body.isMostOrdered;
+    // Blank clears the ceiling. The range itself is validated in admin-menu, not here.
+    if (body.maxQuantityPerOrder === null || typeof body.maxQuantityPerOrder === "number") {
+      patch.maxQuantityPerOrder = body.maxQuantityPerOrder as number | null;
+    }
     if (body.mostOrderedSortOrder === null || typeof body.mostOrderedSortOrder === "number") {
       patch.mostOrderedSortOrder = body.mostOrderedSortOrder as number | null;
     }

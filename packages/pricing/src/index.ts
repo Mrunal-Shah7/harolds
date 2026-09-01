@@ -26,3 +26,4 @@ export type { OrderabilityInput, OrderabilityResult } from "./orderability";
 export { quoteCart } from "./quote";
 export type { QuoteInput, QuoteOk, QuoteErr, QuoteStoreContext } from "./quote";
 export { toMenuCatalog } from "./catalog-builder";
+export { sanitizeKitchenNote } from "./notes";
