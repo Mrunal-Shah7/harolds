@@ -16,14 +16,11 @@ import {
   completeJob,
   deadLetterJob,
   inspectBackgroundJob,
-  isPhoneSuppressed,
   recordAttemptFailure,
-  recordSmsInboundEvent,
   recoverStrandedJobs,
   reportBackgroundJobs,
   retryDeadJob,
   retryDeadJobsByType,
-  setSmsSuppression,
 } from "./jobs";
 
 const MARKER = "s7jobs";
@@ -318,30 +315,3 @@ describe("ops", () => {
   });
 });
 
-describe("suppression", () => {
-  it("honours opt-out and restores on opt-in; inbound is idempotent", async () => {
-    if (!dbAvailable) return;
-    const phone = "+17085557001";
-    await prisma.smsSuppression.deleteMany({ where: { phoneE164: phone } });
-    await prisma.smsInboundEvent.deleteMany({ where: { fromPhone: phone } });
-    assert.equal(await isPhoneSuppressed(phone), false);
-    await setSmsSuppression({ phoneE164: phone, suppressed: true });
-    assert.equal(await isPhoneSuppressed(phone), true);
-    await setSmsSuppression({ phoneE164: phone, suppressed: false });
-    assert.equal(await isPhoneSuppressed(phone), false);
-    const first = await recordSmsInboundEvent({
-      providerEventId: "s7in-dup",
-      fromPhone: phone,
-      body: "STOP",
-      kind: "opt_out",
-    });
-    const second = await recordSmsInboundEvent({
-      providerEventId: "s7in-dup",
-      fromPhone: phone,
-      body: "STOP",
-      kind: "opt_out",
-    });
-    assert.equal(first.outcome, "recorded");
-    assert.equal(second.outcome, "duplicate");
-  });
-});

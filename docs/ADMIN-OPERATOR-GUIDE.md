@@ -112,7 +112,7 @@ On the order:
 2. Read the amount.
 3. Confirm.
 
-The refund talks to Square. Until Square confirms, treat it as pending — do not tap it again. The remaining refundable amount is on the screen. You cannot refund more than that.
+The refund talks to the payment gateway. Until the gateway confirms, treat it as pending — do not tap it again. The remaining refundable amount is on the screen. You cannot refund more than that.
 
 Every refund is recorded with your name.
 
@@ -143,7 +143,7 @@ A **dead job** is a text or email that was supposed to go out and did not. The r
 
 1. Open **Jobs**.
 2. Read the last error.
-3. **Retry** one job, or **Bulk retry type** after an outage (for example every ready-text after Twilio was down).
+3. **Retry** one job, or **Bulk retry type** after an outage (for example every email receipt after the mail provider was down).
 
 Do not ignore a non-zero dead count. Someone was not told their food is ready, or a manager alert never arrived.
 

@@ -26,7 +26,7 @@ async function waitForUp() {
 }
 
 const health = await waitForUp();
-console.log(`ok health square=${health.data?.squareEnvironment} db=${health.data?.checks?.database}`);
+console.log(`ok health gateway=${health.data?.paymentEnvironment} db=${health.data?.checks?.database}`);
 
 const menu = await (await fetch(`${base}/api/v1/menu`)).json();
 const items =
@@ -99,7 +99,6 @@ try {
         lastName: "Eleven",
         phone: "+17085550200",
         email: "sprint11@example.com",
-        smsConsent: false,
       },
       paymentToken: "cnon:card-nonce-ok",
       idempotencyKey: `s11-e2e-${Date.now()}`,

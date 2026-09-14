@@ -1,4 +1,4 @@
-// SPRINT-4: in-memory mock orders — no DB, no Square; status lookup works for process lifetime
+// SPRINT-4: in-memory mock orders — no DB, no gateway; status lookup works for process lifetime
 import { randomBytes } from "node:crypto";
 import type { CheckoutOrderResponse, PublicOrderStatusResponse } from "@harolds/types";
 

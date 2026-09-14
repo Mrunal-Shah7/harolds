@@ -122,7 +122,7 @@ Kitchen APIs are not public; they require a staff session. Health is enough to k
 
 1. Whoever operates the Ubuntu host (Node process + PostgreSQL + reverse proxy + TLS).
 2. Whoever holds the printer runbook (`docs/PRINT-RUNBOOK.md`) if tickets are the issue rather than the screen.
-3. Do **not** call the chicken shop’s Square support for a kitchen-display outage — Square does not run this PWA.
+3. Do **not** call the chicken shop’s payment-gateway support for a kitchen-display outage — NMI does not run this PWA.
 
 ---
 

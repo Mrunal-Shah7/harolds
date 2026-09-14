@@ -1,7 +1,7 @@
 // Regression: a captured order must never be re-numbered, however far the kitchen has taken it.
 //
 // THE BUG THIS COVERS. `markOrderPaidAndAllocate` used to short-circuit only when
-// `status === PAID && paymentStatus === CAPTURED && orderNumber`. Square redelivers
+// `status === PAID && paymentStatus === CAPTURED && orderNumber`. The gateway redelivers
 // `payment.updated`, and by the time a retry arrives the kitchen has usually advanced the order
 // to PRINTED / IN_PROGRESS / READY. The status half of that guard then failed, the retry fell
 // through, and the order was allocated a SECOND number and reset to PAID — a customer watching
@@ -29,6 +29,10 @@ async function cleanup(): Promise<void> {
   const orders = await prisma.order.findMany({
     where: { customerLastName: MARKER },
     select: { id: true },
+  });
+  // The throwaway counter row these orders allocate from (see FUTURE_BUSINESS_DATE).
+  await prisma.orderNumberCounter.deleteMany({
+    where: { businessDate: new Date(`${FUTURE_BUSINESS_DATE}T00:00:00.000Z`) },
   });
   const ids = orders.map((o) => o.id);
   if (ids.length === 0) return;
@@ -62,9 +66,17 @@ async function seedPendingOrder(token: string) {
   });
 }
 
+/**
+ * Allocation happens under the business date containing `paidAt`. Using the wall clock here
+ * consumes real order numbers from the store's live counter on every run — and the counter is
+ * gap-free and never rolls back, so deleting these orders in cleanup does NOT give them back.
+ * A far-future date allocates from a throwaway row that cleanup deletes instead.
+ */
+const FUTURE_BUSINESS_DATE = "2099-07-05";
+
 const captureArgs = {
-  paymentId: "sq_test_idem",
-  paidAt: new Date(),
+  paymentId: "txn_test_idem",
+  paidAt: new Date(`${FUTURE_BUSINESS_DATE}T18:00:00.000Z`),
   kitchenSerial: "TESTKITCHEN",
   counterSerial: "TESTCOUNTER",
   printMaxAttempts: 5,
@@ -119,7 +131,7 @@ describe("markOrderPaidAndAllocate is idempotent past PAID", () => {
       // The kitchen advances it, exactly as the KDS does.
       await prisma.order.update({ where: { id: order.id }, data: { status: advanced } });
 
-      // Square retries the payment webhook.
+      // The gateway retries the payment webhook.
       const replayed = await markOrderPaidAndAllocate(order.id, captureArgs);
 
       assert.equal(replayed.orderNumber, originalNumber, "the order number must not change");

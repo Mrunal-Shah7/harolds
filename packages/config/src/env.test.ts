@@ -15,11 +15,10 @@ function baseEnv(overrides: Record<string, string | undefined> = {}): Record<str
     DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/harolds?schema=public",
     NODE_ENV: "test",
     NEXT_PUBLIC_APP_URL: "http://localhost:3000",
-    SQUARE_APPLICATION_ID: "sandbox-app",
-    SQUARE_ACCESS_TOKEN: "sandbox-token",
-    SQUARE_LOCATION_ID: "LTEST",
-    SQUARE_ENVIRONMENT: "sandbox",
-    SQUARE_WEBHOOK_SIGNATURE_KEY: "whsec",
+    NMI_ENVIRONMENT: "sandbox",
+    NMI_SECURITY_KEY_SANDBOX: "sandbox-security-key",
+    NMI_TOKENIZATION_KEY_SANDBOX: "sandbox-tokenization-key",
+    NMI_WEBHOOK_SIGNING_KEY_SANDBOX: "sandbox-signing-key",
     PRINTER_SERIAL_NUMBER: "XBVN044247",
     PRINTER_SDP_SHARED_SECRET: "secret",
     ...overrides,
@@ -53,9 +52,6 @@ describe("parseEnv printer requirements", () => {
 describe("parseEnv production provider requirements", () => {
   it("names every missing production variable at once", () => {
     const copy = baseEnv({ NODE_ENV: "production" });
-    delete copy.TWILIO_ACCOUNT_SID;
-    delete copy.TWILIO_AUTH_TOKEN;
-    delete copy.TWILIO_FROM_NUMBER;
     delete copy.EMAIL_API_KEY;
     delete copy.EMAIL_FROM_ADDRESS;
     try {
@@ -63,9 +59,8 @@ describe("parseEnv production provider requirements", () => {
       assert.fail("expected throw");
     } catch (err) {
       const text = (err as Error).message;
-      assert.match(text, /TWILIO_ACCOUNT_SID/);
-      assert.match(text, /TWILIO_AUTH_TOKEN/);
-      assert.match(text, /TWILIO_FROM_NUMBER/);
+      // SPRINT-18: TWILIO_* used to be listed here too; SMS was removed, so email is the only
+      // provider a production start still requires.
       assert.match(text, /EMAIL_API_KEY/);
       assert.match(text, /EMAIL_FROM_ADDRESS/);
     }
@@ -78,9 +73,6 @@ describe("parseEnv production provider requirements", () => {
           baseEnv({
             NODE_ENV: "production",
             PRINTER_SDP_SHARED_SECRET: "short",
-            TWILIO_ACCOUNT_SID: "ACxx",
-            TWILIO_AUTH_TOKEN: "tok",
-            TWILIO_FROM_NUMBER: "+17085550000",
             EMAIL_API_KEY: "re_x",
             EMAIL_FROM_ADDRESS: "orders@example.com",
           }),
@@ -95,41 +87,33 @@ describe("parseEnv production provider requirements", () => {
     const env = parseEnv(
       baseEnv({
         NODE_ENV: "production",
-        TWILIO_ACCOUNT_SID: "ACxx",
-        TWILIO_AUTH_TOKEN: "tok",
-        TWILIO_FROM_NUMBER: "+17085550000",
         EMAIL_API_KEY: "re_x",
         EMAIL_FROM_ADDRESS: "orders@example.com",
         PRINTER_SDP_SHARED_SECRET: "a".repeat(32),
-        NEXT_PUBLIC_SQUARE_APPLICATION_ID: "sandbox-app",
-        NEXT_PUBLIC_SQUARE_LOCATION_ID: "LTEST",
-        NEXT_PUBLIC_SQUARE_ENVIRONMENT: "sandbox",
+        NEXT_PUBLIC_NMI_TOKENIZATION_KEY: "sandbox-tokenization-key",
+        NEXT_PUBLIC_NMI_ENVIRONMENT: "sandbox",
       }),
     );
     assert.equal(env.NODE_ENV, "production");
   });
 
-  it("refuses production start when public Square identifiers are missing", () => {
+  it("refuses production start when the public Collect.js key is missing", () => {
     assert.throws(
       () =>
         parseEnv(
           baseEnv({
             NODE_ENV: "production",
-            TWILIO_ACCOUNT_SID: "ACxx",
-            TWILIO_AUTH_TOKEN: "tok",
-            TWILIO_FROM_NUMBER: "+17085550000",
             EMAIL_API_KEY: "re_x",
             EMAIL_FROM_ADDRESS: "orders@example.com",
             PRINTER_SDP_SHARED_SECRET: "a".repeat(32),
           }),
         ),
-      /NEXT_PUBLIC_SQUARE_APPLICATION_ID/,
+      /NEXT_PUBLIC_NMI_TOKENIZATION_KEY/,
     );
   });
 
   it("skips production provider guards when compiling (next build sets NEXT_PHASE)", () => {
     const copy = baseEnv({ NODE_ENV: "production" });
-    delete copy.TWILIO_ACCOUNT_SID;
     const env = parseEnv(copy, { skipProductionGuards: true });
     assert.equal(env.NODE_ENV, "production");
   });

@@ -2,7 +2,6 @@
 import { getJobWorkerConfig, emitLog } from "@harolds/config";
 import { sendEmail } from "@harolds/email";
 import { createDefaultJobRegistry, runWorkerPass } from "@harolds/notify";
-import { sendSms } from "@harolds/sms";
 import { captureException } from "@/lib/errors";
 import { markWorkerPass, markWorkerStarted } from "@/lib/worker-heartbeat";
 
@@ -19,7 +18,7 @@ async function tick(): Promise<void> {
     const cfg = getJobWorkerConfig();
     const result = await runWorkerPass({
       registry,
-      ports: { sendSms, sendEmail },
+      ports: { sendEmail },
       claimLimit: cfg.claimLimit,
       strandedMs: cfg.strandedMs,
       backoffMs: cfg.backoffMs,

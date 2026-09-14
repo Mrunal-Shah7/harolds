@@ -37,7 +37,7 @@ Tick nothing you have not personally observed. The point of this document is to 
 | # | Check | Expected |
 |---|---|---|
 | B2.1 | `NODE_ENV=production pnpm db:seed` | Refuses. Names the test accounts. Exits non-zero. Writes nothing. |
-| B2.2 | Start with `NODE_ENV=production` and empty Twilio/email vars | Refuses to start. Names every missing variable at once. |
+| B2.2 | Start with `NODE_ENV=production` and empty email vars | Refuses to start. Names every missing variable at once. |
 | B2.3 | Start with `NODE_ENV=production` and a short print secret | Refuses. Names the length requirement. |
 | B2.4 | Start with `NODE_ENV=production` and placeholder manager alert destinations | Refuses after the database connects. |
 | B2.5 | Development start with all of the above empty | Starts normally. |
@@ -137,16 +137,16 @@ Everything here is typed into `/admin`. None of it needs a developer.
 
 | # | Item | Verify |
 |---|---|---|
-| F1 | A2P 10DLC brand and campaign **approved**, not merely submitted | Twilio console shows approved |
+| F1 | ~~A2P 10DLC brand and campaign approved~~ | **Not applicable since Sprint 18** — SMS and Twilio were removed. |
 | F2 | Ubuntu server provisioned | Node 24, pnpm 11.8.0, PostgreSQL local-only, app role without CREATEDB |
 | F3 | Domain with valid TLS, **complete chain** | Test from outside the network. The printer is stricter than a browser. |
-| F4 | Production Square credentials | `/api/v1/health` reports `squareEnvironment: production` |
+| F4 | Production NMI credentials | `/api/v1/health` reports `paymentEnvironment: production` |
 | F5 | Email sending domain verified with SPF, DKIM, DMARC | Provider console |
 | F6 | Backups running off-box, restore drilled **on the server** | Restore to a scratch database and verify counts |
 | F7 | nginx forwards real client address | Rate limiting keys per client, not one bucket for everyone |
-| F8 | nginx preserves raw body for the Square webhook | A test webhook verifies |
+| F8 | nginx preserves raw body for the NMI webhook | A test webhook verifies (the HMAC covers the raw bytes) |
 | F9 | nginx omits query strings from print poll access logs | Check the log file for `?key=` |
-| F10 | Independent uptime monitor pointed at health | Alerts reach a phone by a path that is not Twilio or Resend |
+| F10 | Independent uptime monitor pointed at health | Alerts reach a phone by a path that is not Resend. This matters more now: email is the app's only channel, so an email outage is silent. |
 
 ---
 
@@ -156,7 +156,7 @@ Everything here is typed into `/admin`. None of it needs a developer.
 |---|---|
 | G1 | Backup taken immediately before migration |
 | G2 | Printer re-pointed at production, secret rotated, ticket prints |
-| G3 | Square webhook subscription at the exact production path, not root — verify a delivery |
+| G3 | NMI webhook subscription at the exact production path (`/api/v1/webhooks/nmi`), not root — verify a delivery |
 | G4 | Kitchen display reinstalled from the production origin |
 | G5 | Small real charge made and refunded, both recorded |
 | G6 | Staff dry run: at least twenty realistic orders worked as they would during service |

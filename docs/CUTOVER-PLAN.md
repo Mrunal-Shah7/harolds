@@ -23,9 +23,9 @@ Redirects from any old owned URL, if one exists, go to `https://<domain>/`. Mark
 | # | Step | Who | Verify | Rollback |
 |---|---|---|---|---|
 | 1 | Backup production DB; confirm last off-box dump | Developer | File exists off-box; restore drill already succeeded on this server | N/A |
-| 2 | Production `.env` is production-only (Square env glance) | Developer | health `squareEnvironment=production` | Revert `.env`, restart |
+| 2 | Production `.env` is production-only (gateway env glance) | Developer | health `paymentEnvironment=production` | Revert `.env`, restart |
 | 3 | Rotate print secret; set printer SDP URL to `https://<domain>/api/v1/print/poll?key=…` | Developer + whoever has the printer web page | Printer last-polled on Dashboard within 10s | Point printer back at previous URL; restore previous secret in `.env` |
-| 4 | Square webhook subscription = `https://<domain>/api/v1/webhooks/square` (exact path, not `/`) | Developer | Dashboard delivery 2xx; one test event stored | Repoint subscription at previous URL |
+| 4 | NMI webhook subscription = `https://<domain>/api/v1/webhooks/nmi` (exact path, not `/`) | Developer | Control Panel delivery 2xx; one test event stored | Repoint subscription at previous URL |
 | 5 | Kitchen PWA reinstalled from `https://<domain>/kitchen` | Kitchen lead | Board loads; PIN works; audio unlock chirp | Open previous origin (do not leave both installed) |
 | 6 | Staff dry run complete; test charges refunded | Kitchen + manager | Notes in SPRINT-10 | Stay dark; do not publish the URL |
 | 7 | DNS / listings point at the new site | Owner | Site loads on **mobile data**, not store Wi-Fi | DNS TTL should be low (5 min) beforehand; revert A record |
@@ -35,7 +35,7 @@ Redirects from any old owned URL, if one exists, go to `https://<domain>/`. Mark
 
 ## First-service watch
 
-For each of the first real orders: payment captured, ticket printed, card on KDS, confirmation SMS/email, customer collected food. Someone who can refund, reprint, and correct status stays available for the first service.
+For each of the first real orders: payment captured, ticket printed, card on KDS, email receipt received, customer collected food. Someone who can refund, reprint, and correct status stays available for the first service.
 
 ---
 

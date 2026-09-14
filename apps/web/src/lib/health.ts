@@ -1,13 +1,13 @@
 // SPRINT-9 / SPRINT-12: dependency-aware health — process alive is not enough; database and worker matter.
 import { env, getWorkerStaleMs } from "@harolds/config";
 import { prisma } from "@harolds/db";
-import { getSquareEnvironment } from "@harolds/square";
+import { getPaymentEnvironment } from "@harolds/payments";
 import { API_CONTRACT_VERSION } from "@harolds/types";
 import { getWorkerHeartbeat } from "@/lib/worker-heartbeat";
 
 export type HealthSnapshot = {
   ok: boolean;
-  squareEnvironment: string;
+  paymentEnvironment: string;
   nodeEnv: string;
   contractVersion: typeof API_CONTRACT_VERSION;
   checks: {
@@ -50,7 +50,7 @@ export async function getHealthSnapshot(
   const ok = dbUp && worker === "up";
   return {
     ok,
-    squareEnvironment: getSquareEnvironment(),
+    paymentEnvironment: getPaymentEnvironment(),
     nodeEnv: env.NODE_ENV,
     contractVersion: API_CONTRACT_VERSION,
     checks: {

@@ -26,7 +26,7 @@ export type PaymentDiscrepancyAlert = {
   kind: string | null;
   processorPaymentId: string | null;
   orderTotalCents: number | null;
-  squareAmountCents: number | null;
+  gatewayAmountCents: number | null;
   detail: string | null;
 };
 
@@ -34,15 +34,14 @@ function orderLabel(orderNumber: string | null, orderId: string): string {
   return orderNumber ? `order ${orderNumber}` : `order id ${orderId}`;
 }
 
-export function renderPrintFailedAlert(a: PrintFailedAlert): { sms: string; emailSubject: string; emailText: string } {
+export function renderPrintFailedAlert(a: PrintFailedAlert): { emailSubject: string; emailText: string } {
   const who = orderLabel(a.orderNumber, a.orderId);
   const err = a.lastError ?? "no error recorded";
-  const sms = `Print failed for ${who} (${a.target} on ${a.printerSerial ?? "unknown printer"}): ${err}. Check the printer and reprint from the queue.`;
+  const summary = `Print failed for ${who} (${a.target} on ${a.printerSerial ?? "unknown printer"}): ${err}. Check the printer and reprint from the queue.`;
   return {
-    sms,
     emailSubject: `Print failed — ${who}`,
     emailText: [
-      sms,
+      summary,
       "",
       `Order id: ${a.orderId}`,
       `Ticket: ${a.target}`,
@@ -53,15 +52,14 @@ export function renderPrintFailedAlert(a: PrintFailedAlert): { sms: string; emai
   };
 }
 
-export function renderUnackedAlert(a: UnackedAlert): { sms: string; emailSubject: string; emailText: string } {
+export function renderUnackedAlert(a: UnackedAlert): { emailSubject: string; emailText: string } {
   const who = orderLabel(a.orderNumber, a.orderId);
   const reason = a.reason ?? "Paid order has not been acknowledged by the kitchen.";
-  const sms = `${who} is still unacknowledged. ${reason} Open the kitchen display and start the order.`;
+  const summary = `${who} is still unacknowledged. ${reason} Open the kitchen display and start the order.`;
   return {
-    sms,
     emailSubject: `Unacknowledged ${who}`,
     emailText: [
-      sms,
+      summary,
       "",
       `Order id: ${a.orderId}`,
       `Reason: ${reason}`,
@@ -70,14 +68,13 @@ export function renderUnackedAlert(a: UnackedAlert): { sms: string; emailSubject
   };
 }
 
-export function renderJobDeadAlert(a: JobDeadAlert): { sms: string; emailSubject: string; emailText: string } {
+export function renderJobDeadAlert(a: JobDeadAlert): { emailSubject: string; emailText: string } {
   const who = a.orderId ? ` (order id ${a.orderId})` : "";
-  const sms = `Background job ${a.deadJobType} is dead${who}. Last error: ${a.lastError ?? "none"}. Inspect the job queue and retry or cancel.`;
+  const summary = `Background job ${a.deadJobType} is dead${who}. Last error: ${a.lastError ?? "none"}. Inspect the job queue and retry or cancel.`;
   return {
-    sms,
     emailSubject: `Dead job — ${a.deadJobType}`,
     emailText: [
-      sms,
+      summary,
       "",
       `Dead job id: ${a.deadJobId}`,
       `Type: ${a.deadJobType}`,
@@ -90,21 +87,20 @@ export function renderJobDeadAlert(a: JobDeadAlert): { sms: string; emailSubject
 
 export function renderPaymentDiscrepancyAlert(
   a: PaymentDiscrepancyAlert,
-): { sms: string; emailSubject: string; emailText: string } {
-  const sms = `Payment discrepancy for order id ${a.orderId} (${a.kind ?? "unknown"}). Do not auto-fix money. Reconcile Square vs the order.`;
+): { emailSubject: string; emailText: string } {
+  const summary = `Payment discrepancy for order id ${a.orderId} (${a.kind ?? "unknown"}). Do not auto-fix money. Reconcile the gateway vs the order.`;
   return {
-    sms,
     emailSubject: `Payment discrepancy — ${a.orderId}`,
     emailText: [
-      sms,
+      summary,
       "",
       `Order id: ${a.orderId}`,
       `Kind: ${a.kind ?? "unknown"}`,
-      `Square payment: ${a.processorPaymentId ?? "none"}`,
+      `Gateway payment: ${a.processorPaymentId ?? "none"}`,
       `Order total cents: ${a.orderTotalCents ?? "n/a"}`,
-      `Square amount cents: ${a.squareAmountCents ?? "n/a"}`,
+      `Gateway amount cents: ${a.gatewayAmountCents ?? "n/a"}`,
       `Detail: ${a.detail ?? "none"}`,
-      "Action: compare Square and the order row. Do not mark the order paid from this alert. Run reconciliation and resolve by hand.",
+      "Action: compare the gateway and the order row. Do not mark the order paid from this alert. Run reconciliation and resolve by hand.",
     ].join("\n"),
   };
 }

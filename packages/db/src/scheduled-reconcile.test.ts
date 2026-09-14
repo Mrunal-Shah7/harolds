@@ -116,7 +116,7 @@ describe("scheduled reconciliation", () => {
   it("runs once per business date, records findings, and a restart does not run again", async () => {
     if (!dbAvailable) return;
     await cleanup();
-    const order = await awaitingWithPayment("sqpay-s11-orphan");
+    const order = await awaitingWithPayment("gwpay-s11-orphan");
     const markedBefore = await prisma.order.count({
       where: { clientIdempotencyKey: { startsWith: PREFIX } },
     });
@@ -126,12 +126,12 @@ describe("scheduled reconciliation", () => {
       lookbackHours: 48,
       enqueueAlerts: true,
       probePayment: async (id) =>
-        id === "sqpay-s11-orphan" ? { status: "completed", amountCents: 968 } : null,
+        id === "gwpay-s11-orphan" ? { status: "completed", amountCents: 968 } : null,
     });
     assert.equal(first.skipped, false);
     assert.equal(first.businessDate, BUSINESS);
     assert.ok(first.findingCount >= 1);
-    assert.ok(first.findings.some((f) => f.kind === "ORPHAN_SQUARE_PAYMENT" && f.orderId === order.id));
+    assert.ok(first.findings.some((f) => f.kind === "ORPHAN_GATEWAY_PAYMENT" && f.orderId === order.id));
     const alerts = await prisma.backgroundJob.count({
       where: {
         type: JobType.ALERT_MANAGER_PAYMENT_DISCREPANCY,

@@ -23,7 +23,7 @@ export type ReceiptEmailInput = {
   customerNote: string | null;
   /** Who ordered — the printed slip names them, so the emailed copy does too. */
   customerName: string | null;
-  /** Last four of the card Square captured, when it gave us one. Never the full number. */
+  /** Last four of the card the gateway captured, when it gave us one. Never the full number. */
   cardLast4: string | null;
   /** When the payment was captured. The printed slip is stamped with it. */
   paidAt: Date | null;

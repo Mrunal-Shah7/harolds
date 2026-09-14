@@ -52,8 +52,15 @@ export {
   isPlaceholderManagerEmail,
 } from "./production-guards";
 export {
-  assertPublicSquareIdentifiersForBuild,
-  missingPublicSquareIdentifiers,
-  publicSquareIdsPresentAtBuild,
-  type PublicSquareEnv,
-} from "./square-public";
+  assertPublicPaymentIdentifiersForBuild,
+  missingPublicPaymentIdentifiers,
+  publicPaymentIdsPresentAtBuild,
+  type PublicPaymentsEnv,
+} from "./payments-public";
+export {
+  getNmiConfig,
+  missingNmiCredentials,
+  NMI_SANDBOX_BASE_URL,
+  NMI_PRODUCTION_BASE_URL,
+  type NmiConfig,
+} from "./payments";

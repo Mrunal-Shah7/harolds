@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { getOrderDuplicateGuardWindowMs, getPrinterConfig } from "@harolds/config";
 import {
+  claimOrderForCharge,
   createPendingOrderGuarded,
   findOrderByIdempotencyKey,
   getPublicOrderView,
@@ -9,7 +10,9 @@ import {
   markOrderPaymentFailed,
   markOrderPaymentUnknown,
   normalizePhoneToE164,
+  prisma,
   recordProcessorPaymentId,
+  releaseChargeClaim,
   validateEmail,
   fetchItemsForQuote,
   getStoreConfig,
@@ -17,9 +20,15 @@ import {
   type OrderWithLines,
 } from "@harolds/db";
 import { parseCartRequest, quoteCart, sanitizeKitchenNote, toMenuCatalog } from "@harolds/pricing";
-import { createPayment } from "@harolds/square";
+import {
+  createPayment,
+  findPaymentByOrderId,
+  GATEWAY_REQUEST_TIMEOUT_MS,
+} from "@harolds/payments";
 import {
   ApiErrorCode,
+  JobStatus,
+  JobType,
   OrderStatus,
   PaymentStatus,
   type CartRequest,
@@ -76,12 +85,46 @@ export function cartFingerprint(cart: CartRequest): string {
  * on the one path where it is least likely to be true, and it is the sentence most likely to
  * produce the second attempt. The confident wording stays on PAYMENT_DECLINED, where it is
  * earned.
+ *
+ * SPRINT-18 corrected the wording: it told the customer to "check your texts", which stopped
+ * being possible the moment SMS was removed. It now points at the only two things that actually
+ * happen — an email receipt if the charge did land, and the store's phone.
  */
 export const AMBIGUOUS_PAYMENT_MESSAGE =
-  "We couldn't confirm that payment. Don't try again just yet — check your texts in a minute, or call the store.";
+  "We couldn't confirm that payment. Don't try again just yet — check your email for a receipt in a minute, or call the store.";
 
-/** Square payment idempotency key — derived from our order id so retries never double-charge. */
-export function squarePaymentIdempotencyKey(orderId: string): string {
+/**
+ * Machine-readable reason attached to an ambiguous PAYMENT_FAILED, so the response says WHY
+ * without telling the customer something the system cannot know.
+ *
+ * The customer-facing message is identical in every case on purpose — the honest answer is
+ * always "we don't know yet". These exist so an operator reading a log or a support ticket can
+ * tell a gateway that never answered from one that answered with something unusable, without
+ * having to open the database.
+ */
+export const AmbiguousPaymentReason = {
+  /** The sale was sent and the gateway did not give a usable answer. May or may not have charged. */
+  GATEWAY_UNCONFIRMED: "GATEWAY_UNCONFIRMED",
+  /** Another request holds the charge claim and may still be in flight. */
+  CHARGE_IN_PROGRESS: "CHARGE_IN_PROGRESS",
+  /** A previous attempt was interrupted and the gateway could not be asked what happened. */
+  RECOVERY_UNAVAILABLE: "RECOVERY_UNAVAILABLE",
+  /** The gateway has a sale for this order whose amount does not match the order total. */
+  AMOUNT_MISMATCH: "AMOUNT_MISMATCH",
+  /** The gateway has a sale for this order that is not in a completed state. */
+  GATEWAY_SALE_INCOMPLETE: "GATEWAY_SALE_INCOMPLETE",
+} as const;
+export type AmbiguousPaymentReason =
+  (typeof AmbiguousPaymentReason)[keyof typeof AmbiguousPaymentReason];
+
+/**
+ * Correlation id stamped on the gateway call's logs — NOT an idempotency key.
+ *
+ * It was one under Square, which deduplicated on it. NMI has no such field, so this value
+ * makes nothing safe on its own; `claimOrderForCharge` is what prevents a double charge.
+ * Renamed rather than deleted so log lines stay greppable across the migration.
+ */
+export function paymentCorrelationId(orderId: string): string {
   return `pay:${orderId}`;
 }
 
@@ -212,13 +255,17 @@ function parseCreateOrderBody(body: unknown):
       };
     }
   }
-  if (typeof c.smsConsent !== "boolean") {
+  // SPRINT-18: `customer.smsConsent` is still ACCEPTED so existing storefront clients keep
+  // working, but it is no longer required and is never read. SMS was removed with Twilio, so
+  // there is nothing to consent to; a client that still sends it is not an error, and one that
+  // omits it is not either. When present it must still be a boolean rather than arbitrary data.
+  if (c.smsConsent !== undefined && typeof c.smsConsent !== "boolean") {
     return {
       ok: false,
       failure: {
         ok: false,
         code: ApiErrorCode.VALIDATION_ERROR,
-        message: "customer.smsConsent must be an explicit boolean.",
+        message: "customer.smsConsent, when provided, must be a boolean.",
         details: { field: "customer.smsConsent" },
       },
     };
@@ -268,7 +315,6 @@ function parseCreateOrderBody(body: unknown):
       lastName: (c.lastName as string).trim(),
       phone: phoneE164,
       email: (c.email as string).trim().toLowerCase(),
-      smsConsent: c.smsConsent,
     },
     paymentToken: raw.paymentToken,
     idempotencyKey: raw.idempotencyKey.trim(),
@@ -313,7 +359,7 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
         ok: false,
         code: ApiErrorCode.PAYMENT_FAILED,
         message: AMBIGUOUS_PAYMENT_MESSAGE,
-        details: null,
+        details: { reason: AmbiguousPaymentReason.GATEWAY_SALE_INCOMPLETE, replayed: true },
       };
     }
     if (existing.paymentStatus === PaymentStatus.FAILED) {
@@ -321,7 +367,7 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
         ok: false,
         code: ApiErrorCode.PAYMENT_DECLINED,
         message: existing.paymentFailureReason ?? "Payment was declined.",
-        details: null,
+        details: { replayed: true },
       };
     }
     if (existing.processorPaymentId) {
@@ -399,7 +445,6 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
     };
   }
 
-  const smsConsentAt = request.customer.smsConsent ? new Date() : null;
 
   // SPRINT-16: the server-side duplicate guard. The derived client key stops the reload double
   // charge, but a cleared browser, a second tab, or another device defeats it. This is the
@@ -412,8 +457,6 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
       lastName: request.customer.lastName,
       phoneE164: request.customer.phone,
       email: request.customer.email,
-      smsConsent: request.customer.smsConsent,
-      smsConsentAt,
     },
     clientIdempotencyKey: request.idempotencyKey,
     cartFingerprint: fingerprint,
@@ -452,7 +495,7 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
         ok: false,
         code: ApiErrorCode.PAYMENT_FAILED,
         message: AMBIGUOUS_PAYMENT_MESSAGE,
-        details: null,
+        details: { reason: AmbiguousPaymentReason.GATEWAY_UNCONFIRMED, duplicateGuard: true },
       };
     }
     // Unpaid: continue paying THAT order rather than creating another.
@@ -462,35 +505,197 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
   return chargeExistingPending(guarded.order, request.paymentToken);
 }
 
-async function chargeExistingPending(
+/**
+ * How long a claim must have existed before we treat it as possibly abandoned.
+ *
+ * This is NOT a staleness heuristic for deciding whether money moved — the gateway decides that.
+ * It exists because "the gateway has no record of this order" is ambiguous while a sale is still
+ * in flight: an unbooked transaction and one that never arrived look identical. Until the
+ * in-flight window has closed, a claim is presumed live and is left strictly alone.
+ *
+ * The margin covers the gap between the gateway answering and the winner persisting its outcome.
+ */
+export const CHARGE_RECOVERY_AFTER_MS = GATEWAY_REQUEST_TIMEOUT_MS + 10_000;
+
+/** Seams for tests. Production always uses the real gateway and the real clock. */
+export type ChargeDeps = {
+  createPayment: typeof createPayment;
+  findPaymentByOrderId: typeof findPaymentByOrderId;
+  now: () => number;
+};
+
+const REAL_DEPS: ChargeDeps = {
+  createPayment,
+  findPaymentByOrderId,
+  now: () => Date.now(),
+};
+
+/**
+ * Charge an order that is pending payment.
+ *
+ * SPRINT-17. Under Square this function could simply call the gateway: the idempotency key made
+ * a repeat call harmless, so a race or a retry cost nothing. NMI has no such field, and this
+ * account's processor rejects `dup_seconds`, so a second call here takes a SECOND payment from
+ * the customer. Every path below exists to make sure the gateway is called at most once per
+ * order, and that an interrupted attempt is resolved by asking the gateway what happened rather
+ * than by guessing.
+ */
+export async function chargeExistingPending(
   order: OrderWithLines,
   paymentToken: string,
+  deps: ChargeDeps = REAL_DEPS,
 ): Promise<CheckoutSuccess | CheckoutFailure> {
-  const printers = getPrinterConfig();
-  const outcome = await createPayment({
-    sourceId: paymentToken,
-    idempotencyKey: squarePaymentIdempotencyKey(order.id),
+  const claim = await claimOrderForCharge(order.id);
+
+  switch (claim.kind) {
+    case "claimed":
+      return chargeClaimedOrder(claim.order, paymentToken, deps);
+    case "not_found":
+      return { ok: false, code: ApiErrorCode.NOT_FOUND, message: "Order not found." };
+    case "already_charged":
+      // A charge landed between our read and our claim. Show what we have; the webhook or the
+      // reconciler will finish converging it.
+      return { ok: true, order: toCheckoutOrderResponse(claim.order), replay: true };
+    case "not_chargeable":
+      // Payment already resolved (declined, refunded) or the order left AWAITING_PAYMENT.
+      //
+      // A recorded failure reason means the gateway gave a DEFINITE answer on a previous
+      // attempt, so this replays that answer as a decline. Returning PAYMENT_FAILED here told
+      // the customer the outcome was unknown when it was known — the one wording that stops
+      // them retrying with a different card, which is exactly what a declined order needs.
+      if (claim.order.paymentStatus === PaymentStatus.FAILED && claim.order.paymentFailureReason) {
+        return {
+          ok: false,
+          code: ApiErrorCode.PAYMENT_DECLINED,
+          message: claim.order.paymentFailureReason,
+          details: { replayed: true },
+        };
+      }
+      return {
+        ok: false,
+        code: ApiErrorCode.PAYMENT_FAILED,
+        message: AMBIGUOUS_PAYMENT_MESSAGE,
+        details: { reason: AmbiguousPaymentReason.GATEWAY_UNCONFIRMED },
+      };
+    case "in_flight":
+      return resolveInFlightCharge(claim.order, paymentToken, claim.claimedAt, deps);
+  }
+}
+
+/**
+ * Someone else holds the charge claim — either a concurrent request, or an attempt that died
+ * before it could record its outcome.
+ *
+ * Two questions, in order, and the order matters:
+ *
+ *  1. COULD the holder still be working? A claim younger than the gateway's own request timeout
+ *     may belong to a sale that is in flight right now. The gateway has not booked it yet, so
+ *     asking would return "no such order" — the same answer it gives when the request never
+ *     arrived. Acting on that ambiguity is a double charge, so a young claim is left untouched.
+ *  2. Only once the window has closed: what does the GATEWAY say? It is the only thing that
+ *     knows whether money moved, and it is asked by our own order id. Nothing below infers an
+ *     outcome from elapsed time — the clock decides only whether it is safe to look.
+ */
+async function resolveInFlightCharge(
+  order: OrderWithLines,
+  paymentToken: string,
+  claimedAt: Date,
+  deps: ChargeDeps,
+): Promise<CheckoutSuccess | CheckoutFailure> {
+  const ambiguous = (reason: AmbiguousPaymentReason): CheckoutFailure => ({
+    ok: false,
+    code: ApiErrorCode.PAYMENT_FAILED,
+    message: AMBIGUOUS_PAYMENT_MESSAGE,
+    details: { reason },
+  });
+
+  // (1) The holder may still be mid-flight. Touch nothing — not the gateway, not the claim.
+  if (deps.now() - claimedAt.getTime() < CHARGE_RECOVERY_AFTER_MS) {
+    return ambiguous(AmbiguousPaymentReason.CHARGE_IN_PROGRESS);
+  }
+
+  // (2) The window has closed. Ask the gateway what actually happened.
+  let existingPayment: Awaited<ReturnType<typeof findPaymentByOrderId>>;
+  try {
+    existingPayment = await deps.findPaymentByOrderId(order.id);
+  } catch {
+    // We could not ask. Failing closed is the only safe answer: charging now risks doubling a
+    // payment that may already exist.
+    return ambiguous(AmbiguousPaymentReason.RECOVERY_UNAVAILABLE);
+  }
+
+  if (!existingPayment) {
+    // No record after the in-flight window has passed, so the previous attempt never reached the
+    // gateway. Release THIS claim specifically — `releaseChargeClaim` matches the exact timestamp
+    // we observed, so a claim taken since we looked is left alone — then re-claim and charge.
+    const released = await releaseChargeClaim(order.id, claimedAt);
+    if (!released) return ambiguous(AmbiguousPaymentReason.CHARGE_IN_PROGRESS);
+
+    const reclaim = await claimOrderForCharge(order.id);
+    if (reclaim.kind !== "claimed") return ambiguous(AmbiguousPaymentReason.CHARGE_IN_PROGRESS);
+    return chargeClaimedOrder(reclaim.order, paymentToken, deps);
+  }
+
+  if (existingPayment.amountCents !== order.totalCents) {
+    // A sale exists for this order but not for this price. Never charge again, never mark paid;
+    // a human has to look at it.
+    await prisma.backgroundJob.create({
+      data: {
+        type: JobType.ALERT_MANAGER_PAYMENT_DISCREPANCY,
+        status: JobStatus.PENDING,
+        payload: {
+          orderId: order.id,
+          paymentId: existingPayment.paymentId,
+          orderTotalCents: order.totalCents,
+          gatewayAmountCents: existingPayment.amountCents,
+          reason: "Recovered gateway sale does not match order total",
+        },
+      },
+    });
+    return ambiguous(AmbiguousPaymentReason.AMOUNT_MISMATCH);
+  }
+
+  // The money moved and the amount is right — the previous attempt succeeded and died before it
+  // could say so. Finish what it started instead of charging again.
+  if (existingPayment.status === "completed") {
+    return finalisePaidOrder(
+      order.id,
+      { paymentId: existingPayment.paymentId, cardLast4: existingPayment.cardLast4 },
+      deps,
+    );
+  }
+
+  // A sale exists but is not (yet) good — failed, pending, or something we do not recognise.
+  // Record the pointer so reconciliation can find it, and leave the claim in place.
+  await markOrderPaymentUnknown(order.id, { processorPaymentId: existingPayment.paymentId });
+  return ambiguous(AmbiguousPaymentReason.GATEWAY_SALE_INCOMPLETE);
+}
+
+/** Send the sale. Only ever reached holding the claim for this order. */
+async function chargeClaimedOrder(
+  order: OrderWithLines,
+  paymentToken: string,
+  deps: ChargeDeps,
+): Promise<CheckoutSuccess | CheckoutFailure> {
+  const outcome = await deps.createPayment({
+    paymentToken,
+    correlationId: paymentCorrelationId(order.id),
     amountCents: order.totalCents,
     orderId: order.id,
     orderReference: order.id,
   });
 
   if (outcome.kind === "succeeded") {
-    // Record payment id BEFORE allocate/paid — crash recovery relies on this.
-    await recordProcessorPaymentId(order.id, outcome.paymentId);
-    const paid = await markOrderPaidAndAllocate(order.id, {
-      paymentId: outcome.paymentId,
-      paidAt: new Date(),
-      kitchenSerial: printers.kitchenSerial,
-      counterSerial: printers.counterSerial,
-      printMaxAttempts: printers.maxAttempts,
-      cardLast4: outcome.cardLast4,
-      correlationId: getRequestId() ?? null,
-    });
-    return { ok: true, order: toCheckoutOrderResponse(paid), replay: false };
+    return finalisePaidOrder(
+      order.id,
+      { paymentId: outcome.paymentId, cardLast4: outcome.cardLast4 },
+      deps,
+    );
   }
 
   if (outcome.kind === "declined") {
+    // Definite: no money moved. This releases the claim, so the customer can retry with
+    // another card on a new order.
     await markOrderPaymentFailed(order.id, {
       processorPaymentId: outcome.paymentId,
       reason: outcome.reason,
@@ -503,7 +708,8 @@ async function chargeExistingPending(
     };
   }
 
-  // transport_failure — do not assume no charge
+  // transport_failure — do not assume no charge. The claim is deliberately NOT released: the
+  // recovery path above will ask the gateway what actually happened.
   await markOrderPaymentUnknown(order.id, {
     processorPaymentId: outcome.paymentId,
   });
@@ -511,8 +717,34 @@ async function chargeExistingPending(
     ok: false,
     code: ApiErrorCode.PAYMENT_FAILED,
     message: AMBIGUOUS_PAYMENT_MESSAGE,
-    details: null,
+    details: { reason: AmbiguousPaymentReason.GATEWAY_UNCONFIRMED },
   };
+}
+
+/** Record the payment id, then allocate the number and enqueue fulfilment. */
+async function finalisePaidOrder(
+  orderId: string,
+  payment: { paymentId: string; cardLast4: string | null },
+  deps: ChargeDeps,
+): Promise<CheckoutSuccess> {
+  const printers = getPrinterConfig();
+  // Record payment id BEFORE allocate/paid — crash recovery relies on this. It also clears the
+  // charge claim, which is what retires this order from the recovery path for good.
+  await recordProcessorPaymentId(orderId, payment.paymentId);
+  const paid = await markOrderPaidAndAllocate(orderId, {
+    paymentId: payment.paymentId,
+    // The INJECTED clock, not `new Date()`. This instant decides the business date the order
+    // number is allocated under, so a test using the wall clock burns real numbers out of
+    // today's counter — which never rolls back, because an order number must never be reused.
+    // Tests pin it to a far-future date and allocate from a throwaway counter row instead.
+    paidAt: new Date(deps.now()),
+    kitchenSerial: printers.kitchenSerial,
+    counterSerial: printers.counterSerial,
+    printMaxAttempts: printers.maxAttempts,
+    cardLast4: payment.cardLast4,
+    correlationId: getRequestId() ?? null,
+  });
+  return { ok: true, order: toCheckoutOrderResponse(paid), replay: false };
 }
 
 export { getPublicOrderView };

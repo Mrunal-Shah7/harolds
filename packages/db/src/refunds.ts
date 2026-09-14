@@ -1,4 +1,4 @@
-// SPRINT-4: refund persistence helpers — no Square imports (caller uses @harolds/square)
+// SPRINT-4: refund persistence helpers — no gateway imports (caller uses @harolds/payments)
 import { prisma } from "./client";
 import type { OrderWithLines } from "./repositories/orders";
 import { OrderStatus, PaymentStatus } from "@harolds/types";

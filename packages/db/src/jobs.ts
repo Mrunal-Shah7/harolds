@@ -413,64 +413,10 @@ export async function countRecentDeliveredAlerts(args: {
   });
 }
 
-export async function isPhoneSuppressed(phoneE164: string): Promise<boolean> {
-  const row = await prisma.smsSuppression.findUnique({
-    where: { phoneE164 },
-    select: { suppressed: true },
-  });
-  return row?.suppressed === true;
-}
+// SPRINT-18: `isPhoneSuppressed`, `setSmsSuppression` and `recordSmsInboundEvent` were removed
+// with the SMS subsystem. The SmsSuppression / SmsInboundEvent tables still exist (the removal
+// was deliberately code-only, no migration) but nothing reads or writes them any more.
 
-export async function setSmsSuppression(args: {
-  phoneE164: string;
-  suppressed: boolean;
-  at?: Date;
-}): Promise<void> {
-  const at = args.at ?? new Date();
-  await prisma.smsSuppression.upsert({
-    where: { phoneE164: args.phoneE164 },
-    create: {
-      phoneE164: args.phoneE164,
-      suppressed: args.suppressed,
-      optedOutAt: args.suppressed ? at : null,
-      optedInAt: args.suppressed ? null : at,
-    },
-    update: {
-      suppressed: args.suppressed,
-      ...(args.suppressed ? { optedOutAt: at } : { optedInAt: at }),
-    },
-  });
-}
-
-export type SmsInboundKind = "opt_out" | "opt_in" | "ignored";
-
-export type RecordSmsInboundResult =
-  | { outcome: "duplicate"; kind: SmsInboundKind }
-  | { outcome: "recorded"; kind: SmsInboundKind };
-
-export async function recordSmsInboundEvent(args: {
-  providerEventId: string;
-  fromPhone: string;
-  body: string;
-  kind: SmsInboundKind;
-}): Promise<RecordSmsInboundResult> {
-  const existing = await prisma.smsInboundEvent.findUnique({
-    where: { providerEventId: args.providerEventId },
-    select: { kind: true },
-  });
-  if (existing) {
-    return { outcome: "duplicate", kind: existing.kind as SmsInboundKind };
-  }
-  await prisma.smsInboundEvent.create({
-    data: {
-      providerEventId: args.providerEventId,
-      fromPhone: args.fromPhone,
-      body: args.body.slice(0, 500),
-      kind: args.kind,
-    },
-  });
-  return { outcome: "recorded", kind: args.kind };
-}
 
 export function payloadOf<T extends Record<string, unknown>>(payload: Prisma.JsonValue): T {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {

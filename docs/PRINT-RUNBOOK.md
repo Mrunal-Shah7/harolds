@@ -29,7 +29,7 @@ Ask a manager to reprint from `/admin` on the order (Reprint kitchen / Reprint c
 
 1. Manager on duty.
 2. The person who set up the online ordering (they have the server and the printer login).
-3. Do not call Square for a missing kitchen ticket — payment already happened. The order is still paid even if the paper never came out. Check the kitchen screen (when it is installed) for the same order.
+3. Do not call the payment gateway for a missing kitchen ticket — payment already happened. The order is still paid even if the paper never came out. Check the kitchen screen (when it is installed) for the same order.
 
 ## 5. What not to do
 

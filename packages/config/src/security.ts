@@ -1,4 +1,4 @@
-// SPRINT-9: rate-limit knobs, body caps, trusted-proxy, and CSP for Square Web Payments.
+// SPRINT-9 / SPRINT-17: rate-limit knobs, body caps, trusted-proxy, and CSP for NMI Collect.js.
 import { env } from "./env";
 
 export type RateBucketName =
@@ -18,7 +18,7 @@ export type RateLimitRule = { limit: number; windowMs: number };
 export const RATE_LIMITS: Record<RateBucketName, RateLimitRule> = {
   // Reprices a whole cart; unauthenticated POST.
   quote: { limit: 20, windowMs: 60_000 },
-  // Touches money and Square. Idempotency covers duplicates; this covers volume.
+  // Touches money and the payment gateway. The pre-charge guard covers duplicates; this covers volume.
   orders: { limit: 8, windowMs: 60_000 },
   // Cheap and cached; scrapers still get a ceiling.
   menu: { limit: 120, windowMs: 60_000 },
@@ -47,8 +47,7 @@ export const WORKER_STALE_DEFAULT_MS = 30_000;
 export const RATE_LIMIT_EXEMPT_PATHS = [
   "/api/v1/print/poll",
   "/api/v1/print/complete",
-  "/api/v1/webhooks/square",
-  "/api/v1/webhooks/twilio",
+  "/api/v1/webhooks/nmi",
   "/api/internal/kitchen/queue",
   "/api/v1/health",
 ] as const;
@@ -74,38 +73,39 @@ export function getWorkerStaleMs(): number {
 }
 
 /**
- * Square Web Payments SDK plus Next.js hydration.
+ * NMI Collect.js plus Next.js hydration.
  * `unsafe-inline` / `unsafe-eval` are required for the App Router without per-request nonces.
- * style-src / font-src must include Square CDN hosts — the card iframe loads
- * `card-wrapper.css` and Square fonts from squarecdn (see Square CSP docs).
+ *
+ * Collect.js is served from the gateway host and mounts its card fields as iframes from that
+ * same host, so the gateway origins must appear in script-src, style-src AND frame-src. Both
+ * the sandbox and production hosts are listed: the CSP is a static header, and a build that
+ * shipped only one would break the moment NMI_ENVIRONMENT flipped.
  */
 export function contentSecurityPolicy(): string {
-  const square = [
-    "https://*.squarecdn.com",
-    "https://*.squareup.com",
-    "https://*.squareupsandbox.com",
-    "https://web.squarecdn.com",
-    "https://sandbox.web.squarecdn.com",
-    "https://pci-connect.squareup.com",
-    "https://pci-connect.squareupsandbox.com",
+  const gateway = [
+    "https://secure.nmi.com",
+    "https://sandbox.nmi.com",
+    "https://secure.networkmerchants.com",
   ].join(" ");
-  // Fonts served by the Web Payments SDK (documented Square CSP hosts).
-  const squareFonts = [
-    "https://*.squarecdn.com",
-    "https://square-fonts-production-f.squarecdn.com",
-    "https://cash-f.squarecdn.com",
-    "https://d1g145x70srn7h.cloudfront.net",
-  ].join(" ");
-  // Square's own SDK telemetry (ingest) — documented alongside connect-src for Web Payments.
-  const squareConnectExtra = "https://o160250.ingest.sentry.io";
+  /**
+   * Apple's Pay JS SDK, which Collect.js injects ITSELF.
+   *
+   * Do not remove this on the reasoning that this checkout has no wallets — it does not, and
+   * this is still required. Collect.js appends the script tag in its own constructor, at load
+   * time, before `CollectJS.configure()` is ever called, with no flag to suppress it. Blocking
+   * it does not prevent any feature we use; it only produces an unfixable CSP violation on
+   * every single checkout page load, which is how a violation report stops being worth reading.
+   * The host is `cdn-apple.com` (hyphen) — `cdn.apple.com` is a different name and will not match.
+   */
+  const collectJsApplePay = "https://applepay.cdn-apple.com";
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${square}`,
-    `style-src 'self' 'unsafe-inline' ${square}`,
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${gateway} ${collectJsApplePay}`,
+    `style-src 'self' 'unsafe-inline' ${gateway}`,
     "img-src 'self' data: blob: https:",
-    `font-src 'self' data: https://fonts.gstatic.com ${squareFonts}`,
-    `frame-src 'self' ${square}`,
-    `connect-src 'self' ${square} ${squareConnectExtra}`,
+    "font-src 'self' data: https://fonts.gstatic.com",
+    `frame-src 'self' ${gateway}`,
+    `connect-src 'self' ${gateway}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

@@ -1,5 +1,5 @@
 // SPRINT-6: order status transition table — the only place legal kitchen/print status changes are decided.
-// SPRINT-7: SMS_ORDER_READY is enqueued in the same transaction as the READY transition.
+// SPRINT-7 / SPRINT-18: the READY transition no longer enqueues a customer notification.
 import { JobStatus, JobType, OrderStatus } from "@harolds/types";
 import { emitLog } from "@harolds/config";
 import { prisma } from "./client";
@@ -166,16 +166,10 @@ export async function applyOrderTransition(
         },
       });
 
-      if (args.to === OrderStatus.READY) {
-        await tx.backgroundJob.create({
-          data: {
-            type: JobType.SMS_ORDER_READY,
-            status: JobStatus.PENDING,
-            payload: { orderId: args.orderId },
-            runAfter: now,
-          },
-        });
-      }
+      // SPRINT-18: reaching READY used to enqueue an SMS_ORDER_READY job. SMS was removed with
+      // Twilio and there is no email equivalent (handleEmailOrderReady was never implemented),
+      // so the customer is NOT notified when their order is ready — the counter calls them.
+      // Restoring a notification here means implementing the email handler first.
 
       if (args.afterWork) {
         await args.afterWork(tx);

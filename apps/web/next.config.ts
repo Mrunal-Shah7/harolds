@@ -1,10 +1,10 @@
 // SPRINT-1: Next.js config — standalone output for self-hosted Ubuntu deployment
-// SPRINT-12: fail the build when public Square identifiers are absent (client SDK needs them inlined).
+// SPRINT-12 / SPRINT-17: fail the build when the public Collect.js key is absent (it is inlined).
 import type { NextConfig } from "next";
 import { config as loadDotenv } from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertPublicSquareIdentifiersForBuild } from "@harolds/config/square-public";
+import { assertPublicPaymentIdentifiersForBuild } from "@harolds/config/payments-public";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -12,7 +12,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadDotenv({ path: path.join(__dirname, "../../.env") });
 
 // Build-time only — a missing public ID produces a broken checkout, not a recoverable runtime gap.
-assertPublicSquareIdentifiersForBuild(process.env);
+assertPublicPaymentIdentifiersForBuild(process.env);
 
 const nextConfig: NextConfig = {
   // Production is a long-lived Node process behind a reverse proxy, not serverless.
@@ -24,15 +24,14 @@ const nextConfig: NextConfig = {
     "@harolds/config",
     "@harolds/db",
     "@harolds/pricing",
-    "@harolds/square",
+    "@harolds/payments",
     "@harolds/print",
     "@harolds/types",
-    "@harolds/sms",
     "@harolds/email",
     "@harolds/notify",
   ],
   // Prisma + provider SDKs ship native / heavy deps — keep them external.
-  serverExternalPackages: ["@prisma/client", "prisma", "square", "twilio", "resend"],
+  serverExternalPackages: ["@prisma/client", "prisma", "resend"],
   webpack: (config, { nextRuntime }) => {
     if (nextRuntime === "edge") {
       const stub = path.join(__dirname, "src/empty-edge-stub.ts");

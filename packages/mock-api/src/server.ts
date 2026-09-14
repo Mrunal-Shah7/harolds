@@ -228,7 +228,7 @@ app.post("/api/v1/quote", async (c) => {
 });
 
 /**
- * POST /api/v1/orders — fabricate paid order via shared pricing engine (no Square, no DB).
+ * POST /api/v1/orders — fabricate paid order via shared pricing engine (no gateway, no DB).
  * Triggers: ?forcePayment=declined|transport
  *           ?forceSoldOut=item
  *           ?forceStore=closed|not-accepting
@@ -272,7 +272,8 @@ app.post("/api/v1/orders", async (c) => {
     return c.json(okBody(existing), 200, { "Cache-Control": "no-store" });
   }
 
-  // SPRINT-11: match the real checkout contract — customer + token required, smsConsent explicit.
+  // SPRINT-11 / SPRINT-18: match the real checkout contract — customer + token required.
+  // `smsConsent` is retired: accepted when present, never required, never used.
   const paymentToken = typeof body.paymentToken === "string" ? body.paymentToken : "";
   if (!paymentToken) {
     return c.json(
@@ -298,9 +299,9 @@ app.post("/api/v1/orders", async (c) => {
       );
     }
   }
-  if (typeof cust.smsConsent !== "boolean") {
+  if (cust.smsConsent !== undefined && typeof cust.smsConsent !== "boolean") {
     return c.json(
-      failBody(ApiErrorCode.VALIDATION_ERROR, "customer.smsConsent must be an explicit boolean.", {
+      failBody(ApiErrorCode.VALIDATION_ERROR, "customer.smsConsent, when provided, must be a boolean.", {
         field: "customer.smsConsent",
       }),
       errorStatus(ApiErrorCode.VALIDATION_ERROR),
@@ -440,7 +441,7 @@ app.get("/api/v1/orders/status/:lookupToken", (c) => {
 });
 
 app.get("/api/v1/health", (c) => {
-  return c.json(okBody({ ok: true, squareEnvironment: "mock", nodeEnv: "development", contractVersion: "1.3.0" }));
+  return c.json(okBody({ ok: true, paymentEnvironment: "mock", nodeEnv: "development", contractVersion: "1.3.0" }));
 });
 
 app.notFound((c) => {

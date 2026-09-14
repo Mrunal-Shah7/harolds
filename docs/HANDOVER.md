@@ -19,9 +19,9 @@ One Next.js 15 App Router process on Ubuntu:
 | Kitchen PWA | `/kitchen` |
 | Public API | `/api/v1/*` |
 | Print SDP | `/api/v1/print/poll` |
-| Square / Twilio webhooks | `/api/v1/webhooks/*` |
+| NMI webhooks | `/api/v1/webhooks/nmi` |
 
-Packages: `pricing` (integer cents, one rounding point), `square` / `sms` / `email` (each the only importer of its SDK), `print` (ePOS XML), `notify` (job worker), `db` (Prisma), `config` (env + logs + rate limits), `mock-api` (storefront contract mock).
+Packages: `pricing` (integer cents, one rounding point), `payments` / `email` (each the only module that talks to its provider), `print` (ePOS XML), `notify` (job worker), `db` (Prisma), `config` (env + logs + rate limits), `mock-api` (storefront contract mock).
 
 PostgreSQL is local on the same box. No Redis. Menu cache, job queue, and rate limits are in-process because production is **one** long-lived Node process.
 
@@ -53,7 +53,7 @@ Watch daily:
 - Error tracker (Sentry if `SENTRY_DSN` set)
 - `pnpm reconcile --hours 24` **every day for the first week**
 
-Health: `GET /api/v1/health` — 200 only if DB `SELECT 1` and worker heartbeat (on `globalThis`) is fresh. Probe this from an **uptime service that is not Twilio or Resend**.
+Health: `GET /api/v1/health` — 200 only if DB `SELECT 1` and worker heartbeat (on `globalThis`) is fresh. Probe this from an **uptime service that is not Resend**.
 
 Backups: daily off-box; restore drill measured in Sprint 9 at **562 ms** on the Windows dev dump. Re-measure on Ubuntu.
 
@@ -61,7 +61,7 @@ Backups: daily off-box; restore drill measured in Sprint 9 at **562 ms** on the 
 
 ## Credential rotation
 
-See `docs/SECURITY.md` §5. Square webhook key and print secret need a coordinated two-sided change.
+See `docs/SECURITY.md` §5. The NMI webhook signing key and the print secret need a coordinated two-sided change.
 
 ---
 

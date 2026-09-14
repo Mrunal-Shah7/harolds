@@ -1,4 +1,4 @@
-// SPRINT-9: exemptions and Square CSP sources.
+// SPRINT-9 / SPRINT-17: exemptions and NMI Collect.js CSP sources.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -8,11 +8,12 @@ import {
 } from "./security";
 
 describe("rate limit policy", () => {
-  it("exempts printer poll, Square webhook, kitchen queue, and health", () => {
+  it("exempts printer poll, gateway webhook, kitchen queue, and health", () => {
     assert.equal(isRateLimitExemptPath("/api/v1/print/poll"), true);
     assert.equal(isRateLimitExemptPath("/api/v1/print/complete"), true);
-    assert.equal(isRateLimitExemptPath("/api/v1/webhooks/square"), true);
-    assert.equal(isRateLimitExemptPath("/api/v1/webhooks/twilio"), true);
+    assert.equal(isRateLimitExemptPath("/api/v1/webhooks/nmi"), true);
+    // SPRINT-18: the Twilio inbound webhook was deleted with the SMS subsystem.
+    assert.equal(isRateLimitExemptPath("/api/v1/webhooks/twilio"), false);
     assert.equal(isRateLimitExemptPath("/api/internal/kitchen/queue"), true);
     assert.equal(isRateLimitExemptPath("/api/v1/health"), true);
     assert.equal(isRateLimitExemptPath("/api/v1/quote"), false);
@@ -26,15 +27,27 @@ describe("rate limit policy", () => {
 });
 
 describe("content security policy", () => {
-  it("allows Square Web Payments script, frame, connect, style, and font origins", () => {
+  it("allows Collect.js script, frame, connect and style origins", () => {
     const csp = contentSecurityPolicy();
-    assert.match(csp, /squarecdn\.com/);
-    assert.match(csp, /squareup\.com/);
-    assert.match(csp, /squareupsandbox\.com/);
+    // Both gateway hosts must be present: the CSP is a static header, so a policy carrying
+    // only the active one would break the moment NMI_ENVIRONMENT flipped.
+    assert.match(csp, /script-src[^;]*https:\/\/secure\.nmi\.com/);
+    assert.match(csp, /script-src[^;]*https:\/\/sandbox\.nmi\.com/);
+    // Collect.js mounts its card fields as iframes served from the gateway.
+    assert.match(csp, /frame-src[^;]*https:\/\/secure\.nmi\.com/);
+    assert.match(csp, /frame-src[^;]*https:\/\/sandbox\.nmi\.com/);
+    assert.match(csp, /style-src[^;]*nmi\.com/);
+    assert.match(csp, /connect-src[^;]*nmi\.com/);
     assert.match(csp, /frame-ancestors 'none'/);
-    assert.match(csp, /style-src[^;]*sandbox\.web\.squarecdn\.com/);
-    assert.match(csp, /font-src[^;]*square-fonts-production-f\.squarecdn\.com/);
-    assert.match(csp, /font-src[^;]*d1g145x70srn7h\.cloudfront\.net/);
-    assert.match(csp, /connect-src[^;]*o160250\.ingest\.sentry\.io/);
+    // Square's CDNs must be gone entirely, not merely unused.
+    assert.doesNotMatch(csp, /square/i);
+  });
+
+  it("allows the Apple Pay SDK host that Collect.js injects for itself", () => {
+    // Not a wallet feature — this checkout has none. Collect.js appends the Apple script tag in
+    // its own constructor before configure() runs, and nothing suppresses it, so omitting the
+    // host means a CSP violation on every checkout load. The hyphen matters.
+    const csp = contentSecurityPolicy();
+    assert.match(csp, /script-src[^;]*https:\/\/applepay\.cdn-apple\.com/);
   });
 });

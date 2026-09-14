@@ -123,7 +123,6 @@ export async function getAdminOrderDetail(id: string, timeZone: string) {
     customerLastName: order.customerLastName,
     customerPhoneRedacted: redactPhone(order.customerPhone),
     customerEmailRedacted: redactEmail(order.customerEmail),
-    smsConsent: order.smsConsent,
     status: order.status,
     paymentStatus: order.paymentStatus,
     processorPaymentIdRedacted: redactPaymentId(order.processorPaymentId),

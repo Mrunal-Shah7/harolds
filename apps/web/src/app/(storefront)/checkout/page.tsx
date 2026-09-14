@@ -33,7 +33,7 @@ import { StorefrontHeader } from "@/components/storefront/header";
 import { CartSheet } from "@/components/storefront/cart-sheet";
 import { hasAnyError, validateCheckout, validateCustomTip } from "@/lib/checkout-validation";
 import { Alert, EmptyState } from "@/components/ui/feedback";
-import { SquarePaymentForm, requestTokenize } from "@/components/storefront/square-payment-form";
+import { NmiPaymentForm, requestTokenize } from "@/components/storefront/nmi-payment-form";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -49,10 +49,9 @@ export default function CheckoutPage() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  // SMS is switched off for now, so nothing collects consent and nothing is texted. The field
-  // is still SENT — the order contract and the notify package are unchanged and expect it — it
-  // is simply always false. Re-enabling SMS means restoring the checkbox, not a schema change.
-  const smsConsent = false;
+  // SPRINT-18: SMS was removed entirely (Twilio dropped), so there is no consent to collect and
+  // nothing to send. `smsConsent` is no longer part of the request at all — the API still
+  // tolerates it from older clients, but this one has stopped claiming a preference it cannot act on.
 
   const [customTip, setCustomTip] = useState("");
   /** Whole-order instruction for the kitchen. Sent as CreateOrderRequest.customerNote. */
@@ -68,7 +67,7 @@ export default function CheckoutPage() {
    * Decoy field, positioned off-screen and hidden from assistive tech. A person never sees it and
    * a scripted submitter fills it, so a non-empty value here means the submission was not typed
    * by a human. Paired with the minimum-elapsed check below to make card testing against this
-   * Square account tedious rather than free.
+   * gateway account tedious rather than free.
    */
   const [decoy, setDecoy] = useState("");
   const mountedAt = useRef<number>(Date.now());
@@ -157,7 +156,6 @@ export default function CheckoutPage() {
         lastName: lastName.trim(),
         phone: phone.trim(),
         email: email.trim(),
-        smsConsent,
       };
       const note = orderNote.trim().length > 0 ? orderNote.trim() : null;
       // Derived, not minted. The same cart + contact + session nonce always derives the same
@@ -411,15 +409,29 @@ export default function CheckoutPage() {
                     ) : null}
                   </div>
 
-                  {/* Decoy. Off-screen and hidden from assistive tech, so only a script fills
-                      it; see `decoy` in state. Never submitted anywhere. */}
+                  {/*
+                    Decoy. Off-screen and hidden from assistive tech, so only a script fills it;
+                    see `decoy` in state. Never submitted anywhere.
+
+                    The name and id are deliberately MEANINGLESS. This field was previously
+                    `company_website` with a visible "Company website" label, and browser password
+                    managers filled it with the user's organisation — every affected customer was
+                    then permanently blocked from paying, because a non-empty decoy fails the
+                    submit check on every attempt. Autofill matches on name/id/label/placeholder
+                    tokens like "company", "organization", "website" and "url", so the trap must
+                    not contain any of them. `autoComplete="off"` alone is not enough: managers
+                    routinely ignore it on fields that look like a real one.
+
+                    If this ever needs renaming again, keep it semantically empty.
+                  */}
                   <div aria-hidden="true" className="decoy-field">
-                    <label htmlFor="company-website">Company website</label>
                     <input
-                      id="company-website"
-                      name="company_website"
+                      id="hx-9f2"
+                      name="hx_9f2"
+                      type="text"
                       tabIndex={-1}
                       autoComplete="off"
+                      aria-hidden="true"
                       value={decoy}
                       onChange={(e) => setDecoy(e.target.value)}
                     />
@@ -534,11 +546,10 @@ export default function CheckoutPage() {
 
                 <div className="co-card card">
                   <h3>Payment</h3>
-                  <SquarePaymentForm
+                  <NmiPaymentForm
                     onTokenReady={handleTokenReady}
                     onError={handleTokenError}
                     disabled={!quote?.orderable}
-                    displayTotalCents={quote?.totalCents}
                   />
                 </div>
               </div>
@@ -614,8 +625,9 @@ export default function CheckoutPage() {
                   server.
                 </p>
 
-                {/* Card only, for now — the wallet methods are hidden in SquarePaymentForm,
-                    and advertising a method the form does not offer is worse than not listing it. */}
+                {/* Card only. Collect.js supports wallets separately and this deployment has not
+                    set them up, and advertising a method the form does not offer is worse than
+                    not listing it. */}
                 <div className="paywith">
                   <span className="paychip">Card</span>
                 </div>

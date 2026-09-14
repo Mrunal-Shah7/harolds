@@ -1,7 +1,7 @@
 // SPRINT-11: in-process daily reconciliation — same start/stop discipline as the print sweeper.
 import { emitLog, getReconcileSchedulerConfig } from "@harolds/config";
 import { maybeRunScheduledReconciliation } from "@harolds/db";
-import { getPayment } from "@harolds/square";
+import { getPayment } from "@harolds/payments";
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let inFlight = false;

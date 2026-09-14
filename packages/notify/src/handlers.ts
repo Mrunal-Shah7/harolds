@@ -1,17 +1,19 @@
-// SPRINT-7: job handlers — one per declared JobType. Never change order state.
+// SPRINT-7 / SPRINT-18: job handlers — one per declared JobType. Never change order state.
+//
+// SMS was removed in Sprint 18. The two SMS job types remain in the JobType enum because it is
+// a PostgreSQL enum with existing rows referencing those values, and dropping them would need a
+// migration plus deleting historical job rows. They are handled here as permanent skips so any
+// straggler row drains harmlessly instead of crashing the worker on an unhandled type.
 import { getJobWorkerConfig } from "@harolds/config";
 import {
   countRecentDeliveredAlerts,
   getStoreConfig,
-  isPhoneSuppressed,
   payloadOf,
   prisma,
   recordJobProviderMessageId,
-  setSmsSuppression,
   type ClaimedBackgroundJob,
 } from "@harolds/db";
 import type { EmailSendResult } from "@harolds/email";
-import { isUnsubscribedCode, type SmsSendResult } from "@harolds/sms";
 import { JobType } from "@harolds/types";
 import { PermanentJobError, TransientJobError } from "./errors";
 import type { NotifyPorts } from "./ports";
@@ -22,7 +24,6 @@ import {
   renderUnackedAlert,
 } from "./templates-alerts";
 import { receiptSubject, renderReceiptHtml, renderReceiptText, type ReceiptLine } from "./templates-email";
-import { renderOrderConfirmationSms, renderOrderReadySms } from "./templates-sms";
 
 export type HandlerSuccess = {
   result: string;
@@ -53,37 +54,12 @@ async function loadOrder(orderId: string) {
   return order;
 }
 
-function applySendResult(job: ClaimedBackgroundJob, send: SmsSendResult | EmailSendResult): string {
+function applySendResult(job: ClaimedBackgroundJob, send: EmailSendResult): string {
   if (send.kind === "sent") return send.providerMessageId;
   if (send.kind === "rejected") {
-    if ("code" in send && isUnsubscribedCode(send.code)) {
-      throw Object.assign(new PermanentJobError(`Provider unsubscribed: ${send.message}`), {
-        unsubscribed: true,
-        code: send.code,
-      });
-    }
     throw new PermanentJobError(`${send.code}: ${send.message}`);
   }
   throw new TransientJobError(send.message);
-}
-
-async function sendAndRecordSms(
-  job: ClaimedBackgroundJob,
-  ports: NotifyPorts,
-  to: string,
-  body: string,
-): Promise<string> {
-  const send = await ports.sendSms({ toE164: to, body });
-  if (send.kind === "sent") {
-    await recordJobProviderMessageId(job.id, send.providerMessageId);
-    return send.providerMessageId;
-  }
-  if (send.kind === "rejected" && isUnsubscribedCode(send.code)) {
-    await setSmsSuppression({ phoneE164: to, suppressed: true });
-    throw Object.assign(new Error("unsubscribed"), { skipSuppressed: true as const });
-  }
-  applySendResult(job, send);
-  throw new TransientJobError("unreachable");
 }
 
 async function sendAndRecordEmail(
@@ -105,53 +81,20 @@ async function sendAndRecordEmail(
   throw new TransientJobError("unreachable");
 }
 
-async function handleCustomerSms(
-  job: ClaimedBackgroundJob,
-  ports: NotifyPorts,
-  bodyFor: (order: Awaited<ReturnType<typeof loadOrder>>, store: Awaited<ReturnType<typeof getStoreConfig>>) => string,
-): Promise<HandlerSuccess> {
-  if (job.providerMessageId) {
-    return { result: "SENT", providerMessageId: job.providerMessageId };
-  }
-  const order = await loadOrder(orderIdOf(job));
-  if (!order.smsConsent) {
-    return { result: "SKIPPED_NO_CONSENT" };
-  }
-  if (await isPhoneSuppressed(order.customerPhone)) {
-    return { result: "SKIPPED_SUPPRESSED" };
-  }
-  if (!E164.test(order.customerPhone)) {
-    throw new PermanentJobError("Stored phone number is not sendable E.164.");
-  }
-  const store = await getStoreConfig();
-  try {
-    const id = await sendAndRecordSms(job, ports, order.customerPhone, bodyFor(order, store));
-    return { result: "SENT", providerMessageId: id };
-  } catch (err) {
-    if (err && typeof err === "object" && "skipSuppressed" in err) {
-      return { result: "SKIPPED_SUPPRESSED" };
-    }
-    throw err;
-  }
-}
-
-export const handleSmsOrderConfirmation: JobHandler = async (job, ports) => {
-  return handleCustomerSms(job, ports, (order, store) => {
-    if (!order.estimatedReadyAt) {
-      throw new PermanentJobError("Order has no estimatedReadyAt.");
-    }
-    return renderOrderConfirmationSms({
-      storeName: store.storeName,
-      orderNumber: order.orderNumber ?? "unnumbered",
-      estimatedReadyAt: order.estimatedReadyAt,
-      timeZone: store.timezone,
-    });
-  });
+/**
+ * SMS was removed in Sprint 18. These two handlers exist ONLY so that `JOB_HANDLERS` stays
+ * exhaustive over the JobType enum, and so that job rows enqueued before the removal drain to a
+ * terminal state instead of failing forever as an unhandled type.
+ *
+ * Nothing enqueues these any more — see `markOrderPaidAndAllocate` and `applyOrderTransition`.
+ * If SMS ever returns, restore the real handlers rather than widening these.
+ */
+const handleRetiredSmsJob: JobHandler = async () => {
+  return { result: "SKIPPED_SMS_REMOVED" };
 };
 
-export const handleSmsOrderReady: JobHandler = async (job, ports) => {
-  return handleCustomerSms(job, ports, (order) => renderOrderReadySms(order.orderNumber ?? "unnumbered"));
-};
+export const handleSmsOrderConfirmation: JobHandler = handleRetiredSmsJob;
+export const handleSmsOrderReady: JobHandler = handleRetiredSmsJob;
 
 export const handleEmailOrderReceipt: JobHandler = async (job, ports) => {
   if (job.providerMessageId) {
@@ -216,19 +159,20 @@ export const handleEmailOrderReady: JobHandler = async () => {
   return { result: "SKIPPED_NOT_IN_V1" };
 };
 
-function managerDestinations(store: { managerAlertPhone: string | null; managerAlertEmail: string | null }): {
-  phone: string | null;
-  email: string | null;
-} {
-  const phone = store.managerAlertPhone && E164.test(store.managerAlertPhone) ? store.managerAlertPhone : null;
+/**
+ * SPRINT-18: email is the only manager alert channel now. `StoreConfig.managerAlertPhone` still
+ * exists on the row (the SMS removal was deliberately code-only, no migration) but is no longer
+ * read — a phone number with no way to send to it is not a destination.
+ */
+function managerDestinations(store: { managerAlertEmail: string | null }): { email: string | null } {
   const email = store.managerAlertEmail && EMAIL.test(store.managerAlertEmail) ? store.managerAlertEmail : null;
-  return { phone, email };
+  return { email };
 }
 
 async function deliverManagerAlert(
   job: ClaimedBackgroundJob,
   ports: NotifyPorts,
-  content: { sms: string; emailSubject: string; emailText: string },
+  content: { emailSubject: string; emailText: string },
 ): Promise<HandlerSuccess> {
   if (job.providerMessageId) {
     return { result: "SENT", providerMessageId: job.providerMessageId };
@@ -243,27 +187,21 @@ async function deliverManagerAlert(
   }
   const store = await getStoreConfig();
   const dest = managerDestinations(store);
-  if (!dest.phone && !dest.email) {
-    throw new PermanentJobError("No manager alert phone or email is configured.");
+  if (!dest.email) {
+    throw new PermanentJobError("No manager alert email is configured.");
   }
 
-  let lastId: string | undefined;
-  if (dest.phone) {
-    try {
-      lastId = await sendAndRecordSms(job, ports, dest.phone, content.sms);
-    } catch (err) {
-      if (err && typeof err === "object" && "skipSuppressed" in err) {
-        throw new PermanentJobError("Manager alert phone is unsubscribed.");
-      }
-      throw err;
-    }
-  }
-  if (dest.email) {
-    const html = `<pre style="font-family:Georgia,serif;white-space:pre-wrap">${content.emailText
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")}</pre>`;
-    lastId = await sendAndRecordEmail(job, ports, dest.email, content.emailSubject, html, content.emailText);
-  }
+  const html = `<pre style="font-family:Georgia,serif;white-space:pre-wrap">${content.emailText
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")}</pre>`;
+  const lastId = await sendAndRecordEmail(
+    job,
+    ports,
+    dest.email,
+    content.emailSubject,
+    html,
+    content.emailText,
+  );
   return { result: "SENT", providerMessageId: lastId };
 }
 
@@ -333,7 +271,7 @@ export const handleAlertPaymentDiscrepancy: JobHandler = async (job, ports) => {
     kind?: string | null;
     processorPaymentId?: string | null;
     orderTotalCents?: number | null;
-    squareAmountCents?: number | null;
+    gatewayAmountCents?: number | null;
     detail?: string | null;
   }>(job.payload);
   if (!p.orderId) throw new PermanentJobError("Payment-discrepancy alert payload is missing orderId.");
@@ -345,7 +283,7 @@ export const handleAlertPaymentDiscrepancy: JobHandler = async (job, ports) => {
       kind: p.kind ?? null,
       processorPaymentId: p.processorPaymentId ?? null,
       orderTotalCents: p.orderTotalCents ?? null,
-      squareAmountCents: p.squareAmountCents ?? null,
+      gatewayAmountCents: p.gatewayAmountCents ?? null,
       detail: p.detail ?? null,
     }),
   );

@@ -4,7 +4,7 @@ import { JobStatus, JobType } from "@harolds/types";
 import { prisma } from "./client";
 import { getStoreConfig } from "./store-config";
 import { businessDateToUtcDate, resolveBusinessDate } from "./business-date";
-import { runReconciliation, type ReconcileFinding, type SquarePaymentProbe } from "./reconcile";
+import { runReconciliation, type ReconcileFinding, type GatewayPaymentProbe } from "./reconcile";
 
 export type ScheduledReconcileSkip = "too_early" | "already_ran";
 
@@ -43,7 +43,7 @@ export async function maybeRunScheduledReconciliation(args: {
   now?: Date;
   hourLocal: number;
   lookbackHours: number;
-  probePayment: (paymentId: string) => Promise<SquarePaymentProbe | null>;
+  probePayment: (paymentId: string) => Promise<GatewayPaymentProbe | null>;
   enqueueAlerts?: boolean;
 }): Promise<ScheduledReconcileResult> {
   const now = args.now ?? new Date();

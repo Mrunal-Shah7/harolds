@@ -39,9 +39,9 @@ describe("rate limiter", () => {
     assert.equal(other.limited, false);
   });
 
-  it("never limits printer poll, Square webhook, or kitchen queue paths", () => {
+  it("never limits printer poll, gateway webhook, or kitchen queue paths", () => {
     assert.equal(checkPathExemption("/api/v1/print/poll"), true);
-    assert.equal(isRateLimitExemptPath("/api/v1/webhooks/square"), true);
+    assert.equal(isRateLimitExemptPath("/api/v1/webhooks/nmi"), true);
     assert.equal(isRateLimitExemptPath("/api/internal/kitchen/queue"), true);
     const printerPollIntervalMs = 5_000;
     const severalMinutesMs = 3 * 60_000;
@@ -50,7 +50,7 @@ describe("rate limiter", () => {
       assert.equal(enforceRateLimit(request, "quote"), null);
     }
     for (let i = 0; i < 40; i += 1) {
-      const burst = new Request("http://localhost/api/v1/webhooks/square", { method: "POST" });
+      const burst = new Request("http://localhost/api/v1/webhooks/nmi", { method: "POST" });
       assert.equal(enforceRateLimit(burst, "orders"), null);
     }
     for (let elapsed = 0; elapsed <= severalMinutesMs; elapsed += 3_000) {

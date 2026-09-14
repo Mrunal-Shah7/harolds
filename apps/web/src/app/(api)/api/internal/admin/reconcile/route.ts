@@ -1,6 +1,6 @@
 // SPRINT-8: GET /api/internal/admin/reconcile — Sprint 4 script, read-only.
 import { redactPaymentId, runReconciliation, todayRange, getStoreConfig } from "@harolds/db";
-import { getPayment } from "@harolds/square";
+import { getPayment } from "@harolds/payments";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminAuthError, adminOk } from "@/lib/admin-http";
 

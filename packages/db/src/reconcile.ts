@@ -1,34 +1,34 @@
-// SPRINT-4: orphan detection — DB reads + optional manager alerts; Square lookups injected by caller
+// SPRINT-4: orphan detection — DB reads + optional manager alerts; gateway lookups injected by caller
 import { prisma } from "./client";
 import { JobType, JobStatus, OrderStatus, PaymentStatus } from "@harolds/types";
 
 export type ReconcileFinding = {
   kind:
-    | "ORPHAN_SQUARE_PAYMENT"
+    | "ORPHAN_GATEWAY_PAYMENT"
     | "STUCK_AWAITING_PAYMENT"
     | "AMOUNT_MISMATCH"
-    | "ORPHAN_SQUARE_REFUND";
+    | "ORPHAN_GATEWAY_REFUND";
   orderId: string | null;
   processorPaymentId: string | null;
   orderTotalCents: number | null;
-  squareAmountCents: number | null;
+  gatewayAmountCents: number | null;
   detail: string;
 };
 
-export type SquarePaymentProbe = {
+export type GatewayPaymentProbe = {
   status: string;
   amountCents: number;
 };
 
 /**
- * Report discrepancies. `probePayment` is injected so this module never imports Square.
+ * Report discrepancies. `probePayment` is injected so this module never imports the gateway.
  * When `enqueueAlerts` is true, inserts manager alert jobs for money findings only.
  */
 export async function runReconciliation(args: {
   since: Date;
   until: Date;
   enqueueAlerts?: boolean;
-  probePayment: (paymentId: string) => Promise<SquarePaymentProbe | null>;
+  probePayment: (paymentId: string) => Promise<GatewayPaymentProbe | null>;
 }): Promise<ReconcileFinding[]> {
   const findings: ReconcileFinding[] = [];
 
@@ -52,7 +52,7 @@ export async function runReconciliation(args: {
       orderId: o.id,
       processorPaymentId: o.processorPaymentId,
       orderTotalCents: o.totalCents,
-      squareAmountCents: null,
+      gatewayAmountCents: null,
       detail: o.processorPaymentId
         ? `Awaiting payment with payment id recorded (status=${o.paymentStatus})`
         : `Awaiting payment with no payment id (status=${o.paymentStatus})`,
@@ -68,17 +68,17 @@ export async function runReconciliation(args: {
               orderId: o.id,
               processorPaymentId: o.processorPaymentId,
               orderTotalCents: o.totalCents,
-              squareAmountCents: payment.amountCents,
-              detail: "Square completed amount differs from order total",
+              gatewayAmountCents: payment.amountCents,
+              detail: "Gateway completed amount differs from order total",
             });
           } else {
             findings.push({
-              kind: "ORPHAN_SQUARE_PAYMENT",
+              kind: "ORPHAN_GATEWAY_PAYMENT",
               orderId: o.id,
               processorPaymentId: o.processorPaymentId,
               orderTotalCents: o.totalCents,
-              squareAmountCents: payment.amountCents,
-              detail: "Square payment completed but local order not marked PAID",
+              gatewayAmountCents: payment.amountCents,
+              detail: "Gateway payment completed but local order not marked PAID",
             });
           }
         }
@@ -107,8 +107,8 @@ export async function runReconciliation(args: {
           orderId: o.id,
           processorPaymentId: o.processorPaymentId,
           orderTotalCents: o.totalCents,
-          squareAmountCents: payment.amountCents,
-          detail: "Paid order total does not match Square captured amount",
+          gatewayAmountCents: payment.amountCents,
+          detail: "Paid order total does not match the gateway captured amount",
         });
       }
     } catch {
@@ -138,6 +138,11 @@ export async function sweepAbandonedOrders(olderThanMinutes: number): Promise<nu
     where: {
       status: OrderStatus.AWAITING_PAYMENT,
       processorPaymentId: null,
+      // SPRINT-17: never abandon an order that still holds a charge claim. A claim with no
+      // payment id means an attempt was interrupted before its outcome was recorded, and
+      // whether money moved is unknown until the gateway is asked. Writing it off as abandoned
+      // would hide a real charge. `findStrandedChargeClaims` surfaces these instead.
+      chargeClaimedAt: null,
       createdAt: { lt: cutoff },
     },
     data: {
@@ -146,4 +151,26 @@ export async function sweepAbandonedOrders(olderThanMinutes: number): Promise<nu
     },
   });
   return result.count;
+}
+
+/**
+ * Orders whose charge claim outlived the request that took it.
+ *
+ * SPRINT-17. Each of these had a sale sent to the gateway, or possibly sent, with no outcome
+ * recorded — so each may represent money taken from a customer for an order the kitchen never
+ * saw. They are reported, never auto-resolved here: settling one requires asking the gateway
+ * for a sale against the order id, which this module deliberately cannot do.
+ */
+export async function findStrandedChargeClaims(olderThanMs: number): Promise<
+  Array<{ id: string; totalCents: number; chargeClaimedAt: Date | null; paymentStatus: string }>
+> {
+  const cutoff = new Date(Date.now() - olderThanMs);
+  return prisma.order.findMany({
+    where: {
+      processorPaymentId: null,
+      chargeClaimedAt: { not: null, lt: cutoff },
+    },
+    select: { id: true, totalCents: true, chargeClaimedAt: true, paymentStatus: true },
+    orderBy: { chargeClaimedAt: "asc" },
+  });
 }

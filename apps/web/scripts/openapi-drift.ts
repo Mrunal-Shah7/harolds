@@ -21,8 +21,8 @@ const REQUIRED = [
   "/api/v1/health",
 ] as const;
 
-/** Present in OpenAPI for Square only — real app has it; mock does not (and must not) serve webhooks. */
-const OPENAPI_ONLY = ["/api/v1/webhooks/square"] as const;
+/** Present in OpenAPI for the gateway only — real app has it; mock does not (and must not) serve webhooks. */
+const OPENAPI_ONLY = ["/api/v1/webhooks/nmi"] as const;
 
 function openApiPathToHono(openApiPath: string): string {
   return openApiPath.replace(/\{([^}]+)\}/g, ":$1");
@@ -60,7 +60,7 @@ function main(): void {
   }
 
   console.log(
-    `OK — drift check passed (${REQUIRED.length} mock-aligned paths + ${OPENAPI_ONLY.length} Square-only)`,
+    `OK — drift check passed (${REQUIRED.length} mock-aligned paths + ${OPENAPI_ONLY.length} gateway-only)`,
   );
 }
 

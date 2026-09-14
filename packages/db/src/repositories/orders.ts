@@ -1,6 +1,6 @@
 // SPRINT-4: order persistence — pending-order creation, payment-result transitions, and lookup.
 // Authoritative repricing (QuoteResult) plus checkout keys go in; a Prisma Order row comes out.
-// This file does NOT talk to Square — it only records outcomes the caller already determined.
+// This file does NOT talk to the payment gateway — it only records outcomes the caller determined.
 import { createHash, randomBytes } from "node:crypto";
 import type { QuoteResult, SelectedModifierSnapshot } from "@harolds/types";
 import { OrderStatus, PaymentStatus, PrintTarget, PrintJobStatus, JobType, JobStatus } from "@harolds/types";
@@ -19,8 +19,6 @@ export type CreatePendingOrderCustomer = {
   /** Must already be normalised to E.164 — see `normalizePhoneToE164` in customer.ts. */
   phoneE164: string;
   email: string;
-  smsConsent: boolean;
-  smsConsentAt: Date | null;
 };
 
 export type CreatePendingOrderArgs = {
@@ -82,8 +80,9 @@ async function createPendingOrderWith(
       customerLastName: customer.lastName,
       customerPhone: customer.phoneE164,
       customerEmail: customer.email,
-      smsConsent: customer.smsConsent,
-      smsConsentAt: customer.smsConsentAt,
+      // SPRINT-18: smsConsent / smsConsentAt remain as columns (the SMS removal was
+      // deliberately code-only, no migration) but are never written. Nothing can send an SMS,
+      // so recording permission to send one would be a false record.
 
       subtotalCents: quote.subtotalCents,
       taxCents: quote.taxCents,
@@ -234,8 +233,90 @@ export async function findOrderByProcessorPaymentId(processorPaymentId: string):
   });
 }
 
+/**
+ * Outcome of trying to take exclusive ownership of an order's charge attempt.
+ *
+ * `claimed` is the only result that permits calling the gateway. `already_charged` means the
+ * order already carries a payment id. `in_flight` means another request holds the claim, or a
+ * previous attempt died holding it — the caller must resolve that with the gateway (by order
+ * id) rather than charging, because whether money moved is unknown.
+ */
+export type ChargeClaim =
+  | { kind: "claimed"; order: OrderWithLines }
+  | { kind: "already_charged"; order: OrderWithLines }
+  | { kind: "in_flight"; order: OrderWithLines; claimedAt: Date }
+  | { kind: "not_chargeable"; order: OrderWithLines }
+  | { kind: "not_found" };
+
+/**
+ * Atomically take the right to charge this order.
+ *
+ * This is the whole double-charge defence. NMI has no idempotency key and this account's
+ * processor rejects `dup_seconds`, so a second concurrent `createPayment` for the same order
+ * WILL take a second payment. The guard has to be here, in a single conditional UPDATE whose
+ * WHERE clause names every precondition — `updateMany` compiles to
+ * `UPDATE ... WHERE id = ? AND chargeClaimedAt IS NULL AND ...`, which PostgreSQL applies
+ * atomically, so exactly one of two racing requests sees `count === 1`.
+ *
+ * Do NOT reimplement this as a read followed by a write: the gap between them is precisely
+ * the race this exists to close.
+ */
+export async function claimOrderForCharge(orderId: string): Promise<ChargeClaim> {
+  const claimedAt = new Date();
+  const claim = await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      chargeClaimedAt: null,
+      processorPaymentId: null,
+      paymentStatus: PaymentStatus.PENDING,
+      status: OrderStatus.AWAITING_PAYMENT,
+    },
+    data: { chargeClaimedAt: claimedAt },
+  });
+
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { lines: true } });
+  if (!order) return { kind: "not_found" };
+  if (claim.count === 1) return { kind: "claimed", order };
+
+  // The update matched nothing — work out which precondition failed, so the caller can tell a
+  // settled order from one whose fate is genuinely unknown.
+  //
+  // A DEFINITE decline is checked BEFORE the payment id, and the order matters. NMI returns a
+  // `transactionid` on declines as well as approvals, and that id is deliberately kept so the
+  // failure stays traceable — so a declined order carries one. Testing `processorPaymentId`
+  // first read that as "already charged" and handed the caller a success replay, which showed
+  // the customer a placed order they had never paid for.
+  if (order.paymentStatus === PaymentStatus.FAILED) return { kind: "not_chargeable", order };
+  if (order.processorPaymentId) return { kind: "already_charged", order };
+  if (order.chargeClaimedAt) return { kind: "in_flight", order, claimedAt: order.chargeClaimedAt };
+  return { kind: "not_chargeable", order };
+}
+
+/**
+ * Release a claim so the order can be charged again.
+ *
+ * Only safe when the gateway has told us NO sale exists for this order — a released claim on an
+ * order that did charge is a licence to charge it twice.
+ *
+ * `claimedAt` is REQUIRED and is matched exactly, so this can only ever clear the specific claim
+ * the caller observed. Without it the release is a double-charge hole: an in-flight sale has not
+ * yet written `processorPaymentId`, so a concurrent request that found no gateway record would
+ * clear the live claim out from under it and charge again. Matching the timestamp means a claim
+ * taken (or retaken) since the caller looked is left alone. `processorPaymentId: null` stays as a
+ * second condition so a charge that lands mid-release still wins.
+ *
+ * Returns true when this call actually cleared the claim.
+ */
+export async function releaseChargeClaim(orderId: string, claimedAt: Date): Promise<boolean> {
+  const released = await prisma.order.updateMany({
+    where: { id: orderId, processorPaymentId: null, chargeClaimedAt: claimedAt },
+    data: { chargeClaimedAt: null },
+  });
+  return released.count === 1;
+}
+
 export type MarkOrderPaidAndAllocateArgs = {
-  /** Processor (Square) payment id — becomes `Order.processorPaymentId`. */
+  /** Gateway payment id — becomes `Order.processorPaymentId`. */
   paymentId: string;
   /** Instant the payment was captured; also the instant business-date allocation resolves against. */
   paidAt: Date;
@@ -245,15 +326,19 @@ export type MarkOrderPaidAndAllocateArgs = {
   counterSerial: string;
   /** Attempt ceiling for the two print jobs. */
   printMaxAttempts?: number;
-  /** Last four of the card, only when Square supplied them. */
+  /** Last four of the card, only when the gateway supplied them. */
   cardLast4?: string | null;
   /** Request correlation id from the originating HTTP request, if any. */
   correlationId?: string | null;
 };
 
 /**
- * Persist Square's payment id as soon as it is known — before allocate/paid transition —
+ * Persist the gateway's payment id as soon as it is known — before allocate/paid transition —
  * so a crash leaves a recoverable pointer for webhooks / reconciliation.
+ *
+ * SPRINT-17: this also clears the charge claim. The payment id is the stronger guard from here
+ * on (`claimOrderForCharge` refuses any order that has one), and leaving the claim set would
+ * strand the order for the recovery path to re-examine for no reason.
  */
 export async function recordProcessorPaymentId(
   orderId: string,
@@ -261,7 +346,7 @@ export async function recordProcessorPaymentId(
 ): Promise<Order> {
   return prisma.order.update({
     where: { id: orderId },
-    data: { processorPaymentId },
+    data: { processorPaymentId, chargeClaimedAt: null },
   });
 }
 
@@ -343,19 +428,14 @@ export async function markOrderPaidAndAllocate(
         },
       });
 
-      await tx.backgroundJob.createMany({
-        data: [
-          {
-            type: JobType.SMS_ORDER_CONFIRMATION,
-            status: JobStatus.PENDING,
-            payload: { orderId, correlationId: args.correlationId ?? undefined },
-          },
-          {
-            type: JobType.EMAIL_ORDER_RECEIPT,
-            status: JobStatus.PENDING,
-            payload: { orderId, correlationId: args.correlationId ?? undefined },
-          },
-        ],
+      // SPRINT-18: the confirmation SMS that used to sit alongside this was removed with
+      // Twilio. The email receipt is now the only customer confirmation.
+      await tx.backgroundJob.create({
+        data: {
+          type: JobType.EMAIL_ORDER_RECEIPT,
+          status: JobStatus.PENDING,
+          payload: { orderId, correlationId: args.correlationId ?? undefined },
+        },
       });
     }
 
@@ -382,6 +462,8 @@ export async function markOrderPaymentFailed(
     data: {
       paymentStatus: PaymentStatus.FAILED,
       paymentFailureReason: args.reason,
+      // A decline is definite — the gateway confirmed no money moved — so the claim is released.
+      chargeClaimedAt: null,
       ...(args.processorPaymentId !== undefined ? { processorPaymentId: args.processorPaymentId } : {}),
     },
   });
@@ -405,6 +487,9 @@ export async function markOrderPaymentUnknown(
     where: { id: orderId },
     data: {
       paymentStatus: PaymentStatus.UNKNOWN,
+      // The claim is DELIBERATELY left in place. Unknown means the charge may have landed, and
+      // releasing it here would re-open the order to a second sale for the same money. It is
+      // cleared only once the gateway has been asked whether a sale exists for this order.
       ...(args.processorPaymentId !== undefined ? { processorPaymentId: args.processorPaymentId } : {}),
     },
   });

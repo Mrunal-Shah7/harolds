@@ -3,6 +3,15 @@
 
 # Wallet verification checklist (Phase 8)
 
+> **SUPERSEDED — Sprint 17 (Square → NMI migration).**
+> Everything below describes Square's Web Payments SDK, which this project no longer uses, and
+> the wallet scaffolding it verifies was deleted in Sprint 17. Checkout is **card only**.
+>
+> Kept as a record of what wallet enablement required, because the shape of the work (HTTPS,
+> domain registration, an association file, CSP review) carries over. If wallets are revived,
+> rewrite this against NMI's digital-wallet setup — do not follow these steps as written.
+> See `docs/SPRINT-17-NOTES.md`.
+
 Prepared in Sprint 13 Phase 1.5. Execute **before** the rest of Phase 8 smoke tests.
 A rendered wallet button is not evidence — each method needs a completed, refunded charge on a real device.
 

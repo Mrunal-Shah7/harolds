@@ -142,8 +142,8 @@ describe("SPRINT-16 Phase 6: the reconciliation report", () => {
     const dup = dupRows[0]!;
     assert.equal(dup[0], "+17085552002");
     assert.equal(dup[1], 40, "gap in seconds");
-    assert.equal(dup[6], "sq-pay-dup-a", "first payment id, for the Square lookup");
-    assert.equal(dup[12], "sq-pay-dup-b", "second payment id, for the Square lookup");
+    assert.equal(dup[6], "sq-pay-dup-a", "first payment id, for the gateway lookup");
+    assert.equal(dup[12], "sq-pay-dup-b", "second payment id, for the gateway lookup");
   });
 
   it("is read-only: a write inside the report transaction is rejected by Postgres", async () => {

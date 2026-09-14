@@ -24,7 +24,7 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { prisma } from "@harolds/db";
 import { OrderStatus, PaymentStatus } from "@harolds/types";
-import { cartFingerprint, squarePaymentIdempotencyKey } from "./checkout";
+import { cartFingerprint, paymentCorrelationId } from "./checkout";
 
 const PREFIX = "s16-";
 
@@ -52,7 +52,7 @@ function legacyMintedKey(): string {
 
 /**
  * Stands in for `createPendingOrder` + the charge attempt. We insert directly so the test needs
- * no priced quote and no Square call — the mechanism under test is the idempotency lookup, not
+ * no priced quote and no gateway call — the mechanism under test is the idempotency lookup, not
  * the pricing path.
  */
 async function createOrderAttempt(args: {
@@ -110,7 +110,7 @@ describe("SPRINT-16 Phase 1 reproduction: the reachable double charge", () => {
     const phone = "+17085550916";
     const fingerprint = cartFingerprint(CART);
 
-    // Attempt 1: the customer pays, Square returns transport_failure, and checkout.ts calls
+    // Attempt 1: the customer pays, the gateway returns transport_failure, and checkout.ts calls
     // markOrderPaymentUnknown — PaymentStatus.UNKNOWN. The screen says PAYMENT_FAILED.
     const firstKey = legacyMintedKey();
     const first = await createOrderAttempt({
@@ -138,13 +138,14 @@ describe("SPRINT-16 Phase 1 reproduction: the reachable double charge", () => {
       phone,
     });
 
-    // Two orders for one cart, and two DISTINCT Square idempotency keys, so Square will not
-    // collapse them either. This is the second charge.
+    // Two orders for one cart. Under Square the two distinct idempotency keys were the reason
+    // the processor could not collapse them; under NMI there is no gateway-side dedupe AT ALL,
+    // so the per-order correlation ids differing merely confirms these are separate charges.
     assert.notEqual(second.id, first.id, "a second order exists for the same cart");
     assert.notEqual(
-      squarePaymentIdempotencyKey(second.id),
-      squarePaymentIdempotencyKey(first.id),
-      "the Square idempotency key differs, so the processor cannot dedupe the charge",
+      paymentCorrelationId(second.id),
+      paymentCorrelationId(first.id),
+      "separate orders charge separately — the gateway cannot dedupe them",
     );
 
     const orders = await prisma.order.findMany({

@@ -21,7 +21,7 @@ const EXPECTED_GET_PATHS = [
 const EXPECTED_POST_PATHS = [
   "/api/v1/quote",
   "/api/v1/orders",
-  "/api/v1/webhooks/square",
+  "/api/v1/webhooks/nmi",
 ] as const;
 
 const EXPECTED_PATHS = [...EXPECTED_GET_PATHS, ...EXPECTED_POST_PATHS] as const;

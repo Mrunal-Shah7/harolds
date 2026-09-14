@@ -1581,7 +1581,7 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
           onClick={() =>
             setConfirm({
               title: "Full refund",
-              body: `Refund ${money(remaining)} now? This talks to Square. The order will show pending until the refund is confirmed.`,
+              body: `Refund ${money(remaining)} now? This talks to the payment gateway. The order will show pending until the refund is confirmed.`,
               run: () =>
                 adminApi(`/api/internal/admin/orders/${id}/refund`, {
                   method: "POST",
@@ -1877,7 +1877,7 @@ function JobsView() {
           type="button"
           className="adm-btn adm-btn-warn"
           onClick={async () => {
-            const type = window.prompt("Job type to bulk-retry (e.g. SMS_ORDER_READY)");
+            const type = window.prompt("Job type to bulk-retry (e.g. EMAIL_ORDER_RECEIPT)");
             if (!type) return;
             await adminApi(`/api/internal/admin/jobs`, { method: "POST", body: JSON.stringify({ action: "retryType", type }) });
             load();

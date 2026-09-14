@@ -13,7 +13,7 @@ In-house online ordering for Harold's Chicken Oak Lawn. Replaces outsourced thir
 | **PostgreSQL + Prisma** | Local DB on the Ubuntu production server; strong schema and migrations |
 | **Integer cents for money** | Avoid float/decimal rounding errors in prices and reconciliation |
 | **Tailwind + shadcn/ui** | Shared UI primitives for admin (Sprint 8) and any shared components |
-| **Square** (Sprint 4) | Payment processor already agreed with the business |
+| **NMI** (Sprint 17) | Payment gateway; replaced Square, which was used through Sprint 16 |
 | **Epson Server Direct Print** (Sprint 5) | Talks to the existing TM-m30III without new hardware |
 
 ## Workspace layout
@@ -26,9 +26,8 @@ packages/
   types/               Shared enums and domain types
   config/              Env schema, shared TS/ESLint config
   pricing/             Integer-cents quoting
-  square/              Square payments (only file that imports the Square SDK)
+  payments/            NMI gateway (the only package that talks to the processor)
   print/               Kitchen/counter tickets and ePOS-Print XML
-  sms/                 Twilio SMS (only file that imports the Twilio SDK)
   email/               Resend email (only file that imports the Resend SDK)
   notify/              Background job worker, templates, handlers
   mock-api/            Contract mock server

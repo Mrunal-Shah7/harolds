@@ -11,7 +11,8 @@ describe("log redaction", () => {
       token: "has_abc",
       customerPhone: "+17085551234",
       customerEmail: "pat@example.com",
-      SQUARE_ACCESS_TOKEN: "sq0at-secret",
+      NMI_SECURITY_KEY_SANDBOX: "nmi-security-key",
+      NMI_WEBHOOK_SIGNING_KEY_SANDBOX: "nmi-signing-key",
       PRINTER_SDP_SHARED_SECRET: "query-secret",
       orderId: "ord_keep",
       amountCents: 879,
@@ -21,7 +22,8 @@ describe("log redaction", () => {
     assert.equal(out.token, REDACTED);
     assert.equal(out.customerPhone, REDACTED);
     assert.equal(out.customerEmail, REDACTED);
-    assert.equal(out.SQUARE_ACCESS_TOKEN, REDACTED);
+    assert.equal(out.NMI_SECURITY_KEY_SANDBOX, REDACTED);
+    assert.equal(out.NMI_WEBHOOK_SIGNING_KEY_SANDBOX, REDACTED);
     assert.equal(out.PRINTER_SDP_SHARED_SECRET, REDACTED);
     assert.equal(out.orderId, "ord_keep");
     assert.equal(out.amountCents, 879);

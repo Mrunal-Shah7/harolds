@@ -72,8 +72,8 @@ Do **not** import `@harolds/db` or Prisma from the storefront.
 | POST | `/api/v1/quote` | Stateless priced cart + orderability (writes nothing) |
 | POST | `/api/v1/orders` | Create order + take payment (authoritative reprice) |
 | GET | `/api/v1/orders/status/{lookupToken}` | Public order status by unguessable token only |
-| GET | `/api/v1/health` | Runtime health + Square environment (`sandbox` \| `production`) |
-| POST | `/api/v1/webhooks/square` | **Square only — not a storefront endpoint** |
+| GET | `/api/v1/health` | Runtime health + payment gateway environment (`sandbox` \| `production`) |
+| POST | `/api/v1/webhooks/nmi` | **NMI only — not a storefront endpoint** |
 
 There is **no pagination**. The catalogue is under 100 items; load it whole.
 
@@ -180,7 +180,7 @@ The quote is **for display only**. Sprint 4 reprices authoritatively at checkout
 
 ## Checkout (Sprint 4)
 
-1. Tokenise in the browser with Square Web Payments SDK — never send card data to Harold's.
+1. Tokenise in the browser with NMI Collect.js — never send card data to Harold's.
 2. `POST /api/v1/orders` with `{ cart, customer, paymentToken, idempotencyKey }` — no prices.
 3. One `idempotencyKey` per checkout attempt; reuse on network retry.
 4. Store `lookupToken` from the response; status via `GET /api/v1/orders/status/{lookupToken}`.

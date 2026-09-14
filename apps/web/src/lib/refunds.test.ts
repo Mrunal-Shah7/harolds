@@ -1,4 +1,4 @@
-// SPRINT-8: refundOrder uses the Sprint 4 service; tests inject a fake Square port.
+// SPRINT-8: refundOrder uses the Sprint 4 service; tests inject a fake gateway port.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";
@@ -101,7 +101,7 @@ describe("refundOrder via existing service", () => {
       amountCents: 9999,
       clientIdempotencyKey: `${key}-over`,
       refundPaymentFn: async () => {
-        throw new Error("Square must not be called when the ceiling fails");
+        throw new Error("the gateway must not be called when the ceiling fails");
       },
     });
     assert.equal(over.ok, false);

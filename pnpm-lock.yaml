@@ -47,12 +47,9 @@ importers:
       '@harolds/print':
         specifier: workspace:*
         version: link:../../packages/print
-      '@harolds/sms':
+      '@harolds/payments':
         specifier: workspace:*
-        version: link:../../packages/sms
-      '@harolds/square':
-        specifier: workspace:*
-        version: link:../../packages/square
+        version: link:../../packages/payments
       '@harolds/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -160,9 +157,9 @@ importers:
       '@harolds/print':
         specifier: workspace:*
         version: link:../print
-      '@harolds/square':
+      '@harolds/payments':
         specifier: workspace:*
-        version: link:../square
+        version: link:../payments
       '@harolds/types':
         specifier: workspace:*
         version: link:../types
@@ -259,9 +256,25 @@ importers:
       '@harolds/pricing':
         specifier: workspace:*
         version: link:../pricing
-      '@harolds/sms':
+      '@harolds/types':
         specifier: workspace:*
-        version: link:../sms
+        version: link:../types
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.1
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.11
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/payments:
+    dependencies:
+      '@harolds/config':
+        specifier: workspace:*
+        version: link:../config
       '@harolds/types':
         specifier: workspace:*
         version: link:../types
@@ -304,47 +317,6 @@ importers:
       '@harolds/config':
         specifier: workspace:*
         version: link:../config
-      '@types/node':
-        specifier: ^22.10.5
-        version: 22.20.1
-      tsx:
-        specifier: ^4.19.2
-        version: 4.23.11
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-
-  packages/sms:
-    dependencies:
-      '@harolds/config':
-        specifier: workspace:*
-        version: link:../config
-      twilio:
-        specifier: ^5.10.3
-        version: 5.13.1
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.5
-        version: 22.20.1
-      tsx:
-        specifier: ^4.19.2
-        version: 4.23.11
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-
-  packages/square:
-    dependencies:
-      '@harolds/config':
-        specifier: workspace:*
-        version: link:../config
-      '@harolds/types':
-        specifier: workspace:*
-        version: link:../types
-      square:
-        specifier: ^45.0.1
-        version: 45.0.1
-    devDependencies:
       '@types/node':
         specifier: ^22.10.5
         version: 22.20.1

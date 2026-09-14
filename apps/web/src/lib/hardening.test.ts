@@ -111,7 +111,7 @@ describe("bounded JSON", () => {
 describe("security headers and print auth", () => {
   it("sets CSP, frame options, nosniff, and referrer policy", () => {
     const headers = browserSecurityHeaders({ isHttps: true, isProduction: true });
-    assert.match(headers["Content-Security-Policy"] ?? "", /squarecdn/);
+    assert.match(headers["Content-Security-Policy"] ?? "", /nmi\.com/);
     assert.equal(headers["X-Frame-Options"], "DENY");
     assert.equal(headers["X-Content-Type-Options"], "nosniff");
     assert.match(headers["Strict-Transport-Security"] ?? "", /max-age=/);

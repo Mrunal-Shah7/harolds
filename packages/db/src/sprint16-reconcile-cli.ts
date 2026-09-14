@@ -13,7 +13,7 @@
 //      correct, so the first sight of the real figure was after the card was charged.
 //
 //   2. DUPLICATE CHECK — orders grouped by phone where two or more fall inside a short interval
-//      with the same cart signature. Output carries enough to look each pair up in Square and
+//      with the same cart signature. Output carries enough to look each pair up in the gateway and
 //      confirm whether two captures actually exist.
 //
 // Usage:
@@ -242,7 +242,7 @@ async function main(): Promise<void> {
   console.log(`  total tip value:  $${money(reports.summary.tipTotalCents)}`);
   console.log(`  date range:       ${reports.summary.tipFirstAt ?? "-"} .. ${reports.summary.tipLastAt ?? "-"}`);
   console.log("");
-  console.log("DUPLICATE CHARGES (candidates — confirm each in Square before refunding)");
+  console.log("DUPLICATE CHARGES (candidates — confirm each in the gateway before refunding)");
   console.log(`  candidate pairs:  ${reports.summary.duplicatePairCount}`);
   console.log(`  second-charge value: $${money(reports.summary.duplicateChargedTotalCents)}`);
   console.log("");

@@ -26,7 +26,7 @@ enum OrderStatus {
   PICKED_UP
   CANCELLED
   REFUNDED
-  /// Checkout abandoned — never reached a Square payment id (Sprint 4 sweeper).
+  /// Checkout abandoned — never reached a gateway payment id (Sprint 4 sweeper).
   ABANDONED
 }
 
@@ -35,7 +35,7 @@ enum PaymentStatus {
   AUTHORISED
   CAPTURED
   FAILED
-  /// Synchronous Square call failed to complete — charge may or may not have succeeded (Sprint 4).
+  /// Synchronous gateway call failed to complete — charge may or may not have succeeded (Sprint 4).
   UNKNOWN
   REFUNDED
   PARTIALLY_REFUNDED
@@ -281,6 +281,12 @@ model Order {
   processorOrderId   String?
   paymentCapturedAt  DateTime?
   paymentFailureReason String?
+  /// SPRINT-17: set atomically before a charge is sent to the gateway and cleared when its
+  /// outcome is known. NMI has no idempotency key, so this claim is the ONLY thing preventing
+  /// two concurrent checkout requests from charging the same order twice. A claim left set by
+  /// a crash is resolved by asking the gateway whether a sale exists for this order id — never
+  /// by a timeout. Never reused as a payment state; paymentStatus remains authoritative.
+  chargeClaimedAt    DateTime?
 
   // Fulfilment
   fulfilmentType   FulfilmentType @default(PICKUP)
@@ -295,7 +301,7 @@ model Order {
   customerNote String?
   staffNote    String?
 
-  /// Last four digits of the card, only when Square supplied them. Never any other card data.
+  /// Last four digits of the card, only when the gateway supplied them. Never any other card data.
   cardLast4          String?
 
   // SPRINT-4: unguessable customer status lookup; never use order number as a public key.
@@ -325,6 +331,7 @@ model Order {
   @@index([customerPhone])
   @@index([processorPaymentId])
   @@index([paymentStatus, createdAt])
+  @@index([chargeClaimedAt])
 }
 
 /// Line item with a COMPLETE purchase snapshot.
@@ -379,7 +386,7 @@ model OrderNumberCounter {
   updatedAt    DateTime @updatedAt
 }
 
-/// SPRINT-4: Square (and later processors) webhook events — unique eventId for exactly-once processing.
+/// SPRINT-4: payment-gateway webhook events — unique eventId for exactly-once processing.
 model ProcessorWebhookEvent {
   id          String    @id @default(cuid())
   eventId     String    @unique

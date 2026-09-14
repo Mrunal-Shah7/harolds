@@ -29,30 +29,28 @@ const envSchema = z.object({
     .string({ required_error: "NEXT_PUBLIC_APP_URL is required (public base URL)" })
     .url("NEXT_PUBLIC_APP_URL must be a valid URL"),
 
-  // Required — Sprint 4 (Square payments). Empty strings fail so partial .env copy fails loudly.
-  SQUARE_APPLICATION_ID: z
-    .string({ required_error: "SQUARE_APPLICATION_ID is required (Square application ID)" })
-    .min(1, "SQUARE_APPLICATION_ID is required and must not be empty"),
-  SQUARE_ACCESS_TOKEN: z
-    .string({ required_error: "SQUARE_ACCESS_TOKEN is required (Square access token)" })
-    .min(1, "SQUARE_ACCESS_TOKEN is required and must not be empty"),
-  SQUARE_LOCATION_ID: z
-    .string({ required_error: "SQUARE_LOCATION_ID is required (Square location ID)" })
-    .min(1, "SQUARE_LOCATION_ID is required and must not be empty"),
-  SQUARE_ENVIRONMENT: z.enum(["sandbox", "production"], {
-    required_error: "SQUARE_ENVIRONMENT is required (sandbox | production)",
-    invalid_type_error: "SQUARE_ENVIRONMENT must be sandbox or production",
+  // Required — Sprint 17 (NMI payments). Selects which credential triple below is live.
+  NMI_ENVIRONMENT: z.enum(["sandbox", "production"], {
+    required_error: "NMI_ENVIRONMENT is required (sandbox | production)",
+    invalid_type_error: "NMI_ENVIRONMENT must be sandbox or production",
   }),
-  SQUARE_WEBHOOK_SIGNATURE_KEY: z
-    .string({
-      required_error: "SQUARE_WEBHOOK_SIGNATURE_KEY is required (Square webhook signature key)",
-    })
-    .min(1, "SQUARE_WEBHOOK_SIGNATURE_KEY is required and must not be empty"),
 
-  // SPRINT-12: public Square IDs for the Web Payments SDK (required at build; required in production start).
-  NEXT_PUBLIC_SQUARE_APPLICATION_ID: z.string().optional(),
-  NEXT_PUBLIC_SQUARE_LOCATION_ID: z.string().optional(),
-  NEXT_PUBLIC_SQUARE_ENVIRONMENT: z.string().optional(),
+  /**
+   * Both credential triples are declared optional HERE on purpose. Only the triple matching
+   * NMI_ENVIRONMENT is actually required, and that is enforced per-environment in
+   * `payments.ts` / `production-guards.ts`. A blanket `.min(1)` would force operators to
+   * invent a live security key just to boot the sandbox.
+   */
+  NMI_SECURITY_KEY_SANDBOX: z.string().optional(),
+  NMI_TOKENIZATION_KEY_SANDBOX: z.string().optional(),
+  NMI_WEBHOOK_SIGNING_KEY_SANDBOX: z.string().optional(),
+  NMI_SECURITY_KEY_LIVE: z.string().optional(),
+  NMI_TOKENIZATION_KEY_LIVE: z.string().optional(),
+  NMI_WEBHOOK_SIGNING_KEY_LIVE: z.string().optional(),
+
+  // SPRINT-17: public Collect.js identifiers (required at build; required in production start).
+  NEXT_PUBLIC_NMI_TOKENIZATION_KEY: z.string().optional(),
+  NEXT_PUBLIC_NMI_ENVIRONMENT: z.string().optional(),
 
   // Required — Sprint 5 (Epson Server Direct Print). Comma-separated serials supported.
   PRINTER_SERIAL_NUMBER: z
@@ -122,12 +120,7 @@ const envSchema = z.object({
   /** Window for manager-alert volume cap in ms (default 900000 = 15 minutes). */
   JOB_ALERT_WINDOW_MS: z.coerce.number().int().positive().optional(),
 
-  // Optional in development/test — required at production start (Sprint 11)
-  TWILIO_ACCOUNT_SID: z.string().optional(),
-  TWILIO_AUTH_TOKEN: z.string().optional(),
-  TWILIO_FROM_NUMBER: z.string().optional(),
-  /** Optional public Twilio inbound URL. When unset, derived from NEXT_PUBLIC_APP_URL. */
-  TWILIO_WEBHOOK_URL: z.string().optional(),
+  // SPRINT-18: TWILIO_* removed with the SMS subsystem. Email is the only notification channel.
 
   // Optional in development/test — required at production start (Sprint 11)
   EMAIL_API_KEY: z.string().optional(),

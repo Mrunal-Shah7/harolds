@@ -26,7 +26,6 @@ const guest = {
   lastName: "Lee",
   phone: "+17085550000",
   email: "pat@example.com",
-  smsConsent: false,
 };
 
 await waitForUp();
@@ -74,6 +73,8 @@ const quote = await fetch(`${base}/api/v1/quote`, {
 if (quote.status !== 200 && quote.status !== 400) fail(`quote ${quote.status}`);
 else console.log(`ok quote ${quote.status}`);
 
+// SPRINT-18: omitting `smsConsent` used to be a 400. SMS was removed, the field is retired,
+// and a request without it is now perfectly valid — this asserts the new contract, not the old.
 const missingConsent = await fetch(`${base}/api/v1/orders`, {
   method: "POST",
   headers: { "content-type": "application/json" },
@@ -85,9 +86,10 @@ const missingConsent = await fetch(`${base}/api/v1/orders`, {
   }),
 });
 const missingConsentJson = await missingConsent.json();
-if (missingConsent.status !== 400 || missingConsentJson.error?.code !== "VALIDATION_ERROR") {
-  fail(`missing smsConsent ${missingConsent.status} ${missingConsentJson.error?.code}`);
-} else console.log("ok missing smsConsent → 400 VALIDATION_ERROR (mock matches real API)");
+if (missingConsentJson.error?.code === "VALIDATION_ERROR" &&
+    missingConsentJson.error?.details?.field === "customer.smsConsent") {
+  fail("omitting smsConsent was rejected; it is retired and must be optional");
+} else console.log("ok omitted smsConsent is accepted (mock matches real API)");
 
 const triggers = [
   ["/api/v1/menu?forceError=NOT_FOUND", 404, "NOT_FOUND"],

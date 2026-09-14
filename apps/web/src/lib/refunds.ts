@@ -1,4 +1,4 @@
-// SPRINT-4: refund + cancellation orchestration (uses @harolds/square at the app boundary)
+// SPRINT-4 / SPRINT-17: refund + cancellation orchestration (uses @harolds/payments at the app boundary)
 import {
   applyRefundToOrder,
   cancelUnpaidOrder,
@@ -9,7 +9,7 @@ import {
   markOrderCancelledAfterRefund,
   type OrderWithLines,
 } from "@harolds/db";
-import { refundPayment } from "@harolds/square";
+import { refundPayment } from "@harolds/payments";
 import { OrderStatus, PaymentStatus } from "@harolds/types";
 
 export type RefundResult =
@@ -64,7 +64,7 @@ export async function refundOrder(args: {
   const outcome = await chargeRefund({
     paymentId: order.processorPaymentId,
     amountCents: amount,
-    idempotencyKey: args.clientIdempotencyKey,
+    correlationId: args.clientIdempotencyKey,
   });
 
   if (outcome.kind === "declined") {

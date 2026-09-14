@@ -1,4 +1,4 @@
-// SPRINT-4 / SPRINT-9 / SPRINT-12: GET /api/v1/health — Square env plus database and worker dependency checks
+// SPRINT-4 / SPRINT-9 / SPRINT-12: GET /api/v1/health — gateway env plus database and worker dependency checks
 import { API_CONTRACT_VERSION } from "@harolds/types";
 import { handleRouteError, ok } from "@/lib/api";
 import { getHealthSnapshot } from "@/lib/health";

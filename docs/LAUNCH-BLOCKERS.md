@@ -23,7 +23,7 @@
     | Closed | What changed |
     |---|---|
     | Customer storefront absent | Storefront is in this repo: browse, cart, quote, tip, checkout. |
-    | Payments not configured on checkout | Root cause was missing `NEXT_PUBLIC_SQUARE_*` at build time. Build now fails without them; production start fails without complete Square config; sandbox card payment produces PAID orders. |
+    | Payments not configured on checkout | Root cause was missing `NEXT_PUBLIC_SQUARE_*` at build time. Since Sprint 17 the equivalent is `NEXT_PUBLIC_NMI_TOKENIZATION_KEY` / `NEXT_PUBLIC_NMI_ENVIRONMENT`. Build now fails without them; production start fails without a complete NMI key triple; sandbox card payment produces PAID orders. |
     | No way to upload item photographs | Admin upload → local content-addressed storage → derivatives → storefront. |
     | No temporary trading overrides | Early close / late open / closed rest of day / open anyway, with self-expiry. |
     | Banner messaging hardcoded | Announcement + editable closed/paused/prep phrasing; trading and prep stay derived. |
@@ -47,9 +47,9 @@
     |---|---|---|---|---|
     | 1 | ~~Customer storefront~~ | — | **Resolved in Sprint 12.** | — |
     | 2 | **Ubuntu production server** | Nowhere to run the app, database, or TLS. | Not provisioned. **Sprint 13 Phase 2: absent — Phases 3–10 blocked.** | Store / hosting |
-    | 3 | **Registered domain + DNS** | Printer, Square webhooks, wallets, and customers need HTTPS. | Not supplied. **Sprint 13 Phase 2: absent.** | Store |
-    | 4 | **Production Square credentials** | Sandbox charges are not real. | This machine is `SQUARE_ENVIRONMENT=sandbox`. | Store / Square Dashboard |
-    | 5 | **Twilio + completed A2P 10DLC** | Incomplete registration looks like “sent” while the customer gets nothing. | Vars present; campaign completion not verified → treated as absent. | Store / Twilio |
+    | 3 | **Registered domain + DNS** | Printer, NMI webhooks, and customers need HTTPS. | Not supplied. **Sprint 13 Phase 2: absent.** | Store |
+    | 4 | **Production NMI credentials** | Sandbox charges are not real. | This machine is `NMI_ENVIRONMENT=sandbox`; the `*_LIVE` key triple is still placeholder. | Store / NMI Control Panel |
+    | 5 | ~~**Twilio + completed A2P 10DLC**~~ | **Removed in Sprint 18.** SMS and Twilio were dropped entirely, so there is no messaging registration to complete. Customers get an email receipt and no texts. | Not applicable | — |
     | 6 | **Production email + verified sending domain** | Receipts land in spam or are rejected. | `EMAIL_API_KEY` / from address empty. | Store / Resend |
     | 7 | **Eight unverified prices** | Invented beverage/dessert prices. | Still flagged — **business can clear in `/admin` now.** | Store |
     | 8 | **Tip preset sign-off** | Unsigned since Sprint 1. | Not signed. | Store |
@@ -73,15 +73,15 @@
     | 19 | Physical ticket with modifiers | Layout tested; paper outstanding. | — | Kitchen |
     | 20 | Android audio unlock + Swan kiosk | Runbook exists; device not on hand. | — | Kitchen + developer |
     | 21 | Independent uptime monitor | Needs a domain. | — | Developer after domain |
-    | 22 | Apple Pay / Google Pay / Cash App | Need HTTPS + domain registration with Square. | Checklist ready ([`WALLET-VERIFICATION-CHECKLIST.md`](./WALLET-VERIFICATION-CHECKLIST.md)); blocked until domain. | Developer after domain |
+    | 22 | Apple Pay / Google Pay / Cash App | **Removed in Sprint 17** with the Square migration. The old scaffolding was Square-specific; NMI does wallets through a separate Collect.js setup that has not been done. Card only today. | Not scheduled | Developer, if the store asks |
 
     ---
 
     ## What we will not do
 
-    - Deploy with sandbox Square credentials.
+    - Deploy with sandbox NMI credentials.
     - Invent a domain or a server.
-    - Go live with unregistered SMS.
+    - Go live believing customers are texted. They are not — SMS was removed in Sprint 18.
     - Charge a real card until production credentials exist.
 
     When items 2–12 are supplied, continue Sprint 13 Phases 3–10 using [`DEPLOYMENT.md`](./DEPLOYMENT.md) and [`CUTOVER-PLAN.md`](./CUTOVER-PLAN.md). See [`SPRINT-13-NOTES.md`](./SPRINT-13-NOTES.md).

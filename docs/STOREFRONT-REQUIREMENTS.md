@@ -12,13 +12,13 @@ Work against **`pnpm mock`** (`http://localhost:4001`) with no database and no `
 
 - Menu items may include optional `imageDerivatives` (thumb / modal / preview, webp + fallback). Prefer those over `imageUrl` alone. Missing images are normal — reserve aspect ratio and show a deliberate placeholder.
 - Store status may include `announcement`, `closedMessage`, `prepEstimatePhrase`, and `closedReason`. Trading and prep segments stay derived; do not let typed announcement text override "Open now".
-- Public Square IDs (`NEXT_PUBLIC_SQUARE_APPLICATION_ID`, `NEXT_PUBLIC_SQUARE_LOCATION_ID`, `NEXT_PUBLIC_SQUARE_ENVIRONMENT`) must be present at **build** time. A runtime-only server env produces a permanently broken checkout.
+- Public NMI identifiers (`NEXT_PUBLIC_NMI_TOKENIZATION_KEY`, `NEXT_PUBLIC_NMI_ENVIRONMENT`) must be present at **build** time — Collect.js runs in the browser and the values are inlined into the bundle. A runtime-only server env produces a permanently broken checkout.
 - Media is served from `/api/v1/media/{hash}/…` with immutable caching.
 ---
 
 ## 1. Tokenise in the browser. Send only the token.
 
-Use the Square Web Payments SDK for **card, Apple Pay, Google Pay, and Cash App Pay**. The token is the only payment credential Harold's accepts.
+Use NMI Collect.js for **card**. Wallets (Apple Pay / Google Pay / Cash App) were removed in Sprint 17 along with Square and are not offered. The single-use `payment_token` is the only payment credential Harold's accepts.
 
 `POST /api/v1/orders` body:
 
@@ -57,20 +57,26 @@ The mock: `?forcePayment=declined` vs `?forcePayment=transport`. If your UI uses
 
 A 200 quote with `orderable: false` and `blockingReasons` (`STORE_CLOSED`, `STORE_NOT_ACCEPTING_ORDERS`) must still show line prices and the total. Do not hide the cart. Do not send the customer to checkout.
 
-## 7. SMS consent is explicit and off by default
+## 7. SMS consent is retired (Sprint 18)
 
-Do not pre-check the box. Do not infer consent from a phone number. Send `smsConsent: true` only after a clear opt-in.
+SMS was removed entirely in Sprint 18 along with Twilio. There is no consent to collect and no
+text is ever sent — the email receipt is the only customer confirmation.
+
+`customer.smsConsent` is **retired but still accepted**: it is no longer required, and when sent
+it is validated as a boolean and then discarded. New clients should omit it. Do not build a
+consent checkbox; it would promise a message the system cannot send.
 
 ## 8. Content security policy
 
 Sprint 9 set CSP on every HTML response. Checkout scripts must load from origins the policy already allows:
 
-- `script-src` / `frame-src` / `connect-src`: `https://*.squarecdn.com`, `https://*.squareup.com`, `https://*.squareupsandbox.com`, `https://web.squarecdn.com`, `https://sandbox.web.squarecdn.com`, `https://pci-connect.squareup.com`, `https://pci-connect.squareupsandbox.com`.
+- `script-src` / `style-src` / `frame-src` / `connect-src`: `https://secure.nmi.com`, `https://sandbox.nmi.com`, `https://secure.networkmerchants.com`. Both gateway hosts are listed because the CSP is a static header and the active one changes with `NMI_ENVIRONMENT`.
+- `script-src` additionally: `https://applepay.cdn-apple.com`. This is **not** a wallet feature — checkout has none. Collect.js injects Apple's SDK script tag in its own constructor, before `configure()` runs, with no way to suppress it. Removing this host does not disable anything; it just produces a CSP violation on every checkout load.
 - `style-src 'self' 'unsafe-inline'`; `img-src 'self' data: blob: https:`; `font-src 'self' data: https://fonts.gstatic.com`; `object-src 'none'`; `frame-ancestors 'none'`.
 
 `unsafe-inline` and `unsafe-eval` are present because the App Router needs them today. Do not add further exceptions without a written review.
 
-If a Square wallet requires an origin that is **not** on that list, **do not** widen CSP locally to make checkout “work”. Record the missing origin and change it in `@harolds/config` `contentSecurityPolicy()` so production and development stay identical.
+If Collect.js requires an origin that is **not** on that list, **do not** widen CSP locally to make checkout “work”. Record the missing origin and change it in `@harolds/config` `contentSecurityPolicy()` so production and development stay identical.
 
 ---
 
@@ -79,7 +85,7 @@ If a Square wallet requires an origin that is **not** on that list, **do not** w
 | | Mock (`:4001`) | Real API (`:3000`) |
 |---|---|---|
 | CORS | `Access-Control-Allow-Origin: *` | none — same origin |
-| Payments | Fabricated; `forcePayment` triggers | Square sandbox/production |
+| Payments | Fabricated; `forcePayment` triggers | NMI sandbox/production |
 | Errors | `forceError`, `forceStore`, `forceSoldOut` | Real store/menu/payment state |
 
 Health on the real API may return **503** with `data.ok: false` and additive `checks` / `worker` fields. That is documented in OpenAPI 1.2.0. The mock health is 200.

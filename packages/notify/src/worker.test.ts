@@ -1,4 +1,6 @@
-// SPRINT-7: worker pass — overlapping claims, consent, suppression, retry, volume cap. No live providers.
+// SPRINT-7 / SPRINT-18: worker pass — overlapping claims, retry, volume cap. No live providers.
+// The consent / suppression / inbound-keyword suites went with the SMS subsystem in Sprint 18;
+// the generic worker behaviours they happened to exercise are now driven through email jobs.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";
@@ -12,16 +14,13 @@ import { JobStatus, JobType, OrderStatus, PaymentStatus } from "@harolds/types";
 import {
   invalidateStoreConfigCache,
   prisma,
-  setSmsSuppression,
   claimDueJobs,
 } from "@harolds/db";
 import type { EmailSendResult } from "@harolds/email";
-import type { SmsSendResult } from "@harolds/sms";
 import { PermanentJobError } from "./errors";
 import { createDefaultJobRegistry, createJobRegistry } from "./registry";
 import { JOB_HANDLERS } from "./handlers";
 import type { NotifyPorts } from "./ports";
-import { processTwilioInbound, classifySmsKeyword } from "./inbound";
 import { runWorkerPass } from "./worker";
 
 const PREFIX = "s7notify-";
@@ -41,16 +40,26 @@ async function cleanup(): Promise<void> {
     },
   });
   await prisma.order.deleteMany({ where: { clientIdempotencyKey: { startsWith: PREFIX } } });
-  await prisma.smsSuppression.deleteMany({ where: { phoneE164: { startsWith: "+17085558" } } });
-  await prisma.smsInboundEvent.deleteMany({ where: { providerEventId: { startsWith: "s7tw-" } } });
+
+  // The manager-alert volume cap counts EVERY delivered alert of a type in a rolling window,
+  // not just this suite's. A SUCCEEDED/SENT alert left behind by another suite (the Sprint-5
+  // print tests enqueue real ALERT_MANAGER_PRINT_FAILED jobs, with no testPrefix to match on)
+  // silently caps the alerts these tests expect to send, for fifteen minutes. Clear delivered
+  // alerts of the types exercised here so the cap starts from zero regardless of run order.
+  await prisma.backgroundJob.deleteMany({
+    where: {
+      type: { in: [JobType.ALERT_MANAGER_PRINT_FAILED, JobType.ALERT_MANAGER_JOB_DEAD] },
+      status: JobStatus.SUCCEEDED,
+      result: "SENT",
+    },
+  });
 }
 
 async function createOrder(args: {
-  smsConsent: boolean;
   phone?: string;
   email?: string;
   estimatedReadyAt?: Date;
-}): Promise<string> {
+} = {}): Promise<string> {
   const key = `${PREFIX}${Math.random().toString(16).slice(2)}`;
   const order = await prisma.order.create({
     data: {
@@ -61,8 +70,6 @@ async function createOrder(args: {
       customerLastName: "Jones",
       customerPhone: args.phone ?? "+17085558001",
       customerEmail: args.email ?? "s7notify@example.com",
-      smsConsent: args.smsConsent,
-      smsConsentAt: args.smsConsent ? new Date() : null,
       subtotalCents: 1099,
       taxCents: 111,
       tipCents: 200,
@@ -110,22 +117,20 @@ async function enqueue(type: JobType, payload: Record<string, unknown>, extra?: 
 }
 
 function ports(opts?: {
-  sms?: SmsSendResult;
   email?: EmailSendResult;
   delayMs?: number;
-  onSms?: () => void;
-}): NotifyPorts & { smsCalls: { n: number; bodies: string[] } } {
-  const smsCalls = { n: 0, bodies: [] as string[] };
+  onEmail?: () => void;
+}): NotifyPorts & { emailCalls: { n: number; subjects: string[] } } {
+  const emailCalls = { n: 0, subjects: [] as string[] };
   return {
-    smsCalls,
-    sendSms: async (input) => {
-      smsCalls.n += 1;
-      smsCalls.bodies.push(input.body);
-      opts?.onSms?.();
+    emailCalls,
+    sendEmail: async (input) => {
+      emailCalls.n += 1;
+      emailCalls.subjects.push(input.subject);
+      opts?.onEmail?.();
       if (opts?.delayMs) await new Promise((r) => setTimeout(r, opts.delayMs));
-      return opts?.sms ?? { kind: "sent", providerMessageId: `SM${smsCalls.n}` };
+      return opts?.email ?? { kind: "sent", providerMessageId: `em${emailCalls.n}` };
     },
-    sendEmail: async () => opts?.email ?? { kind: "sent", providerMessageId: "em_1" },
   };
 }
 
@@ -140,14 +145,14 @@ const PASS = {
 };
 
 let dbAvailable = true;
-let savedAlerts: { phone: string | null; email: string | null } | null = null;
+let savedAlerts: { email: string | null } | null = null;
 
 before(async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     await cleanup();
     const store = await prisma.storeConfig.findUniqueOrThrow({ where: { id: "default" } });
-    savedAlerts = { phone: store.managerAlertPhone, email: store.managerAlertEmail };
+    savedAlerts = { email: store.managerAlertEmail };
   } catch (err) {
     dbAvailable = false;
     console.warn(`[worker.test] skipping: ${(err as Error).message}`);
@@ -159,7 +164,7 @@ after(async () => {
   if (savedAlerts) {
     await prisma.storeConfig.update({
       where: { id: "default" },
-      data: { managerAlertPhone: savedAlerts.phone, managerAlertEmail: savedAlerts.email },
+      data: { managerAlertEmail: savedAlerts.email },
     });
     invalidateStoreConfigCache();
   }
@@ -170,84 +175,26 @@ describe("runWorkerPass", () => {
   it("overlapping passes with a slow handler execute a job once", async () => {
     if (!dbAvailable) return;
     await cleanup();
-    const orderId = await createOrder({ smsConsent: true });
-    await enqueue(JobType.SMS_ORDER_CONFIRMATION, { orderId });
+    const orderId = await createOrder();
+    await enqueue(JobType.EMAIL_ORDER_RECEIPT, { orderId });
     const p = ports({ delayMs: 200 });
     const [a, b] = await Promise.all([
       runWorkerPass({ ...PASS, ports: p }),
       runWorkerPass({ ...PASS, ports: p }),
     ]);
     assert.equal(a.claimed + b.claimed, 1);
-    assert.equal(p.smsCalls.n, 1);
-    assert.equal(smsContainsMoneySafe(p.smsCalls.bodies[0] ?? ""), false);
-  });
-
-  it("skips SMS without consent and completes rather than failing", async () => {
-    if (!dbAvailable) return;
-    await cleanup();
-    const orderId = await createOrder({ smsConsent: false });
-    const job = await enqueue(JobType.SMS_ORDER_CONFIRMATION, { orderId });
-    const p = ports();
-    const result = await runWorkerPass({ ...PASS, ports: p });
-    assert.equal(result.succeeded, 1);
-    assert.equal(p.smsCalls.n, 0);
-    const row = await prisma.backgroundJob.findUniqueOrThrow({ where: { id: job.id } });
-    assert.equal(row.status, JobStatus.SUCCEEDED);
-    assert.equal(row.result, "SKIPPED_NO_CONSENT");
-  });
-
-  it("skips a suppressed number and completes", async () => {
-    if (!dbAvailable) return;
-    await cleanup();
-    const phone = "+17085558002";
-    await setSmsSuppression({ phoneE164: phone, suppressed: true });
-    const orderId = await createOrder({ smsConsent: true, phone });
-    const job = await enqueue(JobType.SMS_ORDER_CONFIRMATION, { orderId });
-    const p = ports();
-    await runWorkerPass({ ...PASS, ports: p });
-    assert.equal(p.smsCalls.n, 0);
-    const row = await prisma.backgroundJob.findUniqueOrThrow({ where: { id: job.id } });
-    assert.equal(row.result, "SKIPPED_SUPPRESSED");
-    assert.equal(row.status, JobStatus.SUCCEEDED);
-  });
-
-  it("opt-out then opt-in restores sending", async () => {
-    if (!dbAvailable) return;
-    await cleanup();
-    const phone = "+17085558003";
-    await processTwilioInbound({ providerEventId: "s7tw-1", fromPhone: phone, body: "STOP" });
-    const orderId = await createOrder({ smsConsent: true, phone });
-    await enqueue(JobType.SMS_ORDER_CONFIRMATION, { orderId });
-    const p = ports();
-    await runWorkerPass({ ...PASS, ports: p });
-    assert.equal(p.smsCalls.n, 0);
-    await processTwilioInbound({ providerEventId: "s7tw-2", fromPhone: phone, body: "START" });
-    await enqueue(JobType.SMS_ORDER_CONFIRMATION, { orderId });
-    const p2 = ports();
-    await runWorkerPass({ ...PASS, ports: p2 });
-    assert.equal(p2.smsCalls.n, 1);
-  });
-
-  it("inbound webhook events are idempotent on MessageSid", async () => {
-    if (!dbAvailable) return;
-    const phone = "+17085558004";
-    const a = await processTwilioInbound({ providerEventId: "s7tw-dup", fromPhone: phone, body: "STOP" });
-    const b = await processTwilioInbound({ providerEventId: "s7tw-dup", fromPhone: phone, body: "STOP" });
-    assert.equal(a.outcome, "recorded");
-    assert.equal(b.outcome, "duplicate");
-    assert.equal(classifySmsKeyword("STOP"), "opt_out");
-    assert.equal(classifySmsKeyword("START"), "opt_in");
+    assert.equal(p.emailCalls.n, 1, "a job claimed by two overlapping passes still sends once");
   });
 
   it("records the provider id before completing, and retries skip a second send", async () => {
     if (!dbAvailable) return;
     await cleanup();
-    const orderId = await createOrder({ smsConsent: true });
-    const job = await enqueue(JobType.SMS_ORDER_CONFIRMATION, { orderId });
+    const orderId = await createOrder();
+    const job = await enqueue(JobType.EMAIL_ORDER_RECEIPT, { orderId });
     const p = ports();
     await runWorkerPass({ ...PASS, ports: p });
     const row = await prisma.backgroundJob.findUniqueOrThrow({ where: { id: job.id } });
-    assert.equal(row.providerMessageId, "SM1");
+    assert.equal(row.providerMessageId, "em1");
     assert.equal(row.status, JobStatus.SUCCEEDED);
     await prisma.backgroundJob.update({
       where: { id: job.id },
@@ -255,15 +202,15 @@ describe("runWorkerPass", () => {
     });
     const p2 = ports();
     await runWorkerPass({ ...PASS, ports: p2 });
-    assert.equal(p2.smsCalls.n, 0);
+    assert.equal(p2.emailCalls.n, 0, "a recorded provider id suppresses a second send");
   });
 
-  it("a rejected unsendable number is permanent (DEAD on first attempt)", async () => {
+  it("a rejected unsendable address is permanent (DEAD on first attempt)", async () => {
     if (!dbAvailable) return;
     await cleanup();
-    const orderId = await createOrder({ smsConsent: true });
-    const job = await enqueue(JobType.SMS_ORDER_CONFIRMATION, { orderId }, { maxAttempts: 5 });
-    const p = ports({ sms: { kind: "rejected", code: "invalid_to", message: "bad" } });
+    const orderId = await createOrder();
+    const job = await enqueue(JobType.EMAIL_ORDER_RECEIPT, { orderId }, { maxAttempts: 5 });
+    const p = ports({ email: { kind: "rejected", code: "invalid_to", message: "bad" } });
     const result = await runWorkerPass({ ...PASS, ports: p });
     assert.equal(result.dead, 1);
     const row = await prisma.backgroundJob.findUniqueOrThrow({ where: { id: job.id } });
@@ -306,10 +253,10 @@ describe("runWorkerPass", () => {
   it("stranded RUNNING jobs are recovered then executed", async () => {
     if (!dbAvailable) return;
     await cleanup();
-    const orderId = await createOrder({ smsConsent: true });
+    const orderId = await createOrder();
     const job = await prisma.backgroundJob.create({
       data: {
-        type: JobType.SMS_ORDER_CONFIRMATION,
+        type: JobType.EMAIL_ORDER_RECEIPT,
         status: JobStatus.RUNNING,
         payload: { testPrefix: PREFIX, orderId },
         attemptCount: 1,
@@ -331,16 +278,15 @@ describe("runWorkerPass", () => {
     await runWorkerPass({ ...PASS, ports: p, strandedMs: 90_000, backoffMs: 1, now: later });
     const row = await prisma.backgroundJob.findUniqueOrThrow({ where: { id: job.id } });
     assert.equal(row.status, JobStatus.SUCCEEDED);
-    assert.equal(p.smsCalls.n, 1);
+    assert.equal(p.emailCalls.n, 1);
   });
 
   it("email receipt sends html and text and matches stored cents", async () => {
     if (!dbAvailable) return;
     await cleanup();
-    const orderId = await createOrder({ smsConsent: true });
+    const orderId = await createOrder();
     const box: { current: { html: string; text: string } | null } = { current: null };
     const p: NotifyPorts = {
-      sendSms: async () => ({ kind: "sent", providerMessageId: "x" }),
       sendEmail: async (input) => {
         box.current = { html: input.html, text: input.text };
         return { kind: "sent", providerMessageId: "em_receipt" };
@@ -365,10 +311,7 @@ describe("runWorkerPass", () => {
     await cleanup();
     await prisma.storeConfig.update({
       where: { id: "default" },
-      data: {
-        managerAlertPhone: "TODO: SET MANAGER ALERT PHONE",
-        managerAlertEmail: "todo-manager-alerts@localhost",
-      },
+      data: { managerAlertEmail: "todo-manager-alerts@localhost" },
     });
     invalidateStoreConfigCache();
     const job = await enqueue(JobType.ALERT_MANAGER_PRINT_FAILED, {
@@ -381,7 +324,7 @@ describe("runWorkerPass", () => {
     const p = ports();
     const result = await runWorkerPass({ ...PASS, ports: p });
     assert.equal(result.dead, 1);
-    assert.equal(p.smsCalls.n, 0);
+    assert.equal(p.emailCalls.n, 0);
     const row = await prisma.backgroundJob.findUniqueOrThrow({ where: { id: job.id } });
     assert.equal(row.status, JobStatus.DEAD);
     const extraAlerts = await prisma.backgroundJob.count({
@@ -395,7 +338,7 @@ describe("runWorkerPass", () => {
     await cleanup();
     await prisma.storeConfig.update({
       where: { id: "default" },
-      data: { managerAlertPhone: "+17085559999", managerAlertEmail: null },
+      data: { managerAlertEmail: "burst-cap@example.com" },
     });
     invalidateStoreConfigCache();
     await enqueue(JobType.ALERT_MANAGER_PRINT_FAILED, {
@@ -414,7 +357,7 @@ describe("runWorkerPass", () => {
     });
     const p = ports();
     await runWorkerPass({ ...PASS, ports: p, claimLimit: 10 });
-    assert.equal(p.smsCalls.n, 1);
+    assert.equal(p.emailCalls.n, 1, "the volume cap lets exactly one of the burst through");
     const skipped = await prisma.backgroundJob.findMany({
       where: {
         type: JobType.ALERT_MANAGER_PRINT_FAILED,
@@ -423,6 +366,23 @@ describe("runWorkerPass", () => {
     });
     const results = skipped.map((j) => j.result).sort();
     assert.deepEqual(results, ["SENT", "SKIPPED_VOLUME_CAP"].sort());
+  });
+
+  it("a retired SMS job drains as skipped instead of failing forever", async () => {
+    // SPRINT-18. The SMS job types are still in the JobType enum (removing a PostgreSQL enum
+    // value with live rows would need a migration), and rows enqueued before the removal are
+    // still in the queue. They must reach a terminal state rather than dying on every pass.
+    if (!dbAvailable) return;
+    await cleanup();
+    const orderId = await createOrder();
+    const job = await enqueue(JobType.SMS_ORDER_CONFIRMATION, { orderId });
+    const p = ports();
+    const result = await runWorkerPass({ ...PASS, ports: p });
+    assert.equal(result.succeeded, 1);
+    assert.equal(p.emailCalls.n, 0, "a retired SMS job sends nothing at all");
+    const row = await prisma.backgroundJob.findUniqueOrThrow({ where: { id: job.id } });
+    assert.equal(row.status, JobStatus.SUCCEEDED);
+    assert.equal(row.result, "SKIPPED_SMS_REMOVED");
   });
 
   it("a dying manager alert does not enqueue another manager alert", async () => {
@@ -450,7 +410,3 @@ describe("runWorkerPass", () => {
     assert.equal(chain, 0);
   });
 });
-
-function smsContainsMoneySafe(body: string): boolean {
-  return /\$\d|\d+\.\d{2}/.test(body);
-}

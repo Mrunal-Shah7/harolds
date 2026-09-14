@@ -33,7 +33,7 @@ async function get(path) {
 
 const health = await get("/api/v1/health");
 checks.push(["health envelope version", health.json?.meta?.version === "1.2.0"]);
-checks.push(["health has squareEnvironment", typeof health.json?.data?.squareEnvironment === "string"]);
+checks.push(["health has paymentEnvironment", typeof health.json?.data?.paymentEnvironment === "string"]);
 checks.push(["health additive checks present", Boolean(health.json?.data?.checks)]);
 
 const menu = await get("/api/v1/menu");

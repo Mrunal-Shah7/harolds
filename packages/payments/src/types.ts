@@ -1,10 +1,10 @@
-// SPRINT-4: public result/error taxonomy for Square payment operations.
-// These types intentionally do not mirror Square's SDK shapes field-for-field —
-// callers outside this package must never need to know Square's vocabulary.
+// SPRINT-4 / SPRINT-17: public result/error taxonomy for payment operations.
+// These types intentionally do not mirror the gateway's wire shapes field-for-field —
+// callers outside this package must never need to know NMI's vocabulary.
 
 /**
- * Our own decline vocabulary. Square's `ErrorCode` values are translated into
- * one of these before leaving the module (see `errors.ts`).
+ * Our own decline vocabulary. NMI's numeric `response_code` values are translated
+ * into one of these before leaving the module (see `errors.ts`).
  */
 export const PaymentDeclineCode = {
   CARD_DECLINED: "CARD_DECLINED",
@@ -40,7 +40,7 @@ export type PaymentOutcome =
   | {
       kind: "declined";
       paymentId: string | null;
-      /** Customer-safe message — never Square field names or raw error text. */
+      /** Customer-safe message — never gateway field names or raw error text. */
       reason: string;
       code: PaymentDeclineCode;
     }
@@ -61,7 +61,7 @@ export type RefundOutcome =
       refundId: string | null;
     };
 
-/** Normalised payment shape returned by getPayment(). No Square field names leak past this type. */
+/** Normalised payment shape returned by getPayment(). No gateway field names leak past this type. */
 export type NormalizedPayment = {
   paymentId: string;
   status: string;
@@ -82,26 +82,36 @@ export type NormalizedRefund = {
 };
 
 export type CreatePaymentInput = {
-  sourceId: string;
+  /** Single-use Collect.js token. Never card data — the PAN never reaches our servers. */
+  paymentToken: string;
   amountCents: number;
-  idempotencyKey: string;
-  /** Our internal order id — stored as Square's referenceId, never as a price or secret. */
+  /**
+   * Correlation id for logs only — NOT an idempotency key. NMI has no equivalent of Square's
+   * `idempotencyKey`, and nothing about this value makes a repeated call safe. The guard
+   * against a double charge is the caller's atomic pre-charge claim; see checkout.ts.
+   */
+  correlationId: string;
+  /** Our internal order id — sent as the gateway's merchant-defined reference, never a price or secret. */
   orderId: string;
-  /** Human-facing order number/reference — stored in Square's note field. */
+  /** Human-facing order number/reference — sent in the gateway's order_description field. */
   orderReference: string;
-  locationId?: string;
 };
 
 export type RefundPaymentInput = {
   paymentId: string;
   amountCents: number;
-  idempotencyKey: string;
+  /** Correlation id for logs only — see the note on CreatePaymentInput.correlationId. */
+  correlationId: string;
+  /**
+   * When true, reverse with `type=void` instead of `type=refund`. Callers that do not know
+   * should leave this undefined: the client then probes the transaction's settlement state.
+   */
+  void?: boolean;
 };
 
 export type VerifyWebhookSignatureInput = {
   body: string | Buffer;
   signatureHeader: string;
-  notificationUrl: string;
 };
 
-export type SquareEnvironmentName = "sandbox" | "production";
+export type PaymentEnvironmentName = "sandbox" | "production";

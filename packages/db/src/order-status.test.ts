@@ -268,7 +268,11 @@ describe("applyOrderTransition", () => {
     assert.equal(still.printedAt, null);
   });
 
-  it("enqueues SMS_ORDER_READY in the READY transaction; a failed enqueue rolls the transition back", async () => {
+  it("reaching READY enqueues NO customer notification, and afterWork failure rolls the transition back", async () => {
+    // SPRINT-18: this used to assert an SMS_ORDER_READY job was created. SMS was removed with
+    // Twilio and no email equivalent exists, so the customer is not notified at all now — the
+    // first half asserts that absence deliberately, so silently re-adding a notification here
+    // would fail rather than pass unnoticed.
     if (!dbAvailable) return;
     const cooking = await paidOrder();
     await applyOrderTransition({
@@ -280,10 +284,13 @@ describe("applyOrderTransition", () => {
     const ready = await prisma.order.findUniqueOrThrow({ where: { id: cooking.id } });
     assert.equal(ready.status, OrderStatus.READY);
     const jobs = await prisma.backgroundJob.findMany({
-      where: { type: JobType.SMS_ORDER_READY, payload: { path: ["orderId"], equals: cooking.id } },
+      where: { payload: { path: ["orderId"], equals: cooking.id } },
     });
-    assert.equal(jobs.length, 1);
+    assert.equal(jobs.length, 0, "READY no longer notifies the customer");
 
+    // The transactional guarantee is unchanged and still worth holding: work handed to
+    // `afterWork` runs INSIDE the transition's transaction, so its failure must undo the status
+    // change rather than leave an order READY with its side effects missing.
     const other = await paidOrder();
     await applyOrderTransition({
       orderId: other.id,
@@ -305,9 +312,5 @@ describe("applyOrderTransition", () => {
     const rolled = await prisma.order.findUniqueOrThrow({ where: { id: other.id } });
     assert.equal(rolled.status, OrderStatus.IN_PROGRESS);
     assert.equal(rolled.readyAt, null);
-    const readyJobs = await prisma.backgroundJob.findMany({
-      where: { type: JobType.SMS_ORDER_READY, payload: { path: ["orderId"], equals: other.id } },
-    });
-    assert.equal(readyJobs.length, 0);
   });
 });

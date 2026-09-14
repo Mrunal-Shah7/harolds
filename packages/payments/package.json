@@ -1,5 +1,5 @@
 {
-  "name": "@harolds/square",
+  "name": "@harolds/payments",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,8 +14,7 @@
   },
   "dependencies": {
     "@harolds/config": "workspace:*",
-    "@harolds/types": "workspace:*",
-    "square": "^45.0.1"
+    "@harolds/types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

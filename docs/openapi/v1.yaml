@@ -97,7 +97,7 @@ tags:
   - name: Orders
     description: Checkout and public order status
   - name: Webhooks
-    description: Processor callbacks (Square only)
+    description: Payment gateway callbacks (NMI only)
 
 paths:
   /api/v1/menu:
@@ -632,10 +632,12 @@ paths:
       tags: [Orders]
       summary: Create order and take payment
       description: |
-        Authoritatively prices the cart, creates a pending order, charges via Square, and on
-        success allocates an order number. **Stateless cart — no prices from the client.**
-        Client sends a Square Web Payments SDK token only — never card data.
-        Idempotent on `idempotencyKey`.
+        Authoritatively prices the cart, creates a pending order, charges via the NMI gateway,
+        and on success allocates an order number. **Stateless cart — no prices from the client.**
+        Client sends an NMI Collect.js single-use payment token only — never card data.
+        Idempotent on `idempotencyKey`: a repeated submit returns the existing order rather
+        than charging again. The gateway itself offers no idempotency, so the server also takes
+        an exclusive per-order charge claim before contacting it.
       operationId: postOrder
       requestBody:
         required: true
@@ -654,7 +656,6 @@ paths:
                 lastName: Cook
                 phone: "+17085550100"
                 email: casey@example.com
-                smsConsent: true
               paymentToken: cnon:card-nonce-ok
               idempotencyKey: checkout-attempt-001
       responses:
@@ -690,13 +691,15 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/webhooks/square:
+  /api/v1/webhooks/nmi:
     post:
       tags: [Webhooks]
-      summary: Square webhook receiver (NOT storefront)
+      summary: NMI webhook receiver (NOT storefront)
       description: |
-        Square only. Verifies HMAC signature over the raw body. Exactly-once by event id.
-      operationId: postSquareWebhook
+        NMI only. Verifies the HMAC-SHA256 `webhook-signature` header over the raw body
+        (signed as `<timestamp>.<body>`). Exactly-once by event id. A backstop rather than the
+        primary path to PAID — the sale's outcome is already known synchronously at checkout.
+      operationId: postNmiWebhook
       responses:
         '200':
           description: Accepted
@@ -706,13 +709,13 @@ paths:
   /api/v1/health:
     get:
       tags: [Store]
-      summary: Health / Square environment selector
+      summary: Health / payment gateway environment selector
       operationId: getHealth
       responses:
         '200':
           description: |
             Process, database, and worker are up.
-            `data.ok` is true. `data.squareEnvironment` is `sandbox` or `production`.
+            `data.ok` is true. `data.paymentEnvironment` is `sandbox` or `production`.
             Additive Sprint 9 fields: `data.checks.database`, `data.checks.worker`, `data.worker.lastPassAt`.
         '503':
           description: |
@@ -1425,13 +1428,15 @@ components:
           $ref: '#/components/schemas/CartRequest'
         customer:
           type: object
-          required: [firstName, lastName, phone, email, smsConsent]
+          required: [firstName, lastName, phone, email]
           properties:
             firstName: { type: string }
             lastName: { type: string }
             phone: { type: string }
             email: { type: string }
-            smsConsent: { type: boolean }
+            # SPRINT-18: retired with the SMS subsystem. Still accepted for backwards
+            # compatibility, never read or stored. Omit it in new clients.
+            smsConsent: { type: boolean, deprecated: true }
         paymentToken: { type: string }
         idempotencyKey: { type: string }
         customerNote: { type: string, nullable: true }

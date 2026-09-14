@@ -1,24 +1,24 @@
-// SPRINT-4: structured logging for Square operations — field-name redaction is applied centrally.
+// SPRINT-4 / SPRINT-17: structured logging for payment operations — field-name redaction is applied centrally.
 import { emitLog } from "@harolds/config";
 
 type LogFields = Record<string, string | number | boolean | null | undefined>;
 
 function emit(level: "info" | "warn" | "error", event: string, fields: LogFields): void {
-  emitLog(level, event, fields, { scope: "@harolds/square" });
+  emitLog(level, event, fields, { scope: "@harolds/payments" });
 }
 
 export function logPaymentAttempt(fields: {
   orderId: string;
-  idempotencyKey: string;
+  correlationId: string;
   amountCents: number;
-  sourceIdProvided: boolean;
+  tokenProvided: boolean;
 }): void {
   emit("info", "payment.attempt", fields);
 }
 
 export function logPaymentOutcome(fields: {
   orderId: string;
-  idempotencyKey: string;
+  correlationId: string;
   amountCents: number;
   outcomeKind: string;
   paymentId?: string | null;
@@ -29,7 +29,7 @@ export function logPaymentOutcome(fields: {
 
 export function logRefundAttempt(fields: {
   paymentId: string;
-  idempotencyKey: string;
+  correlationId: string;
   amountCents: number;
 }): void {
   emit("info", "refund.attempt", fields);
@@ -37,7 +37,7 @@ export function logRefundAttempt(fields: {
 
 export function logRefundOutcome(fields: {
   paymentId: string;
-  idempotencyKey: string;
+  correlationId: string;
   amountCents: number;
   outcomeKind: string;
   refundId?: string | null;

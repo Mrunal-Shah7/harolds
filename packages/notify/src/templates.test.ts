@@ -1,4 +1,4 @@
-// SPRINT-7: customer and manager message copy — transactional only, store-local time, stored cents.
+// SPRINT-7 / SPRINT-18: manager and receipt copy. The SMS template suite went with Twilio.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { formatCents } from "@harolds/pricing";
@@ -10,7 +10,6 @@ import {
   renderUnackedAlert,
 } from "./templates-alerts";
 import { renderReceiptHtml, renderReceiptText, type ReceiptEmailInput } from "./templates-email";
-import { renderOrderConfirmationSms, renderOrderReadySms, smsContainsMoney } from "./templates-sms";
 
 const RICH: ReceiptEmailInput = {
   storeName: "Harold's Chicken Burnham",
@@ -55,30 +54,6 @@ const RICH: ReceiptEmailInput = {
   totalCents: 8063,
 };
 
-describe("SMS copy", () => {
-  it("confirmation has order number, store name, local ready time, and no money", () => {
-    const readyAt = new Date("2026-08-15T22:20:00.000Z");
-    const body = renderOrderConfirmationSms({
-      storeName: "Harold's Chicken Burnham",
-      orderNumber: "HC-042",
-      estimatedReadyAt: readyAt,
-      timeZone: "America/Chicago",
-    });
-    assert.match(body, /Harold's Chicken Burnham/);
-    assert.match(body, /HC-042/);
-    const local = formatStoreLocalTime(readyAt, "America/Chicago");
-    assert.ok(body.includes(local));
-    assert.equal(smsContainsMoney(body), false);
-    assert.equal(body.includes("$"), false);
-  });
-
-  it("ready message is only the order number and pickup", () => {
-    const body = renderOrderReadySms("HC-042");
-    assert.equal(body, "Order HC-042 is ready for pickup.");
-    assert.equal(smsContainsMoney(body), false);
-  });
-});
-
 describe("email receipt", () => {
   it("names the customer, the paid time and the card, matching the printed slip", () => {
     const text = renderReceiptText(RICH);
@@ -90,7 +65,7 @@ describe("email receipt", () => {
     assert.match(html, /Card \*\*\*\*1111/);
   });
 
-  it("omits the card line entirely when Square gave no last four", () => {
+  it("omits the card line entirely when the gateway gave no last four", () => {
     const text = renderReceiptText({ ...RICH, cardLast4: null });
     assert.doesNotMatch(text, /Card/);
     assert.doesNotMatch(renderReceiptHtml({ ...RICH, cardLast4: null }), /Card /);
@@ -147,16 +122,17 @@ describe("manager alerts", () => {
       lastError: "offline",
       printerSerial: "XBVN044247",
     });
-    assert.match(print.sms, /HC-042/);
-    assert.match(print.sms, /KITCHEN_TICKET/);
-    assert.match(print.sms, /reprint/i);
+    assert.match(print.emailText, /HC-042/);
+    assert.match(print.emailText, /KITCHEN_TICKET/);
+    assert.match(print.emailText, /reprint/i);
+    assert.match(print.emailSubject, /HC-042/);
 
     const unack = renderUnackedAlert({
       orderNumber: "HC-042",
       orderId: "ord_1",
       reason: "Paid order has not been moved to in progress.",
     });
-    assert.match(unack.sms, /HC-042/);
+    assert.match(unack.emailText, /HC-042/);
     assert.match(unack.emailText, /kitchen display/i);
 
     const dead = renderJobDeadAlert({
@@ -166,18 +142,20 @@ describe("manager alerts", () => {
       lastError: "timeout",
       attemptCount: 5,
     });
-    assert.match(dead.sms, /dead/i);
+    assert.match(dead.emailText, /dead/i);
     assert.match(dead.emailText, /retry/i);
 
     const pay = renderPaymentDiscrepancyAlert({
       orderId: "ord_1",
       kind: "AMOUNT_MISMATCH",
-      processorPaymentId: "sq_1",
+      processorPaymentId: "txn_1",
       orderTotalCents: 1000,
-      squareAmountCents: 900,
-      detail: "Paid order total does not match Square captured amount",
+      gatewayAmountCents: 900,
+      detail: "Paid order total does not match the gateway captured amount",
     });
-    assert.match(pay.sms, /ord_1/);
+    assert.match(pay.emailText, /ord_1/);
     assert.match(pay.emailText, /Reconcile/i);
+    // Operator-facing copy must not name a processor we no longer use.
+    assert.doesNotMatch(pay.emailText, /square/i);
   });
 });

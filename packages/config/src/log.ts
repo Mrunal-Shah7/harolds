@@ -38,10 +38,14 @@ const SENSITIVE_EXACT = new Set([
   "fromnumber",
   "lookuptoken",
   "processorpaymentid",
-  "square_access_token",
-  "square_webhook_signature_key",
+  // SPRINT-17: NMI credentials. `securitykey` and `signingkey` are the compacted forms of
+  // NMI_SECURITY_KEY_* / NMI_WEBHOOK_SIGNING_KEY_*, which the pattern below does NOT match on
+  // its own — neither contains "secret", "token" or "key" as a whole word. The tokenization
+  // key is public and deliberately absent.
+  "securitykey",
+  "signingkey",
+  "webhooksigningkey",
   "printer_sdp_shared_secret",
-  "twilio_auth_token",
   "email_api_key",
   "sentry_dsn",
   "database_url",
@@ -49,7 +53,7 @@ const SENSITIVE_EXACT = new Set([
 ]);
 
 const SENSITIVE_PATTERN =
-  /(password|secret|token|pin|authorization|cookie|email|phone|card|cvv|pan|dsn|apikey|access_token)/i;
+  /(password|secret|token|pin|authorization|cookie|email|phone|card|cvv|pan|dsn|apikey|access_token|security_key|securitykey|signing_key|signingkey)/i;
 
 export const REDACTED = "[redacted]";
 
@@ -63,8 +67,12 @@ export function isSensitiveLogKey(key: string): boolean {
   if (compact === "id" || compact === "orderid" || compact === "jobid" || compact === "userid") {
     return false;
   }
-  // Capability flags (smsConfigured, emailConfigured) are booleans, not addresses.
+  // Capability and presence flags (smsConfigured, tokenProvided, cardPresent) are BOOLEANS
+  // describing whether a value existed — never the value. Redacting them turns a useful
+  // diagnostic into "[redacted]", which is how "was a payment token even sent?" stopped being
+  // answerable from the logs.
   if (compact.endsWith("configured")) return false;
+  if (compact.endsWith("provided") || compact.endsWith("present")) return false;
   return SENSITIVE_PATTERN.test(key);
 }
 

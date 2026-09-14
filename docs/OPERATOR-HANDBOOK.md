@@ -63,4 +63,4 @@ The printer URL contains a secret. Do not copy it into chat, email, or a screens
 - `/admin` or `/kitchen` will not load.
 - A paid order is not on the kitchen board **and** did not print.
 
-Do not call Square about a missing ticket. The card was already captured. Reprint or correct status from `/admin`.
+Do not call the payment gateway about a missing ticket. The card was already captured. Reprint or correct status from `/admin`.

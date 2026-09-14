@@ -28,7 +28,7 @@
   "dependencies": {
     "@harolds/config": "workspace:*",
     "@harolds/types": "workspace:*",
-    "@harolds/square": "workspace:*",
+    "@harolds/payments": "workspace:*",
     "@harolds/print": "workspace:*",
     "@harolds/pricing": "workspace:*",
     "@prisma/client": "^6.1.0",

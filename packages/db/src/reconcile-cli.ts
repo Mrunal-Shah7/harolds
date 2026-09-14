@@ -1,4 +1,4 @@
-// SPRINT-4: orphan detection CLI — reports Square/DB discrepancies (read-only by default).
+// SPRINT-4: orphan detection CLI — reports gateway/DB discrepancies (read-only by default).
 import path from "node:path";
 import { config as loadDotenv } from "dotenv";
 import { fileURLToPath } from "node:url";
@@ -8,7 +8,7 @@ loadDotenv({ path: path.join(rootDir, ".env") });
 
 import { prisma } from "./client";
 import { runReconciliation, sweepAbandonedOrders } from "./reconcile";
-import { getPayment } from "@harolds/square";
+import { getPayment } from "@harolds/payments";
 
 function parseArgs(argv: string[]) {
   const out = { hours: 24, alerts: false, sweep: false, sweepMinutes: 60 };
@@ -48,7 +48,7 @@ if (findings.length === 0) {
         `order=${f.orderId ?? "-"}`,
         `payment=${f.processorPaymentId ?? "-"}`,
         `orderCents=${f.orderTotalCents ?? "-"}`,
-        `squareCents=${f.squareAmountCents ?? "-"}`,
+        `gatewayCents=${f.gatewayAmountCents ?? "-"}`,
         f.detail,
       ].join(" | "),
     );

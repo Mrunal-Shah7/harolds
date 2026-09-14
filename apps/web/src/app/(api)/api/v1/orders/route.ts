@@ -1,8 +1,8 @@
 // SPRINT-4: POST /api/v1/orders — create order + take payment (authoritative reprice)
 import { checkoutOrder } from "@/lib/checkout";
 import { fail, handleRouteError, ok } from "@/lib/api";
-import { env, emitLog } from "@harolds/config";
-import { getSquareEnvironment } from "@harolds/square";
+import { emitLog } from "@harolds/config";
+import { getPaymentEnvironment } from "@harolds/payments";
 import { BODY_LIMITS, readBoundedJson } from "@/lib/read-json";
 import { enforceRateLimit } from "@/lib/enforce-rate-limit";
 
@@ -11,9 +11,9 @@ export const revalidate = 0;
 
 emitLog(
   "info",
-  "square.environment",
-  { squareEnvironment: getSquareEnvironment(), appIdPrefix: env.SQUARE_APPLICATION_ID.slice(0, 8) },
-  { scope: "square" },
+  "payments.environment",
+  { paymentEnvironment: getPaymentEnvironment() },
+  { scope: "payments" },
 );
 
 export async function POST(request: Request) {

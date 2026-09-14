@@ -1,14 +1,16 @@
-// SPRINT-11: one structured startup line — what this instance can actually do.
-// SPRINT-12: include Square client-build identifier presence.
+// SPRINT-11 / SPRINT-18: one structured startup line — what this instance can actually do.
+// `smsConfigured` is gone: SMS was removed, so email is the only notification channel and
+// `emailConfigured` false now means customers get NO confirmation and alerts go nowhere.
+// SPRINT-12 / SPRINT-17: include Collect.js client-build identifier presence.
 import {
   emitLog,
   env,
   getPrinterConfig,
   managerDestinationProblems,
-  publicSquareIdsPresentAtBuild,
+  publicPaymentIdsPresentAtBuild,
 } from "@harolds/config";
 import { getStoreConfig } from "@harolds/db";
-import { getSquareEnvironment } from "@harolds/square";
+import { getPaymentEnvironment } from "@harolds/payments";
 
 function configured(value: string | undefined): boolean {
   return Boolean(value && value.trim().length > 0);
@@ -19,7 +21,7 @@ export async function runStartupChecks(): Promise<void> {
   let alertingDetail = "store-config-unavailable";
   try {
     const store = await getStoreConfig();
-    const problems = managerDestinationProblems(store.managerAlertPhone, store.managerAlertEmail);
+    const problems = managerDestinationProblems(store.managerAlertEmail);
     if (env.NODE_ENV === "production" && problems.length > 0) {
       throw new Error(
         [
@@ -36,15 +38,14 @@ export async function runStartupChecks(): Promise<void> {
   }
 
   const printers = getPrinterConfig();
-  const squareClientIdsAtBuild = publicSquareIdsPresentAtBuild(process.env);
+  const paymentClientIdsAtBuild = publicPaymentIdsPresentAtBuild(process.env);
   emitLog(
     "info",
     "app.startup_summary",
     {
       nodeEnv: env.NODE_ENV,
-      squareEnvironment: getSquareEnvironment(),
-      squareClientIdsAtBuild,
-      smsConfigured: configured(env.TWILIO_ACCOUNT_SID) && configured(env.TWILIO_AUTH_TOKEN) && configured(env.TWILIO_FROM_NUMBER),
+      paymentEnvironment: getPaymentEnvironment(),
+      paymentClientIdsAtBuild,
       emailConfigured: configured(env.EMAIL_API_KEY) && configured(env.EMAIL_FROM_ADDRESS),
       alertingConfigured,
       alertingDetail,

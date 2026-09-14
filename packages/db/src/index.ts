@@ -55,6 +55,8 @@ export {
   findOrderByLookupToken,
   findOrderByProcessorPaymentId,
   recordProcessorPaymentId,
+  claimOrderForCharge,
+  releaseChargeClaim,
   markOrderPaidAndAllocate,
   markOrderPaymentFailed,
   markOrderPaymentUnknown,
@@ -67,11 +69,12 @@ export type {
   MarkOrderPaidAndAllocateArgs,
   MarkOrderPaymentFailedArgs,
   MarkOrderPaymentUnknownArgs,
+  ChargeClaim,
   PublicOrderView,
   PublicOrderLineView,
 } from "./repositories/orders";
 
-// SPRINT-4: refunds / cancellation / reconciliation (DB-only helpers; Square wired at app/CLI)
+// SPRINT-4: refunds / cancellation / reconciliation (DB-only helpers; gateway wired at app/CLI)
 export {
   findRefundByIdempotencyKey,
   createPendingRefundRow,
@@ -100,7 +103,7 @@ export {
 } from "./print-jobs";
 export type { PrintSweepConfig, PrintQueueReport, CompletionResult } from "./print-jobs";
 export { runReconciliation, sweepAbandonedOrders } from "./reconcile";
-export type { ReconcileFinding, SquarePaymentProbe } from "./reconcile";
+export type { ReconcileFinding, GatewayPaymentProbe } from "./reconcile";
 
 // SPRINT-6: kitchen display — PIN auth, order status machine, queue, unacked alerts
 export {
@@ -162,9 +165,6 @@ export {
   retryDeadJobsByType,
   cancelBackgroundJob,
   countRecentDeliveredAlerts,
-  isPhoneSuppressed,
-  setSmsSuppression,
-  recordSmsInboundEvent,
   payloadOf,
 } from "./jobs";
 export type {
@@ -172,8 +172,6 @@ export type {
   AttemptFailureResult,
   BackgroundQueueReport,
   BackgroundJobCounts,
-  SmsInboundKind,
-  RecordSmsInboundResult,
 } from "./jobs";
 
 // SPRINT-2: menu cache

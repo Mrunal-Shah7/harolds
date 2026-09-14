@@ -264,7 +264,7 @@ describe("order receipt money block", () => {
     assert.match(preview, /Jamal W\./);
   });
 
-  it("omits card data when Square did not supply last four", () => {
+  it("omits card data when the gateway did not supply last four", () => {
     const preview = renderPlainText(buildOrderReceipt(sampleOrder({ cardLast4: null })));
     assert.doesNotMatch(preview, /CARD/);
     assert.doesNotMatch(preview, /\*\*\*\*/);

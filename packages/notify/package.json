@@ -17,7 +17,6 @@
     "@harolds/db": "workspace:*",
     "@harolds/email": "workspace:*",
     "@harolds/pricing": "workspace:*",
-    "@harolds/sms": "workspace:*",
     "@harolds/types": "workspace:*"
   },
   "devDependencies": {

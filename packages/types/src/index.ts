@@ -46,6 +46,12 @@ export const PrintJobStatus = {
 export type PrintJobStatus = (typeof PrintJobStatus)[keyof typeof PrintJobStatus];
 
 export const JobType = {
+  /**
+   * SPRINT-18: RETIRED. SMS was removed with Twilio and nothing enqueues these any more. They
+   * stay declared because `JobType` is a PostgreSQL enum with existing rows referencing both
+   * values — dropping them needs a migration and the deletion of historical job rows. The
+   * handlers for them are permanent skips (see @harolds/notify handlers.ts).
+   */
   SMS_ORDER_READY: "SMS_ORDER_READY",
   SMS_ORDER_CONFIRMATION: "SMS_ORDER_CONFIRMATION",
   EMAIL_ORDER_RECEIPT: "EMAIL_ORDER_RECEIPT",

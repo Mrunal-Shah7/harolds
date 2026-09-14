@@ -23,7 +23,7 @@ async function waitForUp() {
 
 const health = await waitForUp();
 const healthJson = await health.json();
-console.log(`health status=${health.status} ok=${healthJson.data?.ok} db=${healthJson.data?.checks?.database} worker=${healthJson.data?.checks?.worker} square=${healthJson.data?.squareEnvironment}`);
+console.log(`health status=${health.status} ok=${healthJson.data?.ok} db=${healthJson.data?.checks?.database} worker=${healthJson.data?.checks?.worker} gateway=${healthJson.data?.paymentEnvironment}`);
 
 const home = await fetch(`${base}/`);
 const csp = home.headers.get("content-security-policy") ?? "";
@@ -31,7 +31,7 @@ const frame = home.headers.get("x-frame-options");
 const nosniff = home.headers.get("x-content-type-options");
 const cors = home.headers.get("access-control-allow-origin");
 const reqId = home.headers.get("x-request-id");
-console.log(`headers cspSquare=${csp.includes("squarecdn")} frame=${frame} nosniff=${nosniff} cors=${cors ?? "none"} requestId=${Boolean(reqId)}`);
+console.log(`headers cspGateway=${csp.includes("nmi.com")} frame=${frame} nosniff=${nosniff} cors=${cors ?? "none"} requestId=${Boolean(reqId)}`);
 
 const menu = await fetch(`${base}/api/v1/menu`);
 console.log(`menu status=${menu.status}`);
@@ -67,7 +67,7 @@ console.log(`print poll ok=${pollOk} limited=${pollLimited} other=${pollOther} e
 let webhookLimited = 0;
 let webhookOther = 0;
 for (let i = 0; i < 40; i += 1) {
-  const res = await fetch(`${base}/api/v1/webhooks/square`, {
+  const res = await fetch(`${base}/api/v1/webhooks/nmi`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: "{}",
@@ -75,7 +75,7 @@ for (let i = 0; i < 40; i += 1) {
   if (res.status === 429) webhookLimited += 1;
   else webhookOther += 1;
 }
-console.log(`square webhook burst limited=${webhookLimited} other=${webhookOther} (401/400 expected, not 429)`);
+console.log(`gateway webhook burst limited=${webhookLimited} other=${webhookOther} (401/400 expected, not 429)`);
 
 if (pollLimited > 0 || webhookLimited > 0) {
   console.error("exemption failed");

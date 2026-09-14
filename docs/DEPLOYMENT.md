@@ -67,7 +67,7 @@ Confirm on reboot: service comes up **after** Postgres; `GET /api/v1/health` bec
 
 - Terminate TLS; proxy to `127.0.0.1:3000`.
 - `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` and `X-Forwarded-Proto $scheme`. Set `TRUST_PROXY=1` in `.env` so rate limits key on the client, not nginx.
-- Do **not** re-serialise bodies. Square HMAC is over raw bytes (`/api/v1/webhooks/square`).
+- Do **not** re-serialise bodies. The NMI HMAC is over raw bytes (`/api/v1/webhooks/nmi`), signed as `<timestamp>.<body>`.
 - Print poll: omit query string from access logs (`combined_no_query` in `PRINT-RUNBOOK.md` §6).
 - Body sizes: public JSON 32 KiB, admin 64 KiB, webhooks 1 MiB, print 256 KiB — do not set nginx `client_max_body_size` below 1m.
 - HTTP → HTTPS at nginx (Node also redirects when `TRUST_PROXY=1` and proto is http).
@@ -77,19 +77,18 @@ Confirm on reboot: service comes up **after** Postgres; `GET /api/v1/health` bec
 
 ## 4. Environment: build vs run
 
-`pnpm build` (`next build`) sets `NODE_ENV=production` while collecting page data. Twilio, email, print-secret length, and manager destinations are **start-time** requirements. The build skips those guards when `NEXT_PHASE` is set so CI can compile without live credentials.
+`pnpm build` (`next build`) sets `NODE_ENV=production` while collecting page data. Email, print-secret length, and manager destinations are **start-time** requirements. The build skips those guards when `NEXT_PHASE` is set so CI can compile without live credentials.
 
 **Required at run** (`node server.js` with `NODE_ENV=production`):
 
-- Everything in `.env.example` marked required (database, Square, printer serial + secret).
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`
+- Everything in `.env.example` marked required (database, NMI, printer serial + secret).
 - `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`
 - `PRINTER_SDP_SHARED_SECRET` at least 32 characters
 - Store-config manager alert phone and/or email that are **not** the seeded placeholders (`TODO: SET MANAGER ALERT PHONE`, `todo-manager-alerts@localhost`)
 
 A production start names every missing env var at once, then (after the database is reachable) refuses placeholder manager destinations.
 
-**Not required at build:** Twilio, email, Sentry, manager destinations.
+**Not required at build:** email, Sentry, manager destinations.
 
 ---
 
@@ -104,7 +103,7 @@ Write the previous standalone directory aside **before** you replace it.
 5. `pnpm db:migrate:deploy` — **never** `pnpm db:migrate`
 6. `pnpm build`
 7. Copy `static` and `public` into the standalone tree (table in §2). Restart systemd.
-8. Verify: `GET /api/v1/health` 200, `squareEnvironment=production`, `app.startup_summary` in the log, menu 200, printer last-polled updates within 10s.
+8. Verify: `GET /api/v1/health` 200, `paymentEnvironment=production`, `app.startup_summary` in the log, menu 200, printer last-polled updates within 10s.
 
 `pnpm db:migrate:deploy` was rehearsed against a scratch database `harolds_s11_scratch` (created, migrated, dropped). All 10 migrations applied, including `20260815190000_sprint11_reconcile`.
 
@@ -140,12 +139,12 @@ The live database name `harolds` is refused by `scripts/restore-postgres.mjs` on
 Production `.env` must show:
 
 - `NODE_ENV=production`
-- `SQUARE_ENVIRONMENT=production`
+- `NMI_ENVIRONMENT=production`, and `NEXT_PUBLIC_NMI_ENVIRONMENT=production` + `NEXT_PUBLIC_NMI_TOKENIZATION_KEY` present at BUILD time (they are inlined into the client bundle)
 - `NEXT_PUBLIC_APP_URL=https://<real-domain>`
 - `TRUST_PROXY=1`
 - `LOG_LEVEL=info`
-- Twilio and email filled (not empty)
+- Email filled (not empty) — it is the only notification channel
 - Print secret ≥ 32 characters
-- No sandbox Square token, no localhost URLs
+- No sandbox NMI keys, no localhost URLs
 
-`GET /api/v1/health` is the glance check for Square env. If it says `sandbox`, stop. `app.startup_summary` is the glance check for SMS / email / alerting / error tracker / printer serial.
+`GET /api/v1/health` is the glance check for the gateway env. If it says `sandbox`, stop. `app.startup_summary` is the glance check for email / alerting / error tracker / printer serial.

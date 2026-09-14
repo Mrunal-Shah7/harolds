@@ -4751,12 +4751,23 @@ select[multiple] {
 
                 <div class="co-card card">
                   <h3>Payment</h3>
-                  <div style="margin-bottom:16px">
-                    <p class="eyebrow">Express checkout</p>
-                    <div style="height:48px;border:1px solid var(--line);border-radius:var(--r-md);margin-top:8px;display:flex;align-items:center;justify-content:center;color:var(--ink-muted);font-size:var(--body-sm)">Apple&nbsp;Pay</div>
+                  <!-- SPRINT-17: NMI Collect.js. The express-checkout row is GONE, not hidden:
+                       the wallet scaffolding was Square-specific and went with it. Collect.js
+                       mounts one iframe per field, so the card is three labelled containers
+                       rather than one combined row. Only the containers are styled; the field
+                       chrome inside each iframe is passed to Collect.js as customCss. -->
+                  <label style="display:block;font-size:var(--body-sm);margin:0 0 4px;color:var(--ink-muted)">Card number</label>
+                  <div style="min-height:46px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">1234 5678 9012 3456</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div>
+                      <label style="display:block;font-size:var(--body-sm);margin:12px 0 4px;color:var(--ink-muted)">Expiry</label>
+                      <div style="min-height:46px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">MM / YY</div>
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:var(--body-sm);margin:12px 0 4px;color:var(--ink-muted)">Security code</label>
+                      <div style="min-height:46px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">CVV</div>
+                    </div>
                   </div>
-                  <!-- Only the container is styled; Square mounts its own iframe inside. -->
-                  <div style="min-height:56px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">Card number &nbsp; MM/YY &nbsp; CVV &nbsp; ZIP</div>
                 </div>
               </div>
 
@@ -4784,9 +4795,9 @@ select[multiple] {
 
                 <p class="quote-note">Quoted by the store just now &mdash; every figure above, tip included, comes from the server.</p>
 
-                <!-- Card only, for now. The wallet methods are hidden in SquarePaymentForm
-                     (WALLETS_ENABLED), and advertising a method the form does not offer is
-                     worse than not listing it. -->
+                <!-- Card only. Collect.js handles wallets through a separate setup this
+                     deployment has not done, and advertising a method the form does not offer
+                     is worse than not listing it. -->
                 <div class="paywith">
                   <span class="paychip">Card</span>
                 </div>
@@ -5634,7 +5645,7 @@ select[multiple] {
               <table class="adm-table">
                 <thead><tr><th>Type</th><th>Status</th><th>Error</th><th></th></tr></thead>
                 <tbody>
-                  <tr><td>SMS_READY</td><td><span class="adm-badge adm-badge-hot">DEAD</span></td><td>Twilio 21610: unsubscribed recipient</td><td><button type="button" class="adm-btn adm-btn-ghost">Inspect</button></td></tr>
+                  <tr><td>EMAIL_ORDER_RECEIPT</td><td><span class="adm-badge adm-badge-hot">DEAD</span></td><td>Stored email address is not sendable.</td><td><button type="button" class="adm-btn adm-btn-ghost">Inspect</button></td></tr>
                   <tr><td>EMAIL_RECEIPT</td><td><span class="adm-badge adm-badge-hot">DEAD</span></td><td>550 mailbox unavailable</td><td><button type="button" class="adm-btn adm-btn-ghost">Inspect</button></td></tr>
                 </tbody>
               </table>
@@ -5682,7 +5693,7 @@ select[multiple] {
        onclick="if(event.target===this)closeRefund()">
     <div class="adm-dialog confirm-dialog">
       <h3>Full refund</h3>
-      <p>Refund <strong>$37.03</strong> now? This talks to Square. The order will show pending until the refund is confirmed.</p>
+      <p>Refund <strong>$37.03</strong> now? This talks to the payment gateway. The order will show pending until the refund is confirmed.</p>
       <div class="row">
         <button type="button" class="adm-btn adm-btn-ghost" onclick="closeRefund()">Back</button>
         <button type="button" class="adm-btn adm-btn-danger" onclick="closeRefund()">Confirm</button>
@@ -5884,7 +5895,7 @@ select[multiple] {
       contract so the thank-you can name the time.</li>
       <li><strong>An order could be re-numbered after the kitchen finished it.</strong> The capture
       path short-circuited only when <code>status === PAID</code>, so once the kitchen moved an
-      order on, a redelivered Square <code>payment.updated</code> webhook fell through the guard,
+      order on, a redelivered gateway payment webhook fell through the guard,
       allocated a SECOND order number and reset the order to PAID &mdash; a customer watching the
       status page saw HC-001 become HC-002, and the ticket returned to the board. Both guards (the
       allocator and the webhook) are now keyed on the PAYMENT, never on fulfilment progress.
@@ -5896,7 +5907,7 @@ select[multiple] {
       (tips included) and net was that minus refunds, so with no refunds the two tiles agreed.
       Gross is now food + tax and net is gross &minus; tax; tips belong to staff and refunds are
       their own line, and neither moves either figure. Each tile prints its own definition.</li>
-    <li><strong>Selecting a tip destroyed the card field.</strong> The Square mount effect had the
+    <li><strong>Selecting a tip destroyed the card field.</strong> The card mount effect had the
       display total in its dependency array, so every tip change tore down the card iframe and
       re-attached it &mdash; the input vanished on some selections and returned on others. The
       total now lives in a ref: the card mounts once. Card is the only payment method offered for
@@ -5915,7 +5926,7 @@ select[multiple] {
       as a text input, with one ink chevron drawn as a background image &mdash; a replaced element
       cannot host a pseudo-element. Multi-selects keep the native list, having no arrow to draw.</li>
 
-    <h2>Latest round — brand, delivery, and SMS off</h2>
+    <h2>Latest round — brand, delivery, and SMS removed</h2>
     <li><strong>The logo replaces the text wordmark.</strong> The header carries
       <code>logo.jpeg</code> at 40px tall (34 on a phone), sized by height because the lockup is
       2.24:1 and any fixed width would squash it. The favicon is the running man cropped out of
@@ -5935,13 +5946,14 @@ select[multiple] {
       The first initial is now the FALLBACK, not the default.</li>
     <li><strong>Delivery beside pickup.</strong> Secondary button, new tab, straight to DoorDash.
       It leaves the site, so it does not take the primary.</li>
-    <li><strong>SMS is hidden, not removed.</strong> The consent checkbox, the &ldquo;we text this
-      number&rdquo; help line, &ldquo;we&apos;ll text you the moment it&apos;s up&rdquo; and
-      &ldquo;check your texts&rdquo; on the payment-failure path are all gone; the receipt line now
-      says email only. Phone stays REQUIRED — the counter still needs a way to reach someone
-      — with the copy changed to say why. <code>smsConsent</code> is still sent, always false:
-      the order contract and the notify package are untouched, so re-enabling is a checkbox, not a
-      migration.</li>
+    <li><strong>SMS is REMOVED, not hidden (Sprint 18).</strong> It was hidden in the previous
+      round; Twilio and the whole SMS subsystem have now been deleted. The consent checkbox, the
+      &ldquo;we text this number&rdquo; help line, &ldquo;we&apos;ll text you the moment
+      it&apos;s up&rdquo; and &ldquo;check your texts&rdquo; are gone, and so is the code behind
+      them. Phone stays REQUIRED — the counter still needs a way to reach someone — with the
+      copy changed to say why. The customer now gets an email receipt and NOTHING when the order
+      is ready: there was never an email equivalent of the ready text, so the counter calls.
+      <code>smsConsent</code> is no longer sent; the API still tolerates it from older clients.</li>
     <li><strong>Burnham, not Oak Lawn</strong>, in every string, title, manifest and seed. The
       street address and ZIP are unchanged. One print test had to be re-centred by a single space,
       because &ldquo;Burnham&rdquo; is a character shorter and the receipt centres its store name.</li>
@@ -5958,7 +5970,7 @@ select[multiple] {
     <li><strong>Screens v1.1 never drew:</strong> admin sign-in, Dashboard, Modifiers, Store, Jobs, Staff and the item and group editors; the kitchen PIN pad and cancel confirmation; the storefront's hours sheet, route-level skeletons, error state and undo toast. All are built from the design's own primitives — no new visual language.</li>
 
     <h2>Deliberate departures, and why</h2>
-    <li><strong>Checkout takes first and last name, and an SMS-consent row.</strong> v1.1 drew a single "Name" field. The required set predates the design and changing a validation rule is not a design change.</li>
+    <li><strong>Checkout takes first and last name.</strong> v1.1 drew a single "Name" field. The required set predates the design and changing a validation rule is not a design change. The SMS-consent row that used to sit beside it went with the SMS subsystem in Sprint 18.</li>
     <li><strong>The checkout summary is NOT reordered above the form on mobile.</strong> <code>order</code> moves a grid item visually without moving it in the DOM, so a keyboard or screen-reader user would traverse a payment form in a different order than they see it.</li>
     <li><strong>No "New" corner badge.</strong> v1.1 drew one on a most-ordered card. There is no <code>isNew</code> field on a menu item, so the slot carries SOLD OUT only.</li>
     <li><strong>The cart carries no money.</strong> Line totals would ignore modifier surcharges. The only lawful source of a total is the server quote, and the storefront quotes at checkout.</li>
