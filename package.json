@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "description": "Harold's Chicken Oak Lawn — in-house online ordering system",
   "engines": {
-    "node": "24.x",
-    "pnpm": "11.8.0"
+    "node": "22.x",
+    "pnpm": "9.x"
   },
-  "packageManager": "pnpm@11.8.0",
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "pnpm --filter @harolds/web dev",
     "build": "pnpm -r --filter=./packages/* build && pnpm --filter @harolds/web build",
