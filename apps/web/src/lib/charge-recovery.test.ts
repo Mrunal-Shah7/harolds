@@ -76,7 +76,10 @@ async function claimedOrder(claimAgeMs: number) {
     data: {
       customerFirstName: "Test",
       customerLastName: "Customer",
-      customerPhone: "+17085550918",
+      // Unique to this file. It used to be +17085550918, which order-key.test.ts also uses and
+      // counts orders for by phone alone. The test runner runs files in parallel, so whenever
+      // the two overlapped that count came back as 2 and order-key.test.ts failed at random.
+      customerPhone: "+17085550971",
       customerEmail: "test@example.com",
       subtotalCents: 1200,
       taxCents: 120,
@@ -376,7 +379,7 @@ describe("the ambiguous path says WHY, without claiming to know the outcome", ()
     if (result.ok) throw new Error("unreachable");
     assert.equal(result.code, ApiErrorCode.PAYMENT_FAILED);
     assert.equal(result.details?.reason, AmbiguousPaymentReason.GATEWAY_UNCONFIRMED);
-    // The customer-facing sentence must not mention texts: SMS was removed in Sprint 18.
+    // The customer-facing sentence must not mention texts: SMS was removed in Sprint 17.
     assert.doesNotMatch(result.message, /text/i);
   });
 

@@ -2,7 +2,7 @@
   "name": "harolds",
   "private": true,
   "version": "0.0.0",
-  "description": "Harold's Chicken Oak Lawn — in-house online ordering system",
+  "description": "Harold's Chicken Burnham — in-house online ordering system",
   "engines": {
     "node": "22.x",
     "pnpm": "9.x"
@@ -19,6 +19,7 @@
     "db:generate": "pnpm --filter @harolds/db generate",
     "db:migrate": "pnpm --filter @harolds/db migrate:dev",
     "db:migrate:deploy": "pnpm --filter @harolds/db migrate:deploy",
+    "db:reset": "pnpm --filter @harolds/db migrate:reset",
     "db:seed": "pnpm --filter @harolds/db seed",
     "db:seed:menu": "pnpm --filter @harolds/db seed:menu",
     "db:seed:accounts": "pnpm --filter @harolds/db seed:accounts",

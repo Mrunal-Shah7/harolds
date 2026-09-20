@@ -1050,3 +1050,147 @@ select[multiple] {
   text-transform: none;
   color: var(--ink-muted);
 }
+
+/* ---------- SPRINT-18: SEO section ----------
+   Built from existing parts: the tab row reuses the menu's .mtab (design v1.1's tab), badges,
+   .toggle, .dev-card and tables. Only layout and the read-only preview blocks are new. */
+.adm-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.adm-tabs .mtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.adm-tab-count {
+  font-family: var(--font-sans);
+}
+.adm-field-err {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--body-sm);
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--danger);
+}
+.adm-field-warn {
+  color: var(--warn);
+}
+.adm-field [aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.adm-seo-mono {
+  font-family: var(--font-mono);
+  font-size: var(--body-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.adm-seo-listrow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+.adm-seo-listrow-actions {
+  display: flex;
+  gap: 8px;
+}
+.adm-seo-hours {
+  display: grid;
+  grid-template-columns: 110px 160px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.adm-seo-hours .nm {
+  font-weight: 600;
+  padding-top: 12px;
+}
+.adm-seo-hours .adm-field select {
+  margin-top: 0;
+}
+.adm-seo-range {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.adm-seo-range .adm-field {
+  width: 140px;
+}
+.adm-seo-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: auto !important;
+  padding-bottom: 12px;
+}
+.adm-seo-check input[type="checkbox"] {
+  margin: 0;
+}
+@media (max-width: 767px) {
+  .adm-seo-hours {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .adm-seo-listrow {
+    grid-template-columns: 1fr;
+  }
+}
+.adm-seo-static tbody tr {
+  cursor: default;
+}
+.adm-seo-snippet {
+  max-width: 640px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: 16px 20px;
+}
+.adm-seo-snippet .url {
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+}
+.adm-seo-snippet .ttl {
+  font-size: var(--body-lg);
+  color: var(--brand-text);
+  margin: 4px 0;
+}
+.adm-seo-snippet .desc {
+  font-size: var(--body-sm);
+  color: var(--ink);
+}
+.adm-jsonld {
+  background: var(--paper-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px;
+  max-height: 560px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--body-sm);
+  line-height: 1.5;
+  white-space: pre;
+}
+.adm-jsonld .k {
+  color: var(--brand-text);
+}
+.adm-jsonld .s {
+  color: var(--open);
+}
+.adm-jsonld .n {
+  color: var(--warn);
+}
+.adm-jsonld .b {
+  color: var(--ink-muted);
+  font-weight: 600;
+}

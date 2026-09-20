@@ -47,7 +47,7 @@ export type PrintJobStatus = (typeof PrintJobStatus)[keyof typeof PrintJobStatus
 
 export const JobType = {
   /**
-   * SPRINT-18: RETIRED. SMS was removed with Twilio and nothing enqueues these any more. They
+   * SPRINT-17: RETIRED. SMS was removed with Twilio and nothing enqueues these any more. They
    * stay declared because `JobType` is a PostgreSQL enum with existing rows referencing both
    * values — dropping them needs a migration and the deletion of historical job rows. The
    * handlers for them are permanent skips (see @harolds/notify handlers.ts).
@@ -232,3 +232,6 @@ export * from "./kitchen";
 
 // SPRINT-8: admin back-office internal types (not in docs/openapi/v1.yaml)
 export * from "./admin";
+
+// SPRINT-18: SEO configuration (internal admin + storefront metadata; not in docs/openapi/v1.yaml)
+export * from "./seo";

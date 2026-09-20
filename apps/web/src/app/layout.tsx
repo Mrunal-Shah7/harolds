@@ -1,14 +1,17 @@
 // Root application layout — shared HTML shell for all route-group surfaces.
 import type { Metadata } from "next";
 import { ClientErrorReporter } from "@/components/ClientErrorReporter";
+import { rootMetadata } from "@/lib/seo/page";
 // Self-hosted poster/display/body/utility faces.
 import { fontVariables } from "./fonts";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Harold's Chicken Burnham",
-  description: "Order pickup online from Harold's Chicken Burnham.",
-};
+// SPRINT-18: metadataBase is set once, here, from the canonical host in the SEO site defaults;
+// the site-wide title and description come from the same place. Storefront routes override them
+// through lib/seo/page.ts; admin and kitchen set their own.
+export function generateMetadata(): Promise<Metadata> {
+  return rootMetadata();
+}
 
 export const viewport = {
   themeColor: "#f7f0e1",

@@ -80,7 +80,7 @@ async function createPendingOrderWith(
       customerLastName: customer.lastName,
       customerPhone: customer.phoneE164,
       customerEmail: customer.email,
-      // SPRINT-18: smsConsent / smsConsentAt remain as columns (the SMS removal was
+      // SPRINT-17: smsConsent / smsConsentAt remain as columns (the SMS removal was
       // deliberately code-only, no migration) but are never written. Nothing can send an SMS,
       // so recording permission to send one would be a false record.
 
@@ -428,7 +428,7 @@ export async function markOrderPaidAndAllocate(
         },
       });
 
-      // SPRINT-18: the confirmation SMS that used to sit alongside this was removed with
+      // SPRINT-17: the confirmation SMS that used to sit alongside this was removed with
       // Twilio. The email receipt is now the only customer confirmation.
       await tx.backgroundJob.create({
         data: {

@@ -198,6 +198,32 @@ The quote is **for display only**. Sprint 4 reprices authoritatively at checkout
 
 Kitchen (`/kitchen`), admin (`/admin`), print poll, and provider webhooks exist and are out of scope for the customer app. Do not call `/api/internal/*` from the storefront.
 
+## SEO and page metadata (Sprint 18)
+
+**No endpoint was added, changed, or removed by Sprint 18, and the contract version does not move.**
+The whole feature is server-rendered metadata plus one new OWNER-only internal admin route
+(`GET`/`PUT /api/internal/admin/seo`), which is not part of this contract — `docs/openapi/v1.yaml`
+documents only `/api/v1/*`, and its diff for this sprint is empty.
+
+What changed in the rendered HTML, all of it server-side:
+
+- Every storefront route emits a title, description, canonical URL, Open Graph tags and a
+  `summary_large_image` Twitter card, resolved from the database (override → template → site
+  default → site name).
+- `/` and `/menu` each carry **one** `<script type="application/ld+json">` holding a single
+  `@graph` (`Restaurant`, `WebSite`, `WebPage`, cross-referenced by `@id`). The `Restaurant` node
+  is suppressed entirely until an operator marks the business record configured.
+- `/checkout` and `/order/{lookupToken}` are `noindex, nofollow`, absent from `sitemap.xml`, and
+  disallowed in `robots.txt`. Kitchen and admin are `noindex` too.
+- `/robots.txt` and `/sitemap.xml` are generated from the database. `/api/v1/media/` is explicitly
+  **allowed** to crawlers so menu photographs can be indexed and used in link previews; every other
+  API path is disallowed.
+- Values are edited in the admin SEO section and reach the storefront on the next request
+  (in-process cache invalidation), with a one-hour backstop.
+
+Nothing here changes a request or response the storefront makes. The storefront app does not need
+to send anything new, and must still not call `/api/internal/*`.
+
 ## Known placeholder data in fixtures / seed
 
 - 8 items with invented `PLACEHOLDER` prices (beverages / desserts)

@@ -31,8 +31,7 @@ packages/
   email/               Resend email (only file that imports the Resend SDK)
   notify/              Background job worker, templates, handlers
   mock-api/            Contract mock server
-docs/                  Sprint notes
-harolds-menu-reconciliation.xlsx   Authoritative menu source for the seed
+docs/                  Sprint notes + harolds-menu-reconciliation.xlsx (menu seed source)
 ```
 
 ## Prerequisites

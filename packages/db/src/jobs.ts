@@ -413,7 +413,7 @@ export async function countRecentDeliveredAlerts(args: {
   });
 }
 
-// SPRINT-18: `isPhoneSuppressed`, `setSmsSuppression` and `recordSmsInboundEvent` were removed
+// SPRINT-17: `isPhoneSuppressed`, `setSmsSuppression` and `recordSmsInboundEvent` were removed
 // with the SMS subsystem. The SmsSuppression / SmsInboundEvent tables still exist (the removal
 // was deliberately code-only, no migration) but nothing reads or writes them any more.
 

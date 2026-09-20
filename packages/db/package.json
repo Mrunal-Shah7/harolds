@@ -12,6 +12,7 @@
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
+    "migrate:reset": "prisma migrate reset",
     "seed": "tsx src/seed/index.ts",
     "seed:menu": "tsx src/seed/index.ts --menu-only",
     "seed:accounts": "tsx src/seed/index.ts --accounts-only",
@@ -24,6 +25,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "build": "tsc --noEmit"
+  },
+  "prisma": {
+    "seed": "tsx src/seed/index.ts"
   },
   "dependencies": {
     "@harolds/config": "workspace:*",

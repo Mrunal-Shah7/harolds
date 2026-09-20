@@ -120,7 +120,7 @@ const envSchema = z.object({
   /** Window for manager-alert volume cap in ms (default 900000 = 15 minutes). */
   JOB_ALERT_WINDOW_MS: z.coerce.number().int().positive().optional(),
 
-  // SPRINT-18: TWILIO_* removed with the SMS subsystem. Email is the only notification channel.
+  // SPRINT-17: TWILIO_* removed with the SMS subsystem. Email is the only notification channel.
 
   // Optional in development/test — required at production start (Sprint 11)
   EMAIL_API_KEY: z.string().optional(),

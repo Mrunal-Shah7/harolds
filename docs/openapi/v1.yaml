@@ -1434,7 +1434,7 @@ components:
             lastName: { type: string }
             phone: { type: string }
             email: { type: string }
-            # SPRINT-18: retired with the SMS subsystem. Still accepted for backwards
+            # SPRINT-17: retired with the SMS subsystem. Still accepted for backwards
             # compatibility, never read or stored. Omit it in new clients.
             smsConsent: { type: boolean, deprecated: true }
         paymentToken: { type: string }

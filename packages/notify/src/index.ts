@@ -1,4 +1,4 @@
-// SPRINT-7 / SPRINT-18: public API of @harolds/notify — worker, registry, email templates.
+// SPRINT-7 / SPRINT-17: public API of @harolds/notify — worker, registry, email templates.
 export { createJobRegistry, createDefaultJobRegistry, type JobRegistry } from "./registry";
 export { runWorkerPass, type WorkerPassResult } from "./worker";
 export { JOB_HANDLERS, type JobHandler, type HandlerSuccess } from "./handlers";

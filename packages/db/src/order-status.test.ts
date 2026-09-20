@@ -269,7 +269,7 @@ describe("applyOrderTransition", () => {
   });
 
   it("reaching READY enqueues NO customer notification, and afterWork failure rolls the transition back", async () => {
-    // SPRINT-18: this used to assert an SMS_ORDER_READY job was created. SMS was removed with
+    // SPRINT-17: this used to assert an SMS_ORDER_READY job was created. SMS was removed with
     // Twilio and no email equivalent exists, so the customer is not notified at all now — the
     // first half asserts that absence deliberately, so silently re-adding a notification here
     // would fail rather than pass unnoticed.

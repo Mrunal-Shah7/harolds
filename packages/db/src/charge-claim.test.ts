@@ -47,7 +47,8 @@ async function makePendingOrder(overrides: Record<string, unknown> = {}) {
     data: {
       customerFirstName: "Test",
       customerLastName: "Customer",
-      customerPhone: "+17085550917",
+      // Unique to this file; +17085550917 is payment-integrity.test.ts's. See charge-recovery.test.ts.
+      customerPhone: "+17085550972",
       customerEmail: "test@example.com",
       smsConsent: false,
       smsConsentAt: null,

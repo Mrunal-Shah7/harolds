@@ -11,9 +11,9 @@ type WorkBook = import("xlsx").WorkBook;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Default workbook path: repo root `harolds-menu-reconciliation.xlsx` */
+/** Default workbook path: tracked copy under `docs/`. */
 export function defaultWorkbookPath(): string {
-  return path.resolve(__dirname, "../../../../harolds-menu-reconciliation.xlsx");
+  return path.resolve(__dirname, "../../../../docs/harolds-menu-reconciliation.xlsx");
 }
 
 export type CategoryRow = {

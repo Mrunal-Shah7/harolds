@@ -1,6 +1,6 @@
-// SPRINT-7 / SPRINT-18: job handlers — one per declared JobType. Never change order state.
+// SPRINT-7 / SPRINT-17: job handlers — one per declared JobType. Never change order state.
 //
-// SMS was removed in Sprint 18. The two SMS job types remain in the JobType enum because it is
+// SMS was removed in Sprint 17. The two SMS job types remain in the JobType enum because it is
 // a PostgreSQL enum with existing rows referencing those values, and dropping them would need a
 // migration plus deleting historical job rows. They are handled here as permanent skips so any
 // straggler row drains harmlessly instead of crashing the worker on an unhandled type.
@@ -82,7 +82,7 @@ async function sendAndRecordEmail(
 }
 
 /**
- * SMS was removed in Sprint 18. These two handlers exist ONLY so that `JOB_HANDLERS` stays
+ * SMS was removed in Sprint 17. These two handlers exist ONLY so that `JOB_HANDLERS` stays
  * exhaustive over the JobType enum, and so that job rows enqueued before the removal drain to a
  * terminal state instead of failing forever as an unhandled type.
  *
@@ -160,7 +160,7 @@ export const handleEmailOrderReady: JobHandler = async () => {
 };
 
 /**
- * SPRINT-18: email is the only manager alert channel now. `StoreConfig.managerAlertPhone` still
+ * SPRINT-17: email is the only manager alert channel now. `StoreConfig.managerAlertPhone` still
  * exists on the row (the SMS removal was deliberately code-only, no migration) but is no longer
  * read — a phone number with no way to send to it is not a destination.
  */

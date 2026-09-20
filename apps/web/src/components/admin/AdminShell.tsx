@@ -31,6 +31,8 @@ const NAV = [
   { href: "/admin/reports", label: "Reports", ownerOnly: false },
   { href: "/admin/jobs", label: "Jobs", ownerOnly: false },
   { href: "/admin/staff", label: "Staff", ownerOnly: true },
+  // SPRINT-18: what search engines publish about the business — owner only.
+  { href: "/admin/seo", label: "SEO", ownerOnly: true },
 ];
 
 type AdminSession = { user: SessionUser; timezone: string };

@@ -73,7 +73,7 @@ const quote = await fetch(`${base}/api/v1/quote`, {
 if (quote.status !== 200 && quote.status !== 400) fail(`quote ${quote.status}`);
 else console.log(`ok quote ${quote.status}`);
 
-// SPRINT-18: omitting `smsConsent` used to be a 400. SMS was removed, the field is retired,
+// SPRINT-17: omitting `smsConsent` used to be a 400. SMS was removed, the field is retired,
 // and a request without it is now perfectly valid — this asserts the new contract, not the old.
 const missingConsent = await fetch(`${base}/api/v1/orders`, {
   method: "POST",

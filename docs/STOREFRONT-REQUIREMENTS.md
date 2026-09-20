@@ -57,9 +57,9 @@ The mock: `?forcePayment=declined` vs `?forcePayment=transport`. If your UI uses
 
 A 200 quote with `orderable: false` and `blockingReasons` (`STORE_CLOSED`, `STORE_NOT_ACCEPTING_ORDERS`) must still show line prices and the total. Do not hide the cart. Do not send the customer to checkout.
 
-## 7. SMS consent is retired (Sprint 18)
+## 7. SMS consent is retired (Sprint 17)
 
-SMS was removed entirely in Sprint 18 along with Twilio. There is no consent to collect and no
+SMS was removed entirely in Sprint 17 along with Twilio. There is no consent to collect and no
 text is ever sent — the email receipt is the only customer confirmation.
 
 `customer.smsConsent` is **retired but still accepted**: it is no longer required, and when sent

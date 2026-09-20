@@ -16,6 +16,7 @@ import {
   AdminViewSkeleton,
 } from "@/components/admin/AdminSkeletons";
 import { formatStoreDateTime } from "@/lib/admin-format";
+import { SeoView } from "@/components/admin/SeoView";
 
 type Flash = { kind: "ok" | "err"; text: string } | null;
 
@@ -50,6 +51,8 @@ export function AdminApp() {
       {section === "reports" && <ReportsView />}
       {section === "jobs" && <JobsView />}
       {section === "staff" && user.role === "OWNER" && <StaffView />}
+      {/* SPRINT-18: a lower role is told why, rather than shown a blank screen. The API refuses it too. */}
+      {section === "seo" && (user.role === "OWNER" ? <SeoView /> : <OwnerOnlyNotice section="SEO" />)}
     </>
   );
 }
@@ -58,6 +61,19 @@ export function AdminApp() {
  * Design v1.1 badges. Colour never carries the meaning on its own — the status word is always
  * printed — so the four tones only reinforce what the text already says.
  */
+/** SPRINT-18: what a manager sees on an owner-only section. */
+function OwnerOnlyNotice({ section }: { section: string }) {
+  return (
+    <>
+      <h1 className="adm-h1">{section}</h1>
+      <div className="adm-error" role="alert" data-testid="owner-only-notice">
+        Owner only. {section} settings change what search engines publish about the business, so only the owner can
+        view or edit them.
+      </div>
+    </>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const variant =
     status === "READY" || status === "PAID"

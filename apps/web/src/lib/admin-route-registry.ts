@@ -64,6 +64,9 @@ export const ADMIN_ROUTE_REGISTRY: Record<string, AdminRouteMinRole> = {
   "GET /api/internal/admin/staff/[id]/sessions": AdminRole.OWNER,
   "DELETE /api/internal/admin/staff/[id]/sessions": AdminRole.OWNER,
   "GET /api/internal/admin/audit": AdminRole.OWNER,
+  // SPRINT-18: SEO changes what search engines publish about the business — owner only.
+  "GET /api/internal/admin/seo": AdminRole.OWNER,
+  "PUT /api/internal/admin/seo": AdminRole.OWNER,
 };
 
 export class AdminRouteDeniedError extends Error {

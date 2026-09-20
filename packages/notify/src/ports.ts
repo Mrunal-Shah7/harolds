@@ -1,6 +1,6 @@
-// SPRINT-7 / SPRINT-18: injected send ports so tests never need live provider credentials.
+// SPRINT-7 / SPRINT-17: injected send ports so tests never need live provider credentials.
 //
-// SMS was removed in Sprint 18 (Twilio dropped entirely), so email is the only channel. The
+// SMS was removed in Sprint 17 (Twilio dropped entirely), so email is the only channel. The
 // object shape is kept rather than collapsing to a bare function: adding a second channel back
 // should not mean rewriting every handler signature again.
 import type { EmailSendResult, SendEmailInput } from "@harolds/email";

@@ -12,7 +12,7 @@ describe("rate limit policy", () => {
     assert.equal(isRateLimitExemptPath("/api/v1/print/poll"), true);
     assert.equal(isRateLimitExemptPath("/api/v1/print/complete"), true);
     assert.equal(isRateLimitExemptPath("/api/v1/webhooks/nmi"), true);
-    // SPRINT-18: the Twilio inbound webhook was deleted with the SMS subsystem.
+    // SPRINT-17: the Twilio inbound webhook was deleted with the SMS subsystem.
     assert.equal(isRateLimitExemptPath("/api/v1/webhooks/twilio"), false);
     assert.equal(isRateLimitExemptPath("/api/internal/kitchen/queue"), true);
     assert.equal(isRateLimitExemptPath("/api/v1/health"), true);

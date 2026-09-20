@@ -1,4 +1,4 @@
-// SPRINT-7 / SPRINT-18: manager and receipt copy. The SMS template suite went with Twilio.
+// SPRINT-7 / SPRINT-17: manager and receipt copy. The SMS template suite went with Twilio.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { formatCents } from "@harolds/pricing";

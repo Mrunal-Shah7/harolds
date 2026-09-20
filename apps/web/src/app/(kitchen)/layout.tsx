@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   title: "Kitchen — Harold's Chicken Burnham",
   applicationName: "Harold's Kitchen",
   description: "Kitchen display for Harold's Chicken Burnham",
+  // SPRINT-18: the kitchen display was indexable until now. Never for a crawler.
+  robots: { index: false, follow: false },
   manifest: "/kitchen/manifest.webmanifest",
   appleWebApp: {
     capable: true,

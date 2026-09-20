@@ -29,7 +29,7 @@ function present(value: string | undefined): boolean {
 export function missingProductionVariables(env: ProductionEnvSlice): string[] {
   if (env.NODE_ENV !== "production") return [];
   const missing: string[] = [];
-  // SPRINT-18: with SMS gone, email is the ONLY notification channel — for customer receipts
+  // SPRINT-17: with SMS gone, email is the ONLY notification channel — for customer receipts
   // and for every manager alert. A production start without it is silent on both.
   if (!present(env.EMAIL_API_KEY)) missing.push("EMAIL_API_KEY: required in production (receipts and all manager alerts)");
   if (!present(env.EMAIL_FROM_ADDRESS)) missing.push("EMAIL_FROM_ADDRESS: required in production and must be a verified sending address");
@@ -93,7 +93,7 @@ function usable(value: string | null | undefined, placeholder: (v: string | null
 /**
  * Production must have a sendable manager alert EMAIL and no seeded placeholder.
  *
- * SPRINT-18: this used to accept a phone OR an email. With SMS removed there is no way to send
+ * SPRINT-17: this used to accept a phone OR an email. With SMS removed there is no way to send
  * to a phone, so email is not one of two options any more — it is the only channel, and its
  * absence means manager alerts go nowhere at all.
  */

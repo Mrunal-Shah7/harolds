@@ -1,5 +1,5 @@
 // SPRINT-6: order status transition table — the only place legal kitchen/print status changes are decided.
-// SPRINT-7 / SPRINT-18: the READY transition no longer enqueues a customer notification.
+// SPRINT-7 / SPRINT-17: the READY transition no longer enqueues a customer notification.
 import { JobStatus, JobType, OrderStatus } from "@harolds/types";
 import { emitLog } from "@harolds/config";
 import { prisma } from "./client";
@@ -166,7 +166,7 @@ export async function applyOrderTransition(
         },
       });
 
-      // SPRINT-18: reaching READY used to enqueue an SMS_ORDER_READY job. SMS was removed with
+      // SPRINT-17: reaching READY used to enqueue an SMS_ORDER_READY job. SMS was removed with
       // Twilio and there is no email equivalent (handleEmailOrderReady was never implemented),
       // so the customer is NOT notified when their order is ready — the counter calls them.
       // Restoring a notification here means implementing the email handler first.

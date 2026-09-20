@@ -59,7 +59,7 @@ describe("parseEnv production provider requirements", () => {
       assert.fail("expected throw");
     } catch (err) {
       const text = (err as Error).message;
-      // SPRINT-18: TWILIO_* used to be listed here too; SMS was removed, so email is the only
+      // SPRINT-17: TWILIO_* used to be listed here too; SMS was removed, so email is the only
       // provider a production start still requires.
       assert.match(text, /EMAIL_API_KEY/);
       assert.match(text, /EMAIL_FROM_ADDRESS/);

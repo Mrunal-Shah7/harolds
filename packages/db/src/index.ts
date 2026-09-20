@@ -283,3 +283,13 @@ export {
   type CreateTradingOverrideInput,
 } from "./admin-trading";
 export { reorderEntities } from "./admin-menu";
+
+// SPRINT-18: SEO configuration — snapshot loader, the one write path, sitemap lastmod source
+export {
+  loadSeoSnapshot,
+  saveSeoConfig,
+  diffSeoChanges,
+  getMenuLastModified,
+  SeoVersionConflictError,
+  type SeoFieldChange,
+} from "./seo";

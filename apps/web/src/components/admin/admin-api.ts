@@ -4,6 +4,8 @@ export class AdminApiError extends Error {
     message: string,
     public readonly code?: string,
     public readonly status?: number,
+    /** SPRINT-18: the error envelope's `details`, e.g. per-field validation messages. */
+    public readonly details?: Record<string, unknown> | null,
   ) {
     super(message);
     this.name = "AdminApiError";
@@ -29,13 +31,14 @@ export async function adminApi<T>(path: string, init?: RequestInit): Promise<T> 
     return text as T;
   }
   const json = (await res.json().catch(() => null)) as
-    | { data?: T; error?: { code?: string; message?: string } }
+    | { data?: T; error?: { code?: string; message?: string; details?: Record<string, unknown> | null } }
     | null;
   if (!res.ok) {
     throw new AdminApiError(
       json?.error?.message ?? `Request failed (${res.status}). The change was not saved.`,
       json?.error?.code,
       res.status,
+      json?.error?.details ?? null,
     );
   }
   return json?.data as T;

@@ -1,4 +1,4 @@
-// SPRINT-11 / SPRINT-18: one structured startup line — what this instance can actually do.
+// SPRINT-11 / SPRINT-17: one structured startup line — what this instance can actually do.
 // `smsConfigured` is gone: SMS was removed, so email is the only notification channel and
 // `emailConfigured` false now means customers get NO confirmation and alerts go nowhere.
 // SPRINT-12 / SPRINT-17: include Collect.js client-build identifier presence.

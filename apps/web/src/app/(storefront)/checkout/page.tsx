@@ -49,7 +49,7 @@ export default function CheckoutPage() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  // SPRINT-18: SMS was removed entirely (Twilio dropped), so there is no consent to collect and
+  // SPRINT-17: SMS was removed entirely (Twilio dropped), so there is no consent to collect and
   // nothing to send. `smsConsent` is no longer part of the request at all — the API still
   // tolerates it from older clients, but this one has stopped claiming a preference it cannot act on.
 

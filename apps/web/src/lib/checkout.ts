@@ -86,7 +86,7 @@ export function cartFingerprint(cart: CartRequest): string {
  * produce the second attempt. The confident wording stays on PAYMENT_DECLINED, where it is
  * earned.
  *
- * SPRINT-18 corrected the wording: it told the customer to "check your texts", which stopped
+ * SPRINT-17 corrected the wording: it told the customer to "check your texts", which stopped
  * being possible the moment SMS was removed. It now points at the only two things that actually
  * happen — an email receipt if the charge did land, and the store's phone.
  */
@@ -255,7 +255,7 @@ function parseCreateOrderBody(body: unknown):
       };
     }
   }
-  // SPRINT-18: `customer.smsConsent` is still ACCEPTED so existing storefront clients keep
+  // SPRINT-17: `customer.smsConsent` is still ACCEPTED so existing storefront clients keep
   // working, but it is no longer required and is never read. SMS was removed with Twilio, so
   // there is nothing to consent to; a client that still sends it is not an error, and one that
   // omits it is not either. When present it must still be a boolean rather than arbitrary data.

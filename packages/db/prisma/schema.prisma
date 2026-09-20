@@ -747,3 +747,108 @@ model ReconciliationRun {
   @@unique([businessDate])
   @@index([ranAt])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPRINT-18: SEO — structured-data business record, site defaults, per-route overrides.
+//
+// SeoBusiness is a deliberate SECOND record of the business's name, address, phone and hours,
+// separate from StoreConfig / StoreHours by operator decision. The two are never synced in
+// either direction; the admin drift panel compares them and names every disagreement.
+// Everything in these tables is read by the storefront through ONE cached accessor, tagged
+// `seo` (apps/web/src/lib/seo/data.ts). Nothing else queries them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// SPRINT-18: singleton. Every value here is a public claim once it reaches JSON-LD.
+model SeoBusiness {
+  /// Fixed key — enforces singleton together with SeoBusiness_singleton_check.
+  id                  String            @id @default("default")
+  displayName         String
+  legalName           String?
+  description         String
+  streetAddress       String
+  addressLocality     String
+  addressRegion       String
+  postalCode          String
+  /// ISO 3166-1 alpha-2, e.g. "US".
+  addressCountry      String
+  /// E.164, e.g. "+17085550123". Null until the operator supplies a real number.
+  telephone           String?
+  /// Human format when it differs from E.164. Display only — JSON-LD always uses `telephone`.
+  telephoneDisplay    String?
+  latitude            Float?
+  longitude           Float?
+  /// Free text as schema.org defines it, e.g. "$" or "$$".
+  priceRange          String?
+  servesCuisine       String[]
+  logoUrl             String?
+  /// Restaurant.image in JSON-LD.
+  imageUrl            String?
+  /// Ordered profile URLs: Google Business Profile, Facebook, Yelp, Instagram.
+  sameAs              String[]
+  /// Fixed false (pickup counter). Stored so the claim is explicit; a CHECK pins it.
+  acceptsReservations Boolean           @default(false)
+  /// Critical rule 8: while false the Restaurant node is not emitted at all.
+  isConfigured        Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  hours SeoOpeningHours[]
+}
+
+/// SPRINT-18: structured opening hours for JSON-LD. Several rows per day = several ranges.
+/// A day with NO rows is unset (nothing is claimed); a row with isClosed is an explicit closed day.
+model SeoOpeningHours {
+  id         String      @id @default(cuid())
+  businessId String      @default("default")
+  /// 0 = Sunday … 6 = Saturday, matching StoreHours.
+  dayOfWeek  Int
+  isClosed   Boolean     @default(false)
+  /// "HH:mm" 24h. Null when isClosed.
+  opens      String?
+  /// "HH:mm" 24h. Null when isClosed.
+  closes     String?
+  /// The range ends on the following day. Required whenever closes is not after opens.
+  overnight  Boolean     @default(false)
+  sortOrder  Int         @default(0)
+  createdAt  DateTime    @default(now())
+
+  business SeoBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([businessId, dayOfWeek])
+}
+
+/// SPRINT-18: singleton site-wide defaults, and the monotonic version of the whole SEO config.
+model SeoSiteDefaults {
+  /// Fixed key — enforces singleton together with SeoSiteDefaults_singleton_check.
+  id                 String   @id @default("default")
+  siteName           String
+  /// Origin only, e.g. "https://haroldsburnham.com". A deployment concern: shown read-only in
+  /// admin and never accepted from the admin API. Changed by a deliberate database update.
+  canonicalHost      String
+  defaultTitle       String
+  /// Must contain {pageTitle}.
+  titleTemplate      String
+  defaultDescription String
+  defaultOgImageUrl  String?
+  /// Open Graph locale, e.g. "en_US".
+  locale             String   @default("en_US")
+  /// With or without "@". Null emits no twitter:site.
+  twitterHandle      String?
+  /// Bumped in the same transaction as ANY write to any SEO table.
+  version            Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+/// SPRINT-18: per-route overrides, keyed on a stable route key (apps/web/src/lib/seo/routes.ts),
+/// never a raw path. A missing row means "no override".
+model SeoRouteOverride {
+  routeKey        String   @id
+  title           String?
+  description     String?
+  ogImageUrl      String?
+  breadcrumbLabel String?
+  noindex         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

@@ -1,5 +1,5 @@
-// SPRINT-7 / SPRINT-18: worker pass — overlapping claims, retry, volume cap. No live providers.
-// The consent / suppression / inbound-keyword suites went with the SMS subsystem in Sprint 18;
+// SPRINT-7 / SPRINT-17: worker pass — overlapping claims, retry, volume cap. No live providers.
+// The consent / suppression / inbound-keyword suites went with the SMS subsystem in Sprint 17;
 // the generic worker behaviours they happened to exercise are now driven through email jobs.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -369,7 +369,7 @@ describe("runWorkerPass", () => {
   });
 
   it("a retired SMS job drains as skipped instead of failing forever", async () => {
-    // SPRINT-18. The SMS job types are still in the JobType enum (removing a PostgreSQL enum
+    // SPRINT-17. The SMS job types are still in the JobType enum (removing a PostgreSQL enum
     // value with live rows would need a migration), and rows enqueued before the removal are
     // still in the queue. They must reach a terminal state rather than dying on every pass.
     if (!dbAvailable) return;

@@ -3751,6 +3751,150 @@ select[multiple] {
   text-transform: none;
   color: var(--ink-muted);
 }
+
+/* ---------- SPRINT-18: SEO section ----------
+   Built from existing parts: the tab row reuses the menu's .mtab (design v1.1's tab), badges,
+   .toggle, .dev-card and tables. Only layout and the read-only preview blocks are new. */
+.adm-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.adm-tabs .mtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.adm-tab-count {
+  font-family: var(--font-sans);
+}
+.adm-field-err {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--body-sm);
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--danger);
+}
+.adm-field-warn {
+  color: var(--warn);
+}
+.adm-field [aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.adm-seo-mono {
+  font-family: var(--font-mono);
+  font-size: var(--body-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.adm-seo-listrow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+.adm-seo-listrow-actions {
+  display: flex;
+  gap: 8px;
+}
+.adm-seo-hours {
+  display: grid;
+  grid-template-columns: 110px 160px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.adm-seo-hours .nm {
+  font-weight: 600;
+  padding-top: 12px;
+}
+.adm-seo-hours .adm-field select {
+  margin-top: 0;
+}
+.adm-seo-range {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.adm-seo-range .adm-field {
+  width: 140px;
+}
+.adm-seo-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: auto !important;
+  padding-bottom: 12px;
+}
+.adm-seo-check input[type="checkbox"] {
+  margin: 0;
+}
+@media (max-width: 767px) {
+  .adm-seo-hours {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .adm-seo-listrow {
+    grid-template-columns: 1fr;
+  }
+}
+.adm-seo-static tbody tr {
+  cursor: default;
+}
+.adm-seo-snippet {
+  max-width: 640px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: 16px 20px;
+}
+.adm-seo-snippet .url {
+  font-size: var(--body-sm);
+  color: var(--ink-muted);
+}
+.adm-seo-snippet .ttl {
+  font-size: var(--body-lg);
+  color: var(--brand-text);
+  margin: 4px 0;
+}
+.adm-seo-snippet .desc {
+  font-size: var(--body-sm);
+  color: var(--ink);
+}
+.adm-jsonld {
+  background: var(--paper-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px;
+  max-height: 560px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--body-sm);
+  line-height: 1.5;
+  white-space: pre;
+}
+.adm-jsonld .k {
+  color: var(--brand-text);
+}
+.adm-jsonld .s {
+  color: var(--open);
+}
+.adm-jsonld .n {
+  color: var(--warn);
+}
+.adm-jsonld .b {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
 </style>
 <style>
 /* =============================================================================
@@ -4247,6 +4391,7 @@ select[multiple] {
     <button class="chrome-tab" data-screen="adm-reports" aria-selected="false" onclick="scr('adm','adm-reports')">Reports</button>
     <button class="chrome-tab" data-screen="adm-jobs" aria-selected="false" onclick="scr('adm','adm-jobs')">Jobs</button>
     <button class="chrome-tab" data-screen="adm-staff" aria-selected="false" onclick="scr('adm','adm-staff')">Staff</button>
+    <button class="chrome-tab" data-screen="adm-seo" aria-selected="false" onclick="scr('adm','adm-seo')">SEO</button>
     <button class="chrome-tab" data-screen="adm-signin" aria-selected="false" onclick="scr('adm','adm-signin')">Sign in</button>
     <button class="chrome-tab" onclick="toggleSaveBar()">Save bar</button>
     <button class="chrome-tab" onclick="openRefund()">Confirm dialog</button>
@@ -5186,6 +5331,7 @@ select[multiple] {
             <a id="an-adm-reports"><span class="ic">07</span><span class="tx">Reports</span></a>
             <a id="an-adm-jobs"><span class="ic">08</span><span class="tx">Jobs</span></a>
             <a id="an-adm-staff"><span class="ic">09</span><span class="tx">Staff</span></a>
+            <a id="an-adm-seo"><span class="ic">10</span><span class="tx">SEO</span></a>
           </nav>
           <div class="adm-nav-user">
             <strong>Test Owner</strong>
@@ -5676,6 +5822,189 @@ select[multiple] {
             <p class="adm-muted">Every price change, refund and curation edit is recorded with the actor.</p>
           </div>
 
+          <!-- ---------- SEO (SPRINT-18) ----------
+               Owner only. Four tabs; the tab row reuses the storefront's .mtab so the admin
+               gains no new tab language. Structured fields only — there is no raw JSON-LD,
+               raw HTML or raw <meta> input anywhere, because everything typed here is
+               injected into a <script> tag on the storefront. The generated JSON-LD appears
+               on the Preview tab READ-ONLY. -->
+          <div class="screen" id="adm-seo">
+            <h1 class="adm-h1">SEO</h1>
+            <p class="adm-lead">What search engines and link previews say about the site. Owner only: everything here is published to Google.</p>
+
+            <!-- Persistent and not dismissible while the business record is unconfigured.
+                 Placeholder business data must never reach a crawler. -->
+            <div class="adm-banner" role="status">
+              Structured data is incomplete. The business details below are placeholders, so the storefront is NOT publishing the restaurant's address, phone or hours to search engines. Replace every placeholder, then switch on “Business details are configured” and save.
+            </div>
+
+            <div class="adm-tabs" role="tablist" aria-label="SEO sections">
+              <button type="button" class="mtab" role="tab" aria-selected="true">Business details</button>
+              <button type="button" class="mtab" role="tab" aria-selected="false">Site defaults</button>
+              <button type="button" class="mtab" role="tab" aria-selected="false">Pages</button>
+              <button type="button" class="mtab" role="tab" aria-selected="false">Preview</button>
+            </div>
+
+            <section class="adm-panel adm-formcard">
+              <h3>Publishing</h3>
+              <div class="dev-card">
+                <button type="button" class="toggle" aria-pressed="false" aria-label="Business details are configured"></button>
+                <div>
+                  <div class="nm">Business details are configured</div>
+                  <div class="adm-muted">Off: no Restaurant schema is published at all. On: the details below are published as structured data. Turning it on requires a real phone number and no placeholder text anywhere.</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- The drift panel. The SEO record and the store record are two records of one
+                 fact by deliberate decision, so they are compared and never synced — there is
+                 no sync button in either direction. -->
+            <section class="adm-panel adm-formcard">
+              <h3>Compared with the store record</h3>
+              <p class="adm-formcard-desc">The address, phone and hours here are a separate record from the ones in Store settings, on purpose. They are compared, never synced: if they disagree, edit whichever one is wrong.</p>
+              <div class="adm-warn" role="status">
+                <div><strong>3 differences with the store record:</strong> Street address (SEO: “PLACEHOLDER street address” · Store: “4709 W 95th St”); Telephone (SEO: “Not set” · Store: “TODO: CONFIRM PHONE (not a valid phone number)”); Sunday hours (SEO: “Not set” · Store: “10:30–23:00”).</div>
+              </div>
+              <div class="adm-table-wrap">
+                <table class="adm-table adm-seo-static">
+                  <thead><tr><th>Field</th><th>SEO record</th><th>Store record</th><th>Status</th></tr></thead>
+                  <tbody>
+                    <tr><td>Street address</td><td>PLACEHOLDER street address</td><td>4709 W 95th St</td><td><span class="adm-badge adm-badge-hot">Differs</span></td></tr>
+                    <tr><td>City</td><td>Burnham</td><td>Burnham</td><td><span class="adm-badge adm-badge-ok">Agrees</span></td></tr>
+                    <tr><td>Telephone</td><td>Not set</td><td>TODO: CONFIRM PHONE (not a valid phone number)</td><td><span class="adm-badge adm-badge-hot">Differs</span></td></tr>
+                    <tr><td>Sunday hours</td><td>Not set</td><td>10:30–23:00</td><td><span class="adm-badge adm-badge-hot">Differs</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="adm-panel adm-formcard">
+              <h3>Address</h3>
+              <div class="adm-form-wide">
+                <label class="adm-field">Street address<input value="PLACEHOLDER street address"></label>
+                <label class="adm-field">City<input value="Burnham"></label>
+                <label class="adm-field">State<input value="IL"></label>
+                <label class="adm-field">Postal code<input value="60453"></label>
+                <label class="adm-field">Country (ISO code)<input value="US"><span class="adm-field-help">Two letters, e.g. US.</span></label>
+                <label class="adm-field">Latitude<input type="number" value="41.72"><span class="adm-field-help">-90 to 90</span></label>
+                <label class="adm-field">Longitude<input type="number" value="-87.74"><span class="adm-field-help">-180 to 180</span></label>
+              </div>
+            </section>
+
+            <section class="adm-panel adm-formcard">
+              <h3>Contact and profile</h3>
+              <div class="adm-form-wide">
+                <label class="adm-field">Telephone (E.164)<input placeholder="+17085550123" aria-invalid="true"><span class="adm-field-err">Telephone must be in E.164 form: + then country code and number, e.g. +17085550123.</span></label>
+                <label class="adm-field">Display telephone<input placeholder="(708) 555-0123"><span class="adm-field-help">Optional. Display only; structured data uses E.164.</span></label>
+                <label class="adm-field">Price range<input value="$"></label>
+                <label class="adm-field">Cuisines<input value="American, Chicken"><span class="adm-field-help">Comma-separated.</span></label>
+              </div>
+              <h3 style="margin-top:16px">Profile links (in order)</h3>
+              <p class="adm-formcard-desc">Google Business Profile, Facebook, Yelp, Instagram. Each must be an https:// link.</p>
+              <div class="adm-seo-listrow">
+                <label class="adm-field">Profile 1<input value="https://www.google.com/maps/place/..."></label>
+                <div class="adm-seo-listrow-actions">
+                  <button type="button" class="adm-btn adm-btn-ghost" disabled>↑</button>
+                  <button type="button" class="adm-btn adm-btn-ghost">↓</button>
+                  <button type="button" class="adm-btn adm-btn-danger">Remove</button>
+                </div>
+              </div>
+              <button type="button" class="adm-btn">Add profile link</button>
+            </section>
+
+            <!-- Hours are structured rows, not free text: several ranges per day, an explicit
+                 closed day, and an unset day that claims nothing. -->
+            <section class="adm-panel adm-formcard">
+              <h3>Opening hours (published)</h3>
+              <p class="adm-formcard-desc">“Not set” publishes nothing for that day. “Closed” publishes the day as closed. A day may have several ranges; tick “Closes next day” for a range that runs past midnight.</p>
+              <div class="adm-seo-hours">
+                <div class="nm">Sunday</div>
+                <label class="adm-field"><select><option>Not set</option><option selected>Open</option><option>Closed</option></select></label>
+                <div>
+                  <div class="adm-seo-range">
+                    <label class="adm-field">Opens<input type="time" value="10:30"></label>
+                    <label class="adm-field">Closes<input type="time" value="23:00"></label>
+                    <label class="adm-field adm-seo-check"><input type="checkbox"> Closes next day</label>
+                  </div>
+                  <button type="button" class="adm-btn adm-btn-ghost">Add a range</button>
+                </div>
+              </div>
+              <div class="adm-seo-hours">
+                <div class="nm">Monday</div>
+                <label class="adm-field"><select><option>Not set</option><option>Open</option><option selected>Closed</option></select></label>
+                <div><p class="adm-muted">Published as closed.</p></div>
+              </div>
+            </section>
+
+            <!-- PAGES tab. The noindex toggle is locked on for routes the code fixes as
+                 non-indexable (checkout, order status): those are noindex, out of the sitemap
+                 and blocked in robots.txt whatever this row says. -->
+            <section class="adm-panel adm-formcard">
+              <h3>Menu <span class="adm-seo-mono adm-muted">/menu</span> <span class="adm-badge adm-badge-ok">In search</span></h3>
+              <p class="adm-formcard-desc">The whole menu is this one page. Categories and items have no URLs of their own.</p>
+              <div class="dev-card">
+                <button type="button" class="toggle" aria-pressed="false" aria-label="Hide Menu from search engines"></button>
+                <div>
+                  <div class="nm">Hide from search engines</div>
+                  <div class="adm-muted">On: marked noindex and removed from the sitemap.</div>
+                </div>
+              </div>
+              <div class="adm-form" style="max-width:none">
+                <label class="adm-field">Title<input value="Menu"><span class="adm-field-help">4 characters · approximate limit 60</span></label>
+                <label class="adm-field">Description<textarea rows="3">The full Harold's Chicken Burnham menu. Order online for pickup.</textarea><span class="adm-field-help adm-field-warn">About 168 characters. Google usually cuts descriptions off around 155 characters — it measures pixel width, not characters, so this is approximate. You can still save.</span></label>
+              </div>
+            </section>
+
+            <section class="adm-panel adm-formcard">
+              <h3>Order status and confirmation <span class="adm-seo-mono adm-muted">/order/[lookupToken]</span> <span class="adm-badge">Hidden from search</span></h3>
+              <p class="adm-formcard-desc">Always hidden from search engines: it shows a customer's order and pickup time.</p>
+              <div class="dev-card">
+                <button type="button" class="toggle" aria-pressed="true" aria-label="Hide order status from search engines" disabled></button>
+                <div>
+                  <div class="nm">Hide from search engines</div>
+                  <div class="adm-muted">Always on for this page. It is noindex, left out of the sitemap and blocked in robots.txt.</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- PREVIEW tab: read-only. The snippet and the JSON-LD are rendered by the same
+                 resolver and builder the storefront runs, against the unsaved form state. -->
+            <section class="adm-panel adm-formcard">
+              <h3>Preview <span class="adm-badge adm-badge-hot">unsaved changes</span></h3>
+              <p class="adm-formcard-desc">Read-only. Built from the form as it is now, by the same code the storefront runs.</p>
+              <label class="adm-field" style="max-width:320px">Page<select><option>Home</option><option selected>Menu</option><option>Checkout</option><option>Order status and confirmation</option></select></label>
+              <h3 style="margin-top:20px">Search result</h3>
+              <div class="adm-seo-snippet">
+                <div class="url">haroldsburnham.com › menu</div>
+                <div class="ttl">Menu | Harold's Chicken Burnham</div>
+                <div class="desc">The full Harold's Chicken Burnham menu. Order online for pickup.</div>
+              </div>
+              <p class="adm-field-help">Truncation is approximate: Google cuts by pixel width, around 60 characters for titles and 155 for descriptions. Title source: override.</p>
+              <h3 style="margin-top:20px">Structured data (JSON-LD)</h3>
+              <pre class="adm-jsonld" aria-label="Generated JSON-LD, read-only">{
+  <span class="k">"@context"</span>: <span class="s">"https://schema.org"</span>,
+  <span class="k">"@graph"</span>: [
+    {
+      <span class="k">"@type"</span>: <span class="s">"WebSite"</span>,
+      <span class="k">"@id"</span>: <span class="s">"https://haroldsburnham.com/#website"</span>,
+      <span class="k">"url"</span>: <span class="s">"https://haroldsburnham.com/"</span>,
+      <span class="k">"name"</span>: <span class="s">"Harold's Chicken Burnham"</span>,
+      <span class="k">"inLanguage"</span>: <span class="s">"en-US"</span>
+    },
+    {
+      <span class="k">"@type"</span>: <span class="s">"WebPage"</span>,
+      <span class="k">"@id"</span>: <span class="s">"https://haroldsburnham.com/menu#webpage"</span>,
+      <span class="k">"url"</span>: <span class="s">"https://haroldsburnham.com/menu"</span>,
+      <span class="k">"name"</span>: <span class="s">"Menu | Harold's Chicken Burnham"</span>,
+      <span class="k">"isPartOf"</span>: { <span class="k">"@id"</span>: <span class="s">"https://haroldsburnham.com/#website"</span> },
+      <span class="k">"inLanguage"</span>: <span class="s">"en-US"</span>
+    }
+  ]
+}</pre>
+              <div class="adm-warn"><div><strong>Not published:</strong> Restaurant: isConfigured is false — the business record has not been reviewed</div></div>
+            </section>
+          </div>
+
         </main>
       </div>
     </div>
@@ -5946,7 +6275,7 @@ select[multiple] {
       The first initial is now the FALLBACK, not the default.</li>
     <li><strong>Delivery beside pickup.</strong> Secondary button, new tab, straight to DoorDash.
       It leaves the site, so it does not take the primary.</li>
-    <li><strong>SMS is REMOVED, not hidden (Sprint 18).</strong> It was hidden in the previous
+    <li><strong>SMS is REMOVED, not hidden (Sprint 17).</strong> It was hidden in the previous
       round; Twilio and the whole SMS subsystem have now been deleted. The consent checkbox, the
       &ldquo;we text this number&rdquo; help line, &ldquo;we&apos;ll text you the moment
       it&apos;s up&rdquo; and &ldquo;check your texts&rdquo; are gone, and so is the code behind
@@ -5970,7 +6299,7 @@ select[multiple] {
     <li><strong>Screens v1.1 never drew:</strong> admin sign-in, Dashboard, Modifiers, Store, Jobs, Staff and the item and group editors; the kitchen PIN pad and cancel confirmation; the storefront's hours sheet, route-level skeletons, error state and undo toast. All are built from the design's own primitives — no new visual language.</li>
 
     <h2>Deliberate departures, and why</h2>
-    <li><strong>Checkout takes first and last name.</strong> v1.1 drew a single "Name" field. The required set predates the design and changing a validation rule is not a design change. The SMS-consent row that used to sit beside it went with the SMS subsystem in Sprint 18.</li>
+    <li><strong>Checkout takes first and last name.</strong> v1.1 drew a single "Name" field. The required set predates the design and changing a validation rule is not a design change. The SMS-consent row that used to sit beside it went with the SMS subsystem in Sprint 17.</li>
     <li><strong>The checkout summary is NOT reordered above the form on mobile.</strong> <code>order</code> moves a grid item visually without moving it in the DOM, so a keyboard or screen-reader user would traverse a payment form in a different order than they see it.</li>
     <li><strong>No "New" corner badge.</strong> v1.1 drew one on a most-ordered card. There is no <code>isNew</code> field on a menu item, so the slot carries SOLD OUT only.</li>
     <li><strong>The cart carries no money.</strong> Line totals would ignore modifier surcharges. The only lawful source of a total is the server quote, and the storefront quotes at checkout.</li>

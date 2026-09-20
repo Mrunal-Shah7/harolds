@@ -14,7 +14,7 @@ This document is the operator's security posture, not a PCI attestation and not 
 
 - **The ability to take money.** A caller who can create orders against the gateway charges a real card (the customer's, via NMI's hosted fields — or, if they exploit a sandbox/production mix-up, a live merchant account). Rate limits, cart validation, and the per-order charge claim exist so volume and replay are expensive, not free. NMI has NO idempotency key, so that claim is the only replay defence.
 - **The ability to change what is sold and for how much.** An admin session can edit prices, sold-out flags, hours, and refunds. That session is a password cookie, not a kitchen PIN.
-- **Customer phone numbers and email addresses** on paid orders. The email address receives the receipt; the phone is kept so the counter can call about a collection. Neither is a marketing list, and since Sprint 18 nothing texts the customer at all.
+- **Customer phone numbers and email addresses** on paid orders. The email address receives the receipt; the phone is kept so the counter can call about a collection. Neither is a marketing list, and since Sprint 17 nothing texts the customer at all.
 - **Kitchen and admin credentials.** PINs and passwords, stored as scrypt hashes. Session tokens stored as SHA-256 hashes.
 - **Provider credentials** in the server environment: NMI, Resend, the print shared secret, the database URL.
 
@@ -152,7 +152,7 @@ Stdout of the long-lived Node process should be captured by the process supervis
 5. **Printer URL.** If access logs included `?key=` before the nginx `combined_no_query` change, treat the print secret as leaked and rotate it.
 6. **Return to service** only when health is 200, a sandbox (or live, if that is the environment) test quote succeeds, and the printer polls authenticated again.
 
-Do not use the application's own email path as the only way to tell a human the application is down. Since Sprint 18 it is the ONLY channel the app has, which makes this more important, not less. External uptime monitoring (Sprint 10) is the independent path.
+Do not use the application's own email path as the only way to tell a human the application is down. Since Sprint 17 it is the ONLY channel the app has, which makes this more important, not less. External uptime monitoring (Sprint 10) is the independent path.
 
 ---
 

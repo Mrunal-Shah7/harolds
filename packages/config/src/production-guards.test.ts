@@ -1,4 +1,4 @@
-// SPRINT-11 / SPRINT-18: manager destination placeholders fail a production start.
+// SPRINT-11 / SPRINT-17: manager destination placeholders fail a production start.
 //
 // Email is the ONLY manager alert channel since SMS was removed, so these assertions changed
 // shape: there is no longer a "phone OR email" fallback to satisfy.
@@ -27,7 +27,7 @@ describe("manager destination problems", () => {
   });
 
   it("a phone number is NOT a usable destination any more", () => {
-    // Before Sprint 18 a phone alone satisfied this guard. Nothing can send to a phone now, so
+    // Before Sprint 17 a phone alone satisfied this guard. Nothing can send to a phone now, so
     // accepting one would let production start believing alerts were configured when every
     // alert would be dropped.
     assert.ok(managerDestinationProblems("+17085551212").length >= 1);

@@ -137,7 +137,7 @@ Everything here is typed into `/admin`. None of it needs a developer.
 
 | # | Item | Verify |
 |---|---|---|
-| F1 | ~~A2P 10DLC brand and campaign approved~~ | **Not applicable since Sprint 18** — SMS and Twilio were removed. |
+| F1 | ~~A2P 10DLC brand and campaign approved~~ | **Not applicable since Sprint 17** — SMS and Twilio were removed. |
 | F2 | Ubuntu server provisioned | Node 24, pnpm 11.8.0, PostgreSQL local-only, app role without CREATEDB |
 | F3 | Domain with valid TLS, **complete chain** | Test from outside the network. The printer is stricter than a browser. |
 | F4 | Production NMI credentials | `/api/v1/health` reports `paymentEnvironment: production` |

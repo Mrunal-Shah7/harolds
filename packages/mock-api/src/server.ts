@@ -272,7 +272,7 @@ app.post("/api/v1/orders", async (c) => {
     return c.json(okBody(existing), 200, { "Cache-Control": "no-store" });
   }
 
-  // SPRINT-11 / SPRINT-18: match the real checkout contract — customer + token required.
+  // SPRINT-11 / SPRINT-17: match the real checkout contract — customer + token required.
   // `smsConsent` is retired: accepted when present, never required, never used.
   const paymentToken = typeof body.paymentToken === "string" ? body.paymentToken : "";
   if (!paymentToken) {

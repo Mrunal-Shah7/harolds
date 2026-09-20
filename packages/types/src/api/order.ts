@@ -8,7 +8,7 @@ export type CreateOrderCustomer = {
   phone: string;
   email: string;
   /**
-   * SPRINT-18: RETIRED but still accepted. SMS was removed with Twilio, so this is never read
+   * SPRINT-17: RETIRED but still accepted. SMS was removed with Twilio, so this is never read
    * or stored. Optional so new clients can omit it; tolerated so existing ones do not break.
    */
   smsConsent?: boolean;

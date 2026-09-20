@@ -20,7 +20,7 @@ Use this to walk the product the way people actually use it. Tick only what you 
    - Owner: `test-owner@localhost` / `HaroldsOwner1!`  
    - Kitchen PINs (dev): Staff `2468`, Manager `1357`, Owner `9753`
 5. Payments: NMI **sandbox** test cards (not real money). Wallets were removed in Sprint 17 — checkout is card only, so mark any wallet row **—**.
-6. Printer / Swan tablet / real email: mark **—** until devices and production messaging are available. SMS was removed in Sprint 18 — mark every SMS row **—** permanently.
+6. Printer / Swan tablet / real email: mark **—** until devices and production messaging are available. SMS was removed in Sprint 17 — mark every SMS row **—** permanently.
 
 **Scope reminder:** pickup only · guest checkout only · ASAP only · no delivery · no customer accounts.
 
@@ -86,7 +86,7 @@ Record date, who ran it, and environment (sandbox / production) at the bottom.
 | 3.11 | Cash App Pay (real device, HTTPS) | Completes → paid → refunded | ☐ / — |
 | 3.12 | Confirmation page | Order number, pickup messaging, items/modifiers/totals match cart | ☐ |
 | 3.13 | Open order status / lookup link if shown | Status updates as kitchen advances the order | ☐ |
-| 3.14 | ~~SMS confirmation / ready text~~ | **Removed in Sprint 18.** No text is ever sent. The email receipt (3.15) is the only confirmation. | — |
+| 3.14 | ~~SMS confirmation / ready text~~ | **Removed in Sprint 17.** No text is ever sent. The email receipt (3.15) is the only confirmation. | — |
 | 3.15 | Email receipt (prod email) | Inbox (not only spam); money and lines match | ☐ / — |
 
 **Sandbox card tips (NMI):** use the published test PANs in `packages/payments/src/test-cards.ts` (Visa `4111111111111111`, expiry `10/29`, CVV `999`). The NMI sandbox decides the outcome from the AMOUNT, not the card: **≥ $1.00 approves, under $1.00 declines**. Do not use a real personal card against sandbox.
@@ -214,7 +214,7 @@ Pick **one** paid order with modifiers + a note + a tip. Compare:
 | Surface | Money | Items / modifiers | Times / order # | Result |
 |---|---|---|---|---|
 | 11.1 Storefront confirmation | | | | ☐ |
-| 11.2 ~~SMS~~ (removed Sprint 18) | — | — | — | — |
+| 11.2 ~~SMS~~ (removed Sprint 17) | — | — | — | — |
 | 11.3 Email receipt (if configured) | | | | ☐ / — |
 | 11.4 Kitchen ticket (paper) | | | | ☐ / — |
 | 11.5 Counter receipt (paper) | | | | ☐ / — |
