@@ -1,12 +1,12 @@
-// SPRINT-4 / SPRINT-17: NMI webhook reconciliation — signature verify, exactly-once, converge
-// payment state.
+// SPRINT-4 / SPRINT-17 / SPRINT-18.2: NMI webhook reconciliation — signature verify over raw
+// bytes, exactly-once, converge payment state.
 //
 // With NMI the sale's outcome is already known synchronously at checkout, so this path is a
 // BACKSTOP rather than the primary route to PAID: it catches the orders whose HTTP response
 // never made it back, and it is the only route for reversals issued from the NMI portal.
 import { getPayment, verifyWebhookSignature } from "@harolds/payments";
 import { JobType, JobStatus, OrderStatus, PaymentStatus } from "@harolds/types";
-import { getPrinterConfig } from "@harolds/config";
+import { emitLog, getPrinterConfig } from "@harolds/config";
 import {
   prisma,
   findOrderByProcessorPaymentId,
@@ -35,16 +35,22 @@ type NmiWebhookPayload = {
 };
 
 /**
- * Verify signature over raw body bytes, then process transaction events exactly once.
+ * Verify the signature over the raw body BYTES, then process transaction events exactly once.
  *
- * The raw string is used for BOTH verification and parsing: re-serialising the parsed object
- * would change the bytes and break the HMAC.
+ * The bytes are verified first and only then decoded and parsed: re-serialising the parsed
+ * object, or HMAC'ing a decoded string, would change what the digest covers.
  */
 export async function processNmiWebhook(
-  rawBody: string,
+  rawBody: Buffer,
   signatureHeader: string | null,
 ): Promise<WebhookProcessResult> {
   if (!signatureHeader) {
+    emitLog(
+      "warn",
+      "webhook.signature_verification",
+      { valid: false, reason: "missing_header", bodyBytes: rawBody.byteLength },
+      { scope: "webhooks" },
+    );
     return { ok: false, status: 401, message: "Missing signature." };
   }
 
@@ -53,9 +59,11 @@ export async function processNmiWebhook(
     return { ok: false, status: 401, message: "Invalid webhook signature." };
   }
 
+  // Decoded only after verification. TextDecoder drops a leading BOM, as request.text() did.
+  const bodyText = new TextDecoder("utf-8").decode(rawBody);
   let payload: NmiWebhookPayload;
   try {
-    payload = JSON.parse(rawBody) as NmiWebhookPayload;
+    payload = JSON.parse(bodyText) as NmiWebhookPayload;
   } catch {
     return { ok: false, status: 400, message: "Invalid JSON." };
   }
@@ -76,7 +84,7 @@ export async function processNmiWebhook(
       eventId,
       eventType,
       outcome: "RECEIVED",
-      rawPayload: JSON.parse(rawBody) as object,
+      rawPayload: JSON.parse(bodyText) as object,
     },
   });
 

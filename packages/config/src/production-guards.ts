@@ -1,4 +1,4 @@
-// SPRINT-11: production-only requirements — missing providers and placeholder manager destinations.
+// SPRINT-11 / SPRINT-18.2: production-only requirements — missing providers and placeholder manager destinations.
 export const PRINT_SECRET_MIN_PRODUCTION = 32;
 
 export const PLACEHOLDER_MANAGER_ALERT_PHONE = "TODO: SET MANAGER ALERT PHONE";
@@ -9,9 +9,6 @@ export type ProductionEnvSlice = {
   EMAIL_API_KEY?: string;
   EMAIL_FROM_ADDRESS?: string;
   PRINTER_SDP_SHARED_SECRET?: string;
-  // SPRINT-17: public Collect.js key must be present in a production start (build embeds it).
-  NEXT_PUBLIC_NMI_TOKENIZATION_KEY?: string;
-  NEXT_PUBLIC_NMI_ENVIRONMENT?: string;
   NMI_ENVIRONMENT?: string;
   NMI_SECURITY_KEY_SANDBOX?: string;
   NMI_TOKENIZATION_KEY_SANDBOX?: string;
@@ -39,8 +36,9 @@ export function missingProductionVariables(env: ProductionEnvSlice): string[] {
       `PRINTER_SDP_SHARED_SECRET: must be at least ${PRINT_SECRET_MIN_PRODUCTION} characters in production (query-string secret on the printer)`,
     );
   }
-  // SPRINT-17: NMI must be complete in production — the ACTIVE credential triple plus the
-  // client-build tokenization key. Only the active triple is checked: a production deployment
+  // SPRINT-17 / SPRINT-18.2: NMI must be complete in production — the ACTIVE credential triple.
+  // Its tokenization key is the one the checkout layout hands to Collect.js, so there is no
+  // separate public copy to check. Only the active triple is checked: a production deployment
   // legitimately leaves the sandbox keys blank, and vice versa.
   if (!present(env.NMI_ENVIRONMENT)) {
     missing.push("NMI_ENVIRONMENT: required in production (sandbox | production)");
@@ -59,14 +57,6 @@ export function missingProductionVariables(env: ProductionEnvSlice): string[] {
         }
       }
     }
-  }
-  if (!present(env.NEXT_PUBLIC_NMI_TOKENIZATION_KEY)) {
-    missing.push(
-      "NEXT_PUBLIC_NMI_TOKENIZATION_KEY: required in production (must have been present at build time for Collect.js)",
-    );
-  }
-  if (!present(env.NEXT_PUBLIC_NMI_ENVIRONMENT)) {
-    missing.push("NEXT_PUBLIC_NMI_ENVIRONMENT: required in production (sandbox | production)");
   }
   return missing;
 }

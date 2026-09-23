@@ -1,4 +1,5 @@
 <!-- SPRINT-10 / SPRINT-11: production deploy and rollback. Sprint 11 rehearsed the build, standalone start, migrate:deploy, and rollback copy locally. Ubuntu host still does not exist. -->
+<!-- SPRINT-18.2: gateway glance check (Merchant Pay Connect host), no NEXT_PUBLIC_NMI_*, both key triples may coexist (matches .env.example). -->
 
 # Deployment and rollback — Harold's Chicken Oak Lawn
 
@@ -67,7 +68,7 @@ Confirm on reboot: service comes up **after** Postgres; `GET /api/v1/health` bec
 
 - Terminate TLS; proxy to `127.0.0.1:3000`.
 - `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` and `X-Forwarded-Proto $scheme`. Set `TRUST_PROXY=1` in `.env` so rate limits key on the client, not nginx.
-- Do **not** re-serialise bodies. The NMI HMAC is over raw bytes (`/api/v1/webhooks/nmi`), signed as `<timestamp>.<body>`.
+- Do **not** re-serialise or re-encode bodies. The NMI HMAC is over the raw bytes (`/api/v1/webhooks/nmi`), signed as `<nonce>.<body>`; the handler verifies the bytes before decoding them.
 - Print poll: omit query string from access logs (`combined_no_query` in `PRINT-RUNBOOK.md` §6).
 - Body sizes: public JSON 32 KiB, admin 64 KiB, webhooks 1 MiB, print 256 KiB — do not set nginx `client_max_body_size` below 1m.
 - HTTP → HTTPS at nginx (Node also redirects when `TRUST_PROXY=1` and proto is http).
@@ -103,7 +104,7 @@ Write the previous standalone directory aside **before** you replace it.
 5. `pnpm db:migrate:deploy` — **never** `pnpm db:migrate`
 6. `pnpm build`
 7. Copy `static` and `public` into the standalone tree (table in §2). Restart systemd.
-8. Verify: `GET /api/v1/health` 200, `paymentEnvironment=production`, `app.startup_summary` in the log, menu 200, printer last-polled updates within 10s.
+8. Verify: `GET /api/v1/health` 200, `paymentEnvironment=production` with `paymentGatewayOrigin` / `collectJsUrl` on the Merchant Pay Connect host (§7), `app.startup_summary` in the log, menu 200, printer last-polled updates within 10s.
 
 `pnpm db:migrate:deploy` was rehearsed against a scratch database `harolds_s11_scratch` (created, migrated, dropped). All 10 migrations applied, including `20260815190000_sprint11_reconcile`.
 
@@ -139,12 +140,13 @@ The live database name `harolds` is refused by `scripts/restore-postgres.mjs` on
 Production `.env` must show:
 
 - `NODE_ENV=production`
-- `NMI_ENVIRONMENT=production`, and `NEXT_PUBLIC_NMI_ENVIRONMENT=production` + `NEXT_PUBLIC_NMI_TOKENIZATION_KEY` present at BUILD time (they are inlined into the client bundle)
+- `NMI_ENVIRONMENT="production"` (exact, lowercase) and the complete `NMI_*_KEY_LIVE` triple from the Merchant Pay Connect portal. Nothing about the gateway is inlined at build (Sprint 18.2): the checkout page resolves Collect.js from the server's `NMI_ENVIRONMENT` on every request, so a restart is enough to change it — no rebuild ordering to get wrong. Remove any leftover `NEXT_PUBLIC_NMI_*` lines; nothing reads them.
+- The sandbox triple **may** remain alongside the live one: only the triple matching `NMI_ENVIRONMENT` is read or validated (`packages/config/src/payments.ts`, `production-guards.ts`), matching `.env.example`. Leaving it blank is tidier and equally valid.
 - `NEXT_PUBLIC_APP_URL=https://<real-domain>`
 - `TRUST_PROXY=1`
 - `LOG_LEVEL=info`
 - Email filled (not empty) — it is the only notification channel
 - Print secret ≥ 32 characters
-- No sandbox NMI keys, no localhost URLs
+- No localhost URLs
 
-`GET /api/v1/health` is the glance check for the gateway env. If it says `sandbox`, stop. `app.startup_summary` is the glance check for email / alerting / error tracker / printer serial.
+`GET /api/v1/health` is the glance check for the gateway. It must show `paymentEnvironment: production`, `paymentGatewayOrigin: https://mpc.transactiongateway.com`, and a `collectJsUrl` on that origin. If any says sandbox or a generic NMI host, stop. The gateway host is the reseller's, set once in `packages/config/src/nmi-gateway.ts` — never in `.env`. `app.startup_summary` is the glance check for email / alerting / error tracker / printer serial, and repeats `collectJsUrl`.

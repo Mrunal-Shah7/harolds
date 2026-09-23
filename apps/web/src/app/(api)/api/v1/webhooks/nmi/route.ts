@@ -1,4 +1,4 @@
-// SPRINT-4 / SPRINT-17: POST /api/v1/webhooks/nmi — gateway-only; not a storefront surface
+// SPRINT-4 / SPRINT-17 / SPRINT-18.2: POST /api/v1/webhooks/nmi — gateway-only; not a storefront surface
 import { processNmiWebhook } from "@/lib/webhooks-nmi";
 import { ApiErrorCode } from "@harolds/types";
 import { fail, handleRouteError, ok } from "@/lib/api";
@@ -15,11 +15,13 @@ export async function POST(request: Request) {
     if (Number.isFinite(declared) && declared > BODY_LIMITS.webhookBytes) {
       return fail(ApiErrorCode.VALIDATION_ERROR, "Request body is too large.");
     }
-    const rawBody = await request.text();
-    if (rawBody.length > BODY_LIMITS.webhookBytes) {
+    // Bytes, not `request.text()`: decoding strips a BOM and substitutes invalid sequences, and
+    // either changes what the HMAC covers.
+    const rawBody = Buffer.from(await request.arrayBuffer());
+    if (rawBody.byteLength > BODY_LIMITS.webhookBytes) {
       return fail(ApiErrorCode.VALIDATION_ERROR, "Request body is too large.");
     }
-    // NMI signs `<timestamp>.<raw body>` and sends `webhook-signature: t=...,s=...`.
+    // NMI signs `<nonce>.<raw body>` and sends `webhook-signature: t=<nonce>,s=<digest>`.
     const signature = request.headers.get("webhook-signature");
 
     const result = await processNmiWebhook(rawBody, signature);

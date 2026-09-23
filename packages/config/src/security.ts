@@ -1,5 +1,6 @@
-// SPRINT-9 / SPRINT-17: rate-limit knobs, body caps, trusted-proxy, and CSP for NMI Collect.js.
+// SPRINT-9 / SPRINT-17 / SPRINT-18.2: rate-limit knobs, body caps, trusted-proxy, and CSP for NMI Collect.js.
 import { env } from "./env";
+import { nmiGatewayUrls, type NmiEnvironment } from "./nmi-gateway";
 
 export type RateBucketName =
   | "quote"
@@ -77,16 +78,14 @@ export function getWorkerStaleMs(): number {
  * `unsafe-inline` / `unsafe-eval` are required for the App Router without per-request nonces.
  *
  * Collect.js is served from the gateway host and mounts its card fields as iframes from that
- * same host, so the gateway origins must appear in script-src, style-src AND frame-src. Both
- * the sandbox and production hosts are listed: the CSP is a static header, and a build that
- * shipped only one would break the moment NMI_ENVIRONMENT flipped.
+ * same host, so the gateway origin must appear in script-src, style-src, frame-src AND
+ * connect-src. Only the ACTIVE environment's gateway is allowed, taken from `nmi-gateway.ts`:
+ * the header is built from the same `NMI_ENVIRONMENT` as the checkout page's Collect.js URL,
+ * so the two cannot disagree, and a list of every gateway ever used is looser than it needs to
+ * be and a place for a stale entry to hide.
  */
-export function contentSecurityPolicy(): string {
-  const gateway = [
-    "https://secure.nmi.com",
-    "https://sandbox.nmi.com",
-    "https://secure.networkmerchants.com",
-  ].join(" ");
+export function contentSecurityPolicy(environment: NmiEnvironment = env.NMI_ENVIRONMENT): string {
+  const gateway = nmiGatewayUrls(environment).origin;
   /**
    * Apple's Pay JS SDK, which Collect.js injects ITSELF.
    *

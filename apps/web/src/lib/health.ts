@@ -1,5 +1,8 @@
 // SPRINT-9 / SPRINT-12: dependency-aware health — process alive is not enough; database and worker matter.
-import { env, getWorkerStaleMs } from "@harolds/config";
+// SPRINT-18.2: also reports the gateway this instance is addressed to and the Collect.js URL the
+// checkout page serves. Both come from the same per-request resolution the page uses, so there
+// is no separate bundle environment that could disagree — this is the cutover glance check.
+import { activeNmiGateway, env, getWorkerStaleMs } from "@harolds/config";
 import { prisma } from "@harolds/db";
 import { getPaymentEnvironment } from "@harolds/payments";
 import { API_CONTRACT_VERSION } from "@harolds/types";
@@ -8,6 +11,10 @@ import { getWorkerHeartbeat } from "@/lib/worker-heartbeat";
 export type HealthSnapshot = {
   ok: boolean;
   paymentEnvironment: string;
+  /** SPRINT-18.2 (additive): origin the Payment and Query APIs are called on. */
+  paymentGatewayOrigin: string;
+  /** SPRINT-18.2 (additive): the Collect.js URL /checkout renders for this instance. */
+  collectJsUrl: string;
   nodeEnv: string;
   contractVersion: typeof API_CONTRACT_VERSION;
   checks: {
@@ -48,9 +55,12 @@ export async function getHealthSnapshot(
     worker = "up";
   }
   const ok = dbUp && worker === "up";
+  const gateway = activeNmiGateway();
   return {
     ok,
     paymentEnvironment: getPaymentEnvironment(),
+    paymentGatewayOrigin: gateway.origin,
+    collectJsUrl: gateway.collectJsUrl,
     nodeEnv: env.NODE_ENV,
     contractVersion: API_CONTRACT_VERSION,
     checks: {

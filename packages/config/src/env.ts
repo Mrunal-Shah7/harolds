@@ -1,4 +1,4 @@
-// SPRINT-1 / SPRINT-4 / SPRINT-5: environment schema — validates required vars at module load and fails loudly
+// SPRINT-1 / SPRINT-4 / SPRINT-5 / SPRINT-18.2: environment schema — validates required vars at module load and fails loudly
 import { z } from "zod";
 import { missingProductionVariables } from "./production-guards";
 
@@ -47,10 +47,9 @@ const envSchema = z.object({
   NMI_SECURITY_KEY_LIVE: z.string().optional(),
   NMI_TOKENIZATION_KEY_LIVE: z.string().optional(),
   NMI_WEBHOOK_SIGNING_KEY_LIVE: z.string().optional(),
-
-  // SPRINT-17: public Collect.js identifiers (required at build; required in production start).
-  NEXT_PUBLIC_NMI_TOKENIZATION_KEY: z.string().optional(),
-  NEXT_PUBLIC_NMI_ENVIRONMENT: z.string().optional(),
+  // SPRINT-18.2: there are no NEXT_PUBLIC_NMI_* variables. The checkout layout resolves the
+  // Collect.js URL and the active tokenization key on the server, per request, from the two
+  // values above — so the browser cannot disagree with the server about which gateway is live.
 
   // Required — Sprint 5 (Epson Server Direct Print). Comma-separated serials supported.
   PRINTER_SERIAL_NUMBER: z

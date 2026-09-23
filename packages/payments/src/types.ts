@@ -1,4 +1,4 @@
-// SPRINT-4 / SPRINT-17: public result/error taxonomy for payment operations.
+// SPRINT-4 / SPRINT-17 / SPRINT-18.2 / SPRINT-18.3: public result/error taxonomy for payment operations.
 // These types intentionally do not mirror the gateway's wire shapes field-for-field —
 // callers outside this package must never need to know NMI's vocabulary.
 
@@ -28,6 +28,37 @@ export const RefundDeclineCode = {
 } as const;
 export type RefundDeclineCode = (typeof RefundDeclineCode)[keyof typeof RefundDeclineCode];
 
+/**
+ * SPRINT-18.3: a decline is a statement about the card; every other non-approval is a statement
+ * about us, the gateway, or the network. Mirrors the PaymentAttemptClassification DB enum.
+ */
+export type PaymentAttemptClassification =
+  | "APPROVED"
+  | "DECLINED"
+  | "GATEWAY_FAILURE"
+  | "CONFIGURATION_FAILURE"
+  | "COMMUNICATION_FAILURE";
+
+/**
+ * SPRINT-18.3: what the gateway said about one sale attempt, for the PaymentAttempt row and the
+ * outcome log line. Never card data, never the payment token, never the billing ZIP.
+ */
+export type PaymentAttemptRecord = {
+  gatewayEnvironment: string;
+  gatewayOrigin: string;
+  classification: PaymentAttemptClassification;
+  /** What happened, in internal vocabulary (DO_NOT_HONOR, MERCHANT_ACCOUNT_INACTIVE, ...). */
+  internalReason: string;
+  gatewayResponse: string | null;
+  gatewayResponseCode: string | null;
+  gatewayResponseText: string | null;
+  avsResponse: string | null;
+  cvvResponse: string | null;
+  authCode: string | null;
+  gatewayTransactionId: string | null;
+  httpStatus: number | null;
+};
+
 export type PaymentOutcome =
   | {
       kind: "succeeded";
@@ -36,6 +67,7 @@ export type PaymentOutcome =
       status: string;
       rawStatus: string;
       cardLast4: string | null;
+      attempt: PaymentAttemptRecord;
     }
   | {
       kind: "declined";
@@ -43,12 +75,25 @@ export type PaymentOutcome =
       /** Customer-safe message — never gateway field names or raw error text. */
       reason: string;
       code: PaymentDeclineCode;
+      attempt: PaymentAttemptRecord;
+    }
+  | {
+      /**
+       * SPRINT-18.3: the sale was definitely NOT processed, and not because of the card —
+       * merchant configuration, a rejected request, a processor error, missing credentials.
+       * Safe to retry the same order once the cause is fixed.
+       */
+      kind: "unavailable";
+      /** Customer-safe; says nothing about the card. */
+      message: string;
+      attempt: PaymentAttemptRecord;
     }
   | {
       kind: "transport_failure";
       /** May have charged — do not assume otherwise. Caller must reconcile via getPayment(). */
       message: string;
       paymentId: string | null;
+      attempt: PaymentAttemptRecord;
     };
 
 export type RefundOutcome =
@@ -95,6 +140,11 @@ export type CreatePaymentInput = {
   orderId: string;
   /** Human-facing order number/reference — sent in the gateway's order_description field. */
   orderReference: string;
+  /**
+   * SPRINT-18.3: five-digit billing ZIP, sent as the gateway's `zip` for AVS. Passed through
+   * and never stored or logged — only whether one was provided is logged.
+   */
+  billingZip?: string | null;
 };
 
 export type RefundPaymentInput = {
@@ -110,7 +160,8 @@ export type RefundPaymentInput = {
 };
 
 export type VerifyWebhookSignatureInput = {
-  body: string | Buffer;
+  /** The request body exactly as received. Bytes only — a decoded string is how the HMAC breaks. */
+  body: Buffer;
   signatureHeader: string;
 };
 

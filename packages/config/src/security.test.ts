@@ -1,6 +1,8 @@
-// SPRINT-9 / SPRINT-17: exemptions and NMI Collect.js CSP sources.
+// SPRINT-9 / SPRINT-17 / SPRINT-18.2: exemptions and NMI Collect.js CSP sources.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { env } from "./env";
+import { nmiGatewayUrls } from "./nmi-gateway";
 import {
   RATE_LIMITS,
   contentSecurityPolicy,
@@ -26,18 +28,38 @@ describe("rate limit policy", () => {
   });
 });
 
+/** The sources listed for one directive of a generated policy. */
+function sources(csp: string, directive: string): string[] {
+  const entry = csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${directive} `));
+  return entry ? entry.split(/\s+/).slice(1) : [];
+}
+
+const COLLECT_JS_DIRECTIVES = ["script-src", "style-src", "frame-src", "connect-src"];
+
 describe("content security policy", () => {
-  it("allows Collect.js script, frame, connect and style origins", () => {
+  // SPRINT-18.2: the expected origin is DERIVED from nmi-gateway.ts, never written here. The
+  // literal values are pinned once, in nmi-gateway.test.ts.
+  for (const environment of ["sandbox", "production"] as const) {
+    it(`allows exactly the ${environment} gateway on every Collect.js directive`, () => {
+      const csp = contentSecurityPolicy(environment);
+      const active = nmiGatewayUrls(environment).origin;
+      const other = nmiGatewayUrls(environment === "production" ? "sandbox" : "production").origin;
+      for (const directive of COLLECT_JS_DIRECTIVES) {
+        assert.ok(sources(csp, directive).includes(active), `${directive} must allow ${active}`);
+        assert.ok(!sources(csp, directive).includes(other), `${directive} must not allow ${other}`);
+      }
+      // Only one gateway origin in the whole policy: self, the Apple SDK host and the gateway.
+      const gatewayLike = sources(csp, "frame-src").filter((s) => s !== "'self'");
+      assert.deepEqual(gatewayLike, [active]);
+    });
+  }
+
+  it("follows the running process's NMI_ENVIRONMENT by default", () => {
+    assert.equal(contentSecurityPolicy(), contentSecurityPolicy(env.NMI_ENVIRONMENT));
+  });
+
+  it("keeps the fixed directives", () => {
     const csp = contentSecurityPolicy();
-    // Both gateway hosts must be present: the CSP is a static header, so a policy carrying
-    // only the active one would break the moment NMI_ENVIRONMENT flipped.
-    assert.match(csp, /script-src[^;]*https:\/\/secure\.nmi\.com/);
-    assert.match(csp, /script-src[^;]*https:\/\/sandbox\.nmi\.com/);
-    // Collect.js mounts its card fields as iframes served from the gateway.
-    assert.match(csp, /frame-src[^;]*https:\/\/secure\.nmi\.com/);
-    assert.match(csp, /frame-src[^;]*https:\/\/sandbox\.nmi\.com/);
-    assert.match(csp, /style-src[^;]*nmi\.com/);
-    assert.match(csp, /connect-src[^;]*nmi\.com/);
     assert.match(csp, /frame-ancestors 'none'/);
     // Square's CDNs must be gone entirely, not merely unused.
     assert.doesNotMatch(csp, /square/i);

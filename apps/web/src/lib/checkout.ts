@@ -1,4 +1,4 @@
-// SPRINT-4: authoritative checkout — reprice, persist, charge, converge with webhooks.
+// SPRINT-4 / SPRINT-18.3: authoritative checkout — reprice, persist, charge, converge with webhooks.
 import { createHash } from "node:crypto";
 import { getOrderDuplicateGuardWindowMs, getPrinterConfig } from "@harolds/config";
 import {
@@ -11,6 +11,8 @@ import {
   markOrderPaymentUnknown,
   normalizePhoneToE164,
   prisma,
+  raisePaymentGatewayIncident,
+  recordPaymentAttempt,
   recordProcessorPaymentId,
   releaseChargeClaim,
   validateEmail,
@@ -22,9 +24,12 @@ import {
 import { parseCartRequest, quoteCart, sanitizeKitchenNote, toMenuCatalog } from "@harolds/pricing";
 import {
   createPayment,
+  CustomerMessage,
   findPaymentByOrderId,
+  isGatewayIncident,
   GATEWAY_REQUEST_TIMEOUT_MS,
 } from "@harolds/payments";
+import { BILLING_ZIP_MESSAGE, normalizeBillingZip } from "@/lib/billing-zip";
 import {
   ApiErrorCode,
   JobStatus,
@@ -295,6 +300,25 @@ function parseCreateOrderBody(body: unknown):
     };
   }
 
+  // SPRINT-18.3: optional in the contract, always sent by the storefront. Passed to the gateway
+  // for AVS and never persisted — it goes into `request` and from there only to the sale.
+  let billingZip: string | undefined;
+  if (raw.billingZip !== undefined && raw.billingZip !== null && raw.billingZip !== "") {
+    const normalized = typeof raw.billingZip === "string" ? normalizeBillingZip(raw.billingZip) : null;
+    if (!normalized) {
+      return {
+        ok: false,
+        failure: {
+          ok: false,
+          code: ApiErrorCode.VALIDATION_ERROR,
+          message: BILLING_ZIP_MESSAGE,
+          details: { field: "billingZip" },
+        },
+      };
+    }
+    billingZip = normalized;
+  }
+
   const cartParsed = parseCartRequest(raw.cart);
   if (!cartParsed.ok) {
     return {
@@ -317,6 +341,7 @@ function parseCreateOrderBody(body: unknown):
       email: (c.email as string).trim().toLowerCase(),
     },
     paymentToken: raw.paymentToken,
+    billingZip,
     idempotencyKey: raw.idempotencyKey.trim(),
     // Free text that ends up on a thermal printer. `sanitizeKitchenNote` caps the length and
     // strips control bytes, which ESC/POS would otherwise read as printer commands.
@@ -375,7 +400,7 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
       return { ok: true, order: toCheckoutOrderResponse(existing), replay: true };
     }
     // Same cart, no payment yet — continue charging this existing pending order below.
-    return chargeExistingPending(existing, request.paymentToken);
+    return chargeExistingPending(existing, chargePaymentOf(request));
   }
 
   const itemIds = request.cart.lines.map((l) => l.itemId);
@@ -499,10 +524,10 @@ export async function checkoutOrder(body: unknown): Promise<CheckoutSuccess | Ch
       };
     }
     // Unpaid: continue paying THAT order rather than creating another.
-    return chargeExistingPending(guarded.order, request.paymentToken);
+    return chargeExistingPending(guarded.order, chargePaymentOf(request));
   }
 
-  return chargeExistingPending(guarded.order, request.paymentToken);
+  return chargeExistingPending(guarded.order, chargePaymentOf(request));
 }
 
 /**
@@ -521,14 +546,36 @@ export const CHARGE_RECOVERY_AFTER_MS = GATEWAY_REQUEST_TIMEOUT_MS + 10_000;
 export type ChargeDeps = {
   createPayment: typeof createPayment;
   findPaymentByOrderId: typeof findPaymentByOrderId;
+  /** SPRINT-18.3: persist what the gateway said. Never throws. */
+  recordPaymentAttempt: typeof recordPaymentAttempt;
+  /** SPRINT-18.3: page a human for a gateway incident, once per window. Never throws. */
+  raisePaymentGatewayIncident: typeof raisePaymentGatewayIncident;
   now: () => number;
 };
 
 const REAL_DEPS: ChargeDeps = {
   createPayment,
   findPaymentByOrderId,
+  recordPaymentAttempt,
+  raisePaymentGatewayIncident,
   now: () => Date.now(),
 };
+
+/**
+ * SPRINT-18.3: what a sale needs from the request. The billing ZIP rides along to the gateway
+ * and is never written anywhere — not the order, not the attempt record, not a log line.
+ */
+export type ChargePayment = { paymentToken: string; billingZip: string | null };
+
+function chargePaymentOf(request: CreateOrderRequest): ChargePayment {
+  return { paymentToken: request.paymentToken, billingZip: request.billingZip ?? null };
+}
+
+/**
+ * SPRINT-18.3: the customer wording for a definite gateway incident. Says nothing about the
+ * card, because nothing is wrong with it, and says nothing was charged, because nothing was.
+ */
+export const PAYMENT_UNAVAILABLE_MESSAGE = CustomerMessage.PAYMENTS_UNAVAILABLE;
 
 /**
  * Charge an order that is pending payment.
@@ -542,14 +589,14 @@ const REAL_DEPS: ChargeDeps = {
  */
 export async function chargeExistingPending(
   order: OrderWithLines,
-  paymentToken: string,
+  payment: ChargePayment,
   deps: ChargeDeps = REAL_DEPS,
 ): Promise<CheckoutSuccess | CheckoutFailure> {
   const claim = await claimOrderForCharge(order.id);
 
   switch (claim.kind) {
     case "claimed":
-      return chargeClaimedOrder(claim.order, paymentToken, deps);
+      return chargeClaimedOrder(claim.order, payment, deps);
     case "not_found":
       return { ok: false, code: ApiErrorCode.NOT_FOUND, message: "Order not found." };
     case "already_charged":
@@ -578,7 +625,7 @@ export async function chargeExistingPending(
         details: { reason: AmbiguousPaymentReason.GATEWAY_UNCONFIRMED },
       };
     case "in_flight":
-      return resolveInFlightCharge(claim.order, paymentToken, claim.claimedAt, deps);
+      return resolveInFlightCharge(claim.order, payment, claim.claimedAt, deps);
   }
 }
 
@@ -598,7 +645,7 @@ export async function chargeExistingPending(
  */
 async function resolveInFlightCharge(
   order: OrderWithLines,
-  paymentToken: string,
+  payment: ChargePayment,
   claimedAt: Date,
   deps: ChargeDeps,
 ): Promise<CheckoutSuccess | CheckoutFailure> {
@@ -633,7 +680,7 @@ async function resolveInFlightCharge(
 
     const reclaim = await claimOrderForCharge(order.id);
     if (reclaim.kind !== "claimed") return ambiguous(AmbiguousPaymentReason.CHARGE_IN_PROGRESS);
-    return chargeClaimedOrder(reclaim.order, paymentToken, deps);
+    return chargeClaimedOrder(reclaim.order, payment, deps);
   }
 
   if (existingPayment.amountCents !== order.totalCents) {
@@ -674,16 +721,45 @@ async function resolveInFlightCharge(
 /** Send the sale. Only ever reached holding the claim for this order. */
 async function chargeClaimedOrder(
   order: OrderWithLines,
-  paymentToken: string,
+  payment: ChargePayment,
   deps: ChargeDeps,
 ): Promise<CheckoutSuccess | CheckoutFailure> {
   const outcome = await deps.createPayment({
-    paymentToken,
+    paymentToken: payment.paymentToken,
+    billingZip: payment.billingZip,
     correlationId: paymentCorrelationId(order.id),
     amountCents: order.totalCents,
     orderId: order.id,
     orderReference: order.id,
   });
+
+  // SPRINT-18.3: record what the gateway said BEFORE acting on it, for every outcome. Neither
+  // call throws, so a failure to record can never change the customer's answer or the order.
+  await deps.recordPaymentAttempt({ orderId: order.id, amountCents: order.totalCents, ...outcome.attempt });
+  if (isGatewayIncident(outcome.attempt.classification)) {
+    await deps.raisePaymentGatewayIncident({
+      orderId: order.id,
+      classification: outcome.attempt.classification,
+      internalReason: outcome.attempt.internalReason,
+      gatewayResponseCode: outcome.attempt.gatewayResponseCode,
+      gatewayOrigin: outcome.attempt.gatewayOrigin,
+      gatewayEnvironment: outcome.attempt.gatewayEnvironment,
+    });
+  }
+
+  if (outcome.kind === "unavailable") {
+    // SPRINT-18.3: DEFINITE — the gateway did not process the sale, and not because of the card
+    // (merchant configuration, a rejected request, a processor error). Nothing was charged, so
+    // release THIS claim and leave the order pending: once the incident clears, the same
+    // checkout retries the same order. It is not marked failed, because it did not decline.
+    if (order.chargeClaimedAt) await releaseChargeClaim(order.id, order.chargeClaimedAt);
+    return {
+      ok: false,
+      code: ApiErrorCode.PAYMENT_UNAVAILABLE,
+      message: PAYMENT_UNAVAILABLE_MESSAGE,
+      details: { retryable: true },
+    };
+  }
 
   if (outcome.kind === "succeeded") {
     return finalisePaidOrder(

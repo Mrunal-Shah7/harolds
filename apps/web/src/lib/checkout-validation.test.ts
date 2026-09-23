@@ -1,8 +1,11 @@
 // Checkout field validation. Courtesy layer only -- the server re-checks all of it.
+// SPRINT-18.3: billing ZIP — required, loose, ZIP+4 accepted.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { normalizeBillingZip } from "./billing-zip";
 import {
   hasAnyError,
+  validateBillingZip,
   validateCheckout,
   validateCustomTip,
   validateEmailField,
@@ -111,6 +114,7 @@ describe("validateCheckout", () => {
     email: "jamal@example.com",
     customTip: "",
     orderNote: "",
+    billingZip: "60633",
   };
 
   it("passes a complete, well-formed form", () => {
@@ -125,15 +129,54 @@ describe("validateCheckout", () => {
       email: "",
       customTip: "",
       orderNote: "",
+      billingZip: "",
     });
     assert.ok(errors.firstName);
     assert.ok(errors.lastName);
     assert.ok(errors.phone);
     assert.ok(errors.email);
+    assert.ok(errors.billingZip);
     assert.equal(hasAnyError(errors), true);
   });
 
   it("fails on a bad tip even when every other field is right", () => {
     assert.equal(hasAnyError(validateCheckout({ ...good, customTip: "9999" })), true);
+  });
+
+  // SPRINT-18.3: the billing ZIP blocks submission when empty or malformed, like every field.
+  it("blocks submission on a missing or malformed billing ZIP", () => {
+    assert.equal(hasAnyError(validateCheckout({ ...good, billingZip: "" })), true);
+    assert.equal(hasAnyError(validateCheckout({ ...good, billingZip: "606" })), true);
+  });
+});
+
+describe("validateBillingZip (SPRINT-18.3)", () => {
+  it("requires a value", () => {
+    assert.equal(validateBillingZip(""), "Billing ZIP is required.");
+    assert.equal(validateBillingZip("   "), "Billing ZIP is required.");
+  });
+
+  it("accepts five digits and ZIP+4 in every common spelling", () => {
+    for (const zip of ["60633", " 60633 ", "60633-1234", "60633 1234", "606331234"]) {
+      assert.equal(validateBillingZip(zip), null, zip);
+    }
+  });
+
+  it("refuses a three-digit entry with a message that says what is wrong", () => {
+    assert.match(validateBillingZip("606") ?? "", /5-digit ZIP code/);
+  });
+
+  it("refuses letters and wrong lengths", () => {
+    // Dash and space placement is deliberately ignored (loose by design), so only digit COUNT
+    // and non-digits can fail.
+    for (const zip of ["6063A", "606331", "6063312", "ABCDE"]) {
+      assert.ok(validateBillingZip(zip), zip);
+    }
+  });
+
+  it("sends only the first five digits of a ZIP+4", () => {
+    assert.equal(normalizeBillingZip("60633-1234"), "60633");
+    assert.equal(normalizeBillingZip("606331234"), "60633");
+    assert.equal(normalizeBillingZip("606"), null);
   });
 });

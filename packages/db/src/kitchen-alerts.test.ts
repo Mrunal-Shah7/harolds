@@ -1,4 +1,7 @@
 // SPRINT-6: unacknowledged-order manager alert is enqueued exactly once per order.
+// SPRINT-18.3: every assertion is scoped to THIS file's own order ids. The sweep is global — it
+// alerts every qualifying paid order in the database — so its return count includes paid orders
+// that other test files create concurrently, and asserting on that count made the file flaky.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";
@@ -28,6 +31,13 @@ async function cleanup(): Promise<void> {
     });
   }
   await prisma.order.deleteMany({ where: { clientIdempotencyKey: { startsWith: PREFIX } } });
+}
+
+/** Alerts of this job type for one order — the only count these tests may assert on. */
+async function alertsFor(orderId: string): Promise<number> {
+  return prisma.backgroundJob.count({
+    where: { type: JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED, payload: { path: ["orderId"], equals: orderId } },
+  });
 }
 
 async function paidOrder(paidAt: Date, status: OrderStatus = OrderStatus.PAID) {
@@ -94,31 +104,11 @@ describe("unacknowledged kitchen alerts", () => {
     const stale = await paidOrder(new Date(Date.now() - 10 * 60_000));
     const fresh = await paidOrder(new Date());
     const now = new Date();
-    const first = await enqueueUnacknowledgedKitchenAlerts({ thresholdMs: 180_000, now });
-    assert.ok(first >= 1);
-    const alerts = await prisma.backgroundJob.findMany({
-      where: {
-        type: JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED,
-        payload: { path: ["orderId"], equals: stale.id },
-      },
-    });
-    assert.equal(alerts.length, 1);
-    const second = await enqueueUnacknowledgedKitchenAlerts({ thresholdMs: 180_000, now });
-    assert.equal(second, 0);
-    const alertsAgain = await prisma.backgroundJob.findMany({
-      where: {
-        type: JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED,
-        payload: { path: ["orderId"], equals: stale.id },
-      },
-    });
-    assert.equal(alertsAgain.length, 1);
-    const freshAlerts = await prisma.backgroundJob.findMany({
-      where: {
-        type: JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED,
-        payload: { path: ["orderId"], equals: fresh.id },
-      },
-    });
-    assert.equal(freshAlerts.length, 0);
+    await enqueueUnacknowledgedKitchenAlerts({ thresholdMs: 180_000, now });
+    assert.equal(await alertsFor(stale.id), 1, "the stale order is alerted on the first sweep");
+    await enqueueUnacknowledgedKitchenAlerts({ thresholdMs: 180_000, now });
+    assert.equal(await alertsFor(stale.id), 1, "and not again on the second");
+    assert.equal(await alertsFor(fresh.id), 0, "a fresh order is not alerted at all");
   });
 
   it("does not alert an order the kitchen has already started", async () => {
@@ -129,11 +119,11 @@ describe("unacknowledged kitchen alerts", () => {
       to: OrderStatus.IN_PROGRESS,
       source: "KDS",
     });
-    const n = await enqueueUnacknowledgedKitchenAlerts({
+    await enqueueUnacknowledgedKitchenAlerts({
       thresholdMs: 1_000,
       now: new Date(),
     });
-    assert.equal(n, 0);
+    assert.equal(await alertsFor(order.id), 0);
   });
 
   it("shares the job type with Sprint 5 so a print-driven alert is not duplicated", async () => {
@@ -149,14 +139,7 @@ describe("unacknowledged kitchen alerts", () => {
         },
       },
     });
-    const n = await enqueueUnacknowledgedKitchenAlerts({ thresholdMs: 1_000, now: new Date() });
-    assert.equal(n, 0);
-    const alerts = await prisma.backgroundJob.findMany({
-      where: {
-        type: JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED,
-        payload: { path: ["orderId"], equals: order.id },
-      },
-    });
-    assert.equal(alerts.length, 1);
+    await enqueueUnacknowledgedKitchenAlerts({ thresholdMs: 1_000, now: new Date() });
+    assert.equal(await alertsFor(order.id), 1, "the existing Sprint 5 alert is not duplicated");
   });
 });

@@ -1,9 +1,10 @@
 "use client";
 
-// SPRINT-12 / SPRINT-17: NMI Collect.js — card fields as gateway-hosted iframes. Only the
-// single-use payment token ever reaches our server; the PAN never touches this origin.
+// SPRINT-12 / SPRINT-17 / SPRINT-18.2: NMI Collect.js — card fields as gateway-hosted iframes.
+// Only the single-use payment token ever reaches our server; the PAN never touches this origin.
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
+import { useNmiCheckoutConfig } from "@/components/storefront/nmi-checkout-config";
 
 declare global {
   interface Window {
@@ -47,17 +48,6 @@ type CollectJS = {
   }) => void;
   startPaymentRequest: () => void;
 };
-
-/**
- * Collect.js is served from the gateway itself, and the sandbox and production accounts are on
- * different hosts — a sandbox tokenization key loaded from the production script does not work.
- * The value is inlined at build time, so it must be a literal `process.env.NEXT_PUBLIC_*`
- * reference rather than a computed lookup, or Next will not substitute it.
- */
-const SDK_SRC =
-  process.env.NEXT_PUBLIC_NMI_ENVIRONMENT === "production"
-    ? "https://secure.nmi.com/token/Collect.js"
-    : "https://sandbox.nmi.com/token/Collect.js";
 
 function reportMissingConfig(missing: string[]): void {
   // Structured client→server log so "not configured" is never silent in ops logs.
@@ -113,16 +103,23 @@ export function NmiPaymentForm({
   const tokenizing = useRef(false);
   const configured = useRef(false);
 
-  const tokenizationKey = process.env.NEXT_PUBLIC_NMI_TOKENIZATION_KEY ?? "";
+  // Collect.js is served from the gateway itself, and the sandbox and production accounts are on
+  // different gateways. Both values come from the server for the active environment
+  // (checkout/layout.tsx), so the script and the key always belong to the same gateway.
+  const { collectJsUrl, tokenizationKey } = useNmiCheckoutConfig();
+  const hasConfig = collectJsUrl.length > 0 && tokenizationKey.length > 0;
 
   useEffect(() => {
-    if (!sdkLoaded || !window.CollectJS || configured.current) return;
+    if (hasConfig) return;
+    reportMissingConfig([
+      ...(collectJsUrl ? [] : ["Collect.js URL"]),
+      ...(tokenizationKey ? [] : ["NMI_TOKENIZATION_KEY for the active NMI_ENVIRONMENT"]),
+    ]);
+    onErrorRef.current("Payments are not configured yet. Please try again later.");
+  }, [hasConfig, collectJsUrl, tokenizationKey]);
 
-    if (!tokenizationKey) {
-      reportMissingConfig(["NEXT_PUBLIC_NMI_TOKENIZATION_KEY"]);
-      onErrorRef.current("Payments are not configured yet. Please try again later.");
-      return;
-    }
+  useEffect(() => {
+    if (!hasConfig || !sdkLoaded || !window.CollectJS || configured.current) return;
 
     configured.current = true;
     try {
@@ -169,7 +166,7 @@ export function NmiPaymentForm({
       configured.current = false;
       onErrorRef.current("Couldn't load the payment form. Please refresh and try again.");
     }
-  }, [sdkLoaded, tokenizationKey]);
+  }, [hasConfig, sdkLoaded]);
 
   useEffect(() => {
     const el = document.getElementById("nmi-card-container");
@@ -193,7 +190,14 @@ export function NmiPaymentForm({
 
   return (
     <div className={disabled ? "pointer-events-none opacity-60" : undefined}>
-      <Script src={SDK_SRC} data-tokenization-key={tokenizationKey} onReady={() => setSdkLoaded(true)} strategy="afterInteractive" />
+      {hasConfig && (
+        <Script
+          src={collectJsUrl}
+          data-tokenization-key={tokenizationKey}
+          onReady={() => setSdkLoaded(true)}
+          strategy="afterInteractive"
+        />
+      )}
 
       {/* Only the CONTAINERS are styled here. Their padding and border sit outside the elements
           Collect.js mounts into, so the hosted iframes' own dimensions are untouched. */}

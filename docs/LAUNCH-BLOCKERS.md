@@ -1,4 +1,5 @@
     <!-- SPRINT-13: launch blockers — Phase 1 carry-forward closed; production cutover still gated. -->
+    <!-- SPRINT-18.2: corrected the _LIVE triple record (not placeholders) and retired NEXT_PUBLIC_NMI_*. -->
 
     # Launch blockers — Harold's Chicken Oak Lawn
 
@@ -23,7 +24,7 @@
     | Closed | What changed |
     |---|---|
     | Customer storefront absent | Storefront is in this repo: browse, cart, quote, tip, checkout. |
-    | Payments not configured on checkout | Root cause was missing `NEXT_PUBLIC_SQUARE_*` at build time. Since Sprint 17 the equivalent is `NEXT_PUBLIC_NMI_TOKENIZATION_KEY` / `NEXT_PUBLIC_NMI_ENVIRONMENT`. Build now fails without them; production start fails without a complete NMI key triple; sandbox card payment produces PAID orders. |
+    | Payments not configured on checkout | Root cause was missing `NEXT_PUBLIC_SQUARE_*` at build time. Sprint 17 replaced that with `NEXT_PUBLIC_NMI_*`; **Sprint 18.2 removed those too** — Collect.js now gets its URL and key from the server per request, so there is nothing to be missing at build. Production start fails without a complete active NMI key triple; sandbox card payment produces PAID orders. |
     | No way to upload item photographs | Admin upload → local content-addressed storage → derivatives → storefront. |
     | No temporary trading overrides | Early close / late open / closed rest of day / open anyway, with self-expiry. |
     | Banner messaging hardcoded | Announcement + editable closed/paused/prep phrasing; trading and prep stay derived. |
@@ -48,7 +49,7 @@
     | 1 | ~~Customer storefront~~ | — | **Resolved in Sprint 12.** | — |
     | 2 | **Ubuntu production server** | Nowhere to run the app, database, or TLS. | Not provisioned. **Sprint 13 Phase 2: absent — Phases 3–10 blocked.** | Store / hosting |
     | 3 | **Registered domain + DNS** | Printer, NMI webhooks, and customers need HTTPS. | Not supplied. **Sprint 13 Phase 2: absent.** | Store |
-    | 4 | **Production NMI credentials** | Sandbox charges are not real. | This machine is `NMI_ENVIRONMENT=sandbox`; the `*_LIVE` key triple is still placeholder. | Store / NMI Control Panel |
+    | 4 | **Production NMI credentials** | Sandbox charges are not real. | **Corrected in Sprint 18.2:** the `*_LIVE` triple on this development machine is *not* a placeholder — Sprint 18.1 found three correctly shaped values distinct from the sandbox keys. They predate the scoped `harolds-api` user and carry the owner's permissions: rotate them, regenerate under `harolds-api`, and put the new triple on the production server only. The code now addresses the Merchant Pay Connect gateway in production (Sprint 18.2). Cutover itself is the operator's Sprint 18.2 Phase 8. After cutover, `pnpm reconcile` is the command that exercises the Query API; `pnpm reconcile:sprint16` makes **no** gateway call — it is a database-only, read-only report, and the earlier mapping that listed it as a Query API consumer was wrong. | Store / Merchant Pay Connect portal |
     | 5 | ~~**Twilio + completed A2P 10DLC**~~ | **Removed in Sprint 17.** SMS and Twilio were dropped entirely, so there is no messaging registration to complete. Customers get an email receipt and no texts. | Not applicable | — |
     | 6 | **Production email + verified sending domain** | Receipts land in spam or are rejected. | `EMAIL_API_KEY` / from address empty. | Store / Resend |
     | 7 | **Eight unverified prices** | Invented beverage/dessert prices. | Still flagged — **business can clear in `/admin` now.** | Store |

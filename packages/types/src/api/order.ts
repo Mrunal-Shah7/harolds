@@ -1,4 +1,4 @@
-// SPRINT-4: checkout / order request + public response contract (version 1.2.0).
+// SPRINT-4 / SPRINT-18.3: checkout / order request + public response contract (version 1.2.0).
 import type { CartRequest, PricedLineSnapshot, TipApplied } from "./cart";
 import type { ApiErrorCode } from "./errors";
 
@@ -23,6 +23,12 @@ export type CreateOrderRequest = {
   cart: CartRequest;
   customer: CreateOrderCustomer;
   paymentToken: string;
+  /**
+   * SPRINT-18.3: the ZIP on the card's billing statement, sent to the gateway for AVS and never
+   * stored. Five digits, or ZIP+4 (the server keeps the first five). Optional in the contract so
+   * existing clients keep working; the storefront always sends it.
+   */
+  billingZip?: string;
   idempotencyKey: string;
   customerNote?: string | null;
 };
@@ -85,6 +91,7 @@ export type CheckoutBlockingCode = Extract<
   | "ITEM_UNAVAILABLE"
   | "PAYMENT_DECLINED"
   | "PAYMENT_FAILED"
+  | "PAYMENT_UNAVAILABLE"
   | "IDEMPOTENCY_CONFLICT"
   | "VALIDATION_ERROR"
   | "NOT_FOUND"

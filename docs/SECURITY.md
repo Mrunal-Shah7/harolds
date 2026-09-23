@@ -1,4 +1,5 @@
 <!-- SPRINT-9: threat model, controls, residual risks, credential rotation, incident response. -->
+<!-- SPRINT-18.2: gateway host is the reseller's (Merchant Pay Connect), stated once in code; CSP active-environment only; no NEXT_PUBLIC_NMI_*. -->
 
 # Security — Harold's Chicken Oak Lawn
 
@@ -56,7 +57,7 @@ Rate limiting is **in-process**. Production is one long-lived Node process. Redi
 ## 3. Residual risks (stated honestly)
 
 1. **The print shared secret sits in the printer's URL query string.** The TM-m30III firmware does not send Digest authentication reliably (Sprint 5). A secret in a query string is written to every access log along the path unless the reverse proxy is configured to omit it for `/api/v1/print/` (see `docs/PRINT-RUNBOOK.md` §6). Anyone who can read those logs, the printer's configuration page, or a packet capture of the poll still has the secret. An invalid secret is refused without revealing whether the serial is known. This is mitigated, not solved.
-2. **CSP includes `'unsafe-inline'` and `'unsafe-eval'`** so Next.js App Router hydration works without per-request nonces. That is weaker than a nonce-based policy. The gateway's frames and scripts (`secure.nmi.com`, `sandbox.nmi.com`) are allowed by design — both hosts, because the CSP is a static header and the active one changes with `NMI_ENVIRONMENT`. `applepay.cdn-apple.com` is also allowed on `script-src`: Collect.js injects Apple's SDK itself, in its constructor, and cannot be told not to.
+2. **CSP includes `'unsafe-inline'` and `'unsafe-eval'`** so Next.js App Router hydration works without per-request nonces. That is weaker than a nonce-based policy. The gateway's frames and scripts are allowed by design — for the **active** `NMI_ENVIRONMENT` only (Sprint 18.2): Merchant Pay Connect (`mpc.transactiongateway.com`) in production, the NMI sandbox in sandbox. The origin is not written in the policy; it is derived from `packages/config/src/nmi-gateway.ts`, the one place the gateway host is stated. `applepay.cdn-apple.com` is also allowed on `script-src`: Collect.js injects Apple's SDK itself, in its constructor, and cannot be told not to.
 3. **Kitchen session tokens live in `localStorage`.** A kiosk XSS (or a stolen tablet) is a kitchen session. Admin uses an httpOnly cookie instead because that surface can refund money and change prices.
 4. **In-process rate limits reset on process restart** and do not coordinate across multiple Node processes. v1 is one process. If Sprint 10 ever runs more than one, this must be revisited.
 5. **`TRUST_PROXY=1` must only be set behind a proxy that overwrites `X-Forwarded-For`.** If it is on and the proxy appends rather than overwrites, a client can spoof the left-most address and evade per-source limits.
@@ -75,7 +76,7 @@ Held only in environment configuration (root `.env`, gitignored). None have a wo
 | Database URL | `DATABASE_URL` | No |
 | NMI security key | `NMI_SECURITY_KEY_SANDBOX` / `NMI_SECURITY_KEY_LIVE` | No |
 | NMI webhook signing key | `NMI_WEBHOOK_SIGNING_KEY_SANDBOX` / `NMI_WEBHOOK_SIGNING_KEY_LIVE` | No |
-| NMI tokenization key | `NMI_TOKENIZATION_KEY_*`, `NEXT_PUBLIC_NMI_TOKENIZATION_KEY` | Yes — public by design (Collect.js runs in the browser). It is NOT a secret; the security key is. |
+| NMI tokenization key | `NMI_TOKENIZATION_KEY_SANDBOX` / `NMI_TOKENIZATION_KEY_LIVE` | No. Public by design — the checkout layout hands the active one to Collect.js per request. It is NOT a secret; the security key is. There is no `NEXT_PUBLIC_` copy since Sprint 18.2. |
 | Print shared secret | `PRINTER_SDP_SHARED_SECRET` | No |
 | Email API key | `EMAIL_API_KEY` | No (optional until live send) |
 | Error tracker DSN | `SENTRY_DSN` | No (optional; empty means local capture only) |
@@ -83,9 +84,9 @@ Held only in environment configuration (root `.env`, gitignored). None have a wo
 
 Glance checks for the running environment:
 
-- `GET /api/v1/health` → `paymentEnvironment` (`sandbox` \| `production`) and `nodeEnv`.
-- Process start log `app.start` includes `nodeEnv`.
-- `NMI_ENVIRONMENT` is required as an explicit enum, not inferred from the key. It also selects the gateway HOST: a sandbox account is rejected outright by `secure.nmi.com`.
+- `GET /api/v1/health` → `paymentEnvironment` (`sandbox` \| `production`), `paymentGatewayOrigin`, `collectJsUrl`, and `nodeEnv`. The Collect.js URL is the one `/checkout` renders: both are resolved from the server's `NMI_ENVIRONMENT` at request time, so there is no separate bundle setting that could disagree.
+- Process start log `app.start` includes `nodeEnv`; `app.startup_summary` includes `paymentEnvironment` and `collectJsUrl`.
+- `NMI_ENVIRONMENT` is required as an explicit enum (`sandbox` \| `production`, exact, lowercase), not inferred from the key. An unrecognised value refuses to start. It also selects the gateway HOST. **The host comes from the reseller, not from NMI:** this MID is a Merchant Pay Connect account, whose gateway is `mpc.transactiongateway.com`, not NMI's generic `secure.nmi.com`. It is set in one place in code, `packages/config/src/nmi-gateway.ts`, and nowhere else — change it there if the reseller ever changes.
 
 `.env.example` documents every variable. Empty strings in the example are documentation, not code fallbacks. `parseEnv` rejects empty required secrets.
 
@@ -98,15 +99,15 @@ Generate a print secret with `node scripts/rotate-print-secret.mjs` (32 random b
 | Credential | Downtime | Procedure |
 |---|---|---|
 | `DATABASE_URL` password | Brief | Create a new role/password in Postgres, update `.env`, restart Node, drop the old password. Connections drain on restart. |
-| `NMI_SECURITY_KEY_*` | None if the new key is valid first | Create a new security key in the NMI Control Panel, put it in `.env`, restart Node, revoke the old key. |
-| `NMI_WEBHOOK_SIGNING_KEY_*` | Coordinated | NMI issues a new signing key when the webhook subscription is rotated. Update `.env` and the Control Panel in the same window. Signature failures return 401; NMI retries. Do not run two keys in code in v1 — keep the window short. |
+| `NMI_SECURITY_KEY_*` | None if the new key is valid first | Create a new security key in the Merchant Pay Connect portal (under the scoped `harolds-api` user, not the owner), put it in `.env`, restart Node, revoke the old key. |
+| `NMI_WEBHOOK_SIGNING_KEY_*` | Coordinated | The gateway issues a new signing key when the webhook subscription is rotated. Update `.env` and the Merchant Pay Connect portal in the same window. Signature failures return 401; NMI retries. Do not run two keys in code in v1 — keep the window short. |
 | `PRINTER_SDP_SHARED_SECRET` | Kitchen tickets pause until both sides match | Set the new secret in `.env`, restart Node, set the same value on the printer Server Direct Print page (URL `?key=`). Invalid secret → 401, empty body, no serial leak. Old polls fail until the printer is saved. |
 | `EMAIL_API_KEY` | None | Rotate in Resend, update `.env`, restart. |
 | `SENTRY_DSN` | None | New DSN in `.env`, restart. Old project keys can be revoked after. |
 | Kitchen PIN / admin password | None | Owner resets from `/admin/staff`. Existing sessions can be revoked. |
 | Admin session cookie | None | Sign out or revoke sessions. Cookie is httpOnly; rotation is "revoke + sign in again". |
 
-Production credentials must never be pasted into the sandbox `.env`, and the reverse. Health's `paymentEnvironment` is the glance check before a live shift. Both key triples live side by side in `.env`; only the triple matching `NMI_ENVIRONMENT` is read or validated.
+Production credentials belong on the production server only — never in a development machine's `.env` — and sandbox credentials never in production's. Within one `.env` both triples may coexist: only the triple matching `NMI_ENVIRONMENT` is read or validated (`packages/config/src/payments.ts`, `production-guards.ts`), and the inactive one may be blank. Health's `paymentEnvironment` and `collectJsUrl` are the glance check before a live shift.
 
 ---
 
@@ -147,7 +148,7 @@ Stdout of the long-lived Node process should be captured by the process supervis
 
 1. **Contain.** Restart is not enough if the secret leaked. Rotate the print secret, NMI security key, NMI webhook signing key, email key, and database password (table above). Revoke all admin and kitchen sessions from `/admin/staff` (or SQL on `AdminSession.revokedAt`).
 2. **Preserve.** Copy current logs and the latest backup off the box before you wipe anything.
-3. **Scope.** Search structured logs by `requestId` / `orderId`. Check `AdminAuditLog` for unexpected price, refund, and staff changes. Check the NMI Control Panel for charges that have no matching paid order (`pnpm reconcile --hours 24`).
+3. **Scope.** Search structured logs by `requestId` / `orderId`. Check `AdminAuditLog` for unexpected price, refund, and staff changes. Check the Merchant Pay Connect portal's Transactions report for charges that have no matching paid order (`pnpm reconcile --hours 24`).
 4. **Customer impact.** If phones/emails leaked, that is a PII incident — notify as required. Card data was never stored here; NMI's incident process applies if their tokenisation was involved.
 5. **Printer URL.** If access logs included `?key=` before the nginx `combined_no_query` change, treat the print secret as leaked and rotate it.
 6. **Return to service** only when health is 200, a sandbox (or live, if that is the environment) test quote succeeds, and the printer polls authenticated again.

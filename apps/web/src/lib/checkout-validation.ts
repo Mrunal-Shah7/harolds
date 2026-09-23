@@ -1,4 +1,5 @@
 // Checkout field validation.
+// SPRINT-18.3: adds the billing ZIP, which belongs to the payment card, not to the contact block.
 //
 // This is a COURTESY layer, not a security boundary: everything here is re-checked on the server
 // (phone by normalizePhoneToE164, email by validateEmail, tip bounds by parseCartRequest against
@@ -8,6 +9,7 @@
 // Each function returns null when the value is acceptable, or the sentence to show under the
 // field when it is not.
 import { CART_LIMITS } from "@harolds/types";
+import { BILLING_ZIP_MESSAGE, normalizeBillingZip } from "@/lib/billing-zip";
 
 /** Digits only, so formatting the customer chose to type is never held against them. */
 function digitsOf(value: string): string {
@@ -80,6 +82,15 @@ export function validateCustomTip(value: string): string | null {
   return null;
 }
 
+/**
+ * The ZIP on the card's billing statement, for AVS. Required: every sale without it is a sale
+ * the issuer sees with no address at all. Loose on format — see billing-zip.ts.
+ */
+export function validateBillingZip(value: string): string | null {
+  if (value.trim().length === 0) return "Billing ZIP is required.";
+  return normalizeBillingZip(value) ? null : BILLING_ZIP_MESSAGE;
+}
+
 /** Whole-order kitchen instruction. Optional; the server strips and caps it regardless. */
 export function validateOrderNote(value: string): string | null {
   if (value.trim().length > CART_LIMITS.maxNoteLength) {
@@ -95,6 +106,7 @@ export type CheckoutFieldErrors = {
   email: string | null;
   customTip: string | null;
   orderNote: string | null;
+  billingZip: string | null;
 };
 
 export function validateCheckout(input: {
@@ -104,6 +116,7 @@ export function validateCheckout(input: {
   email: string;
   customTip: string;
   orderNote: string;
+  billingZip: string;
 }): CheckoutFieldErrors {
   return {
     firstName: validateName(input.firstName, "First name"),
@@ -112,6 +125,7 @@ export function validateCheckout(input: {
     email: validateEmailField(input.email),
     customTip: validateCustomTip(input.customTip),
     orderNote: validateOrderNote(input.orderNote),
+    billingZip: validateBillingZip(input.billingZip),
   };
 }
 

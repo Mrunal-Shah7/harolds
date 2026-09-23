@@ -1,4 +1,4 @@
-// SPRINT-7: manager alert copy — what is wrong, which order, what to do.
+// SPRINT-7 / SPRINT-18.3: manager alert copy — what is wrong, which order, what to do.
 export type PrintFailedAlert = {
   orderNumber: string | null;
   orderId: string;
@@ -28,6 +28,18 @@ export type PaymentDiscrepancyAlert = {
   orderTotalCents: number | null;
   gatewayAmountCents: number | null;
   detail: string | null;
+};
+
+/** SPRINT-18.3: the gateway failed in a way that is not a card decline. */
+export type PaymentGatewayFailureAlert = {
+  orderId: string;
+  classification: string | null;
+  internalReason: string | null;
+  gatewayResponseCode: string | null;
+  gatewayOrigin: string | null;
+  gatewayEnvironment: string | null;
+  firstSeenAt: string | null;
+  windowMinutes: number | null;
 };
 
 function orderLabel(orderNumber: string | null, orderId: string): string {
@@ -101,6 +113,36 @@ export function renderPaymentDiscrepancyAlert(
       `Gateway amount cents: ${a.gatewayAmountCents ?? "n/a"}`,
       `Detail: ${a.detail ?? "none"}`,
       "Action: compare the gateway and the order row. Do not mark the order paid from this alert. Run reconciliation and resolve by hand.",
+    ].join("\n"),
+  };
+}
+
+const GATEWAY_FAILURE_ACTION: Record<string, string> = {
+  CONFIGURATION_FAILURE:
+    "Action: the merchant account or its credentials are being refused. Call Merchant Pay Connect support and ask whether the account is active and boarded for e-commerce (card-not-present). Check the NMI_*_LIVE keys on the server.",
+  COMMUNICATION_FAILURE:
+    "Action: the gateway or the card network is not answering reliably. Some of these orders may have been charged — run `pnpm reconcile` before refunding or re-charging anyone.",
+  GATEWAY_FAILURE:
+    "Action: the gateway is rejecting our requests. Check the server logs for payment.outcome lines and contact Merchant Pay Connect support with the response code below.",
+};
+
+export function renderPaymentGatewayFailureAlert(
+  a: PaymentGatewayFailureAlert,
+): { emailSubject: string; emailText: string } {
+  const kind = a.classification ?? "GATEWAY_FAILURE";
+  const window = a.windowMinutes ?? 15;
+  return {
+    emailSubject: `Online payments failing — ${a.internalReason ?? kind}`,
+    emailText: [
+      `Online card payments are failing on the gateway side (${kind}). These are NOT customer card declines — customers are being told payments are temporarily unavailable.`,
+      `This is the only alert for the next ${window} minutes, however many orders fail.`,
+      "",
+      `Reason: ${a.internalReason ?? "unknown"}`,
+      `Gateway response code: ${a.gatewayResponseCode ?? "none (no answer received)"}`,
+      `Gateway: ${a.gatewayOrigin ?? "unknown"} (${a.gatewayEnvironment ?? "unknown"})`,
+      `First failing order id: ${a.orderId}`,
+      `First seen: ${a.firstSeenAt ?? "unknown"}`,
+      GATEWAY_FAILURE_ACTION[kind] ?? GATEWAY_FAILURE_ACTION.GATEWAY_FAILURE,
     ].join("\n"),
   };
 }

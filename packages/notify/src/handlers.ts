@@ -1,4 +1,4 @@
-// SPRINT-7 / SPRINT-17: job handlers — one per declared JobType. Never change order state.
+// SPRINT-7 / SPRINT-17 / SPRINT-18.3: job handlers — one per declared JobType. Never change order state.
 //
 // SMS was removed in Sprint 17. The two SMS job types remain in the JobType enum because it is
 // a PostgreSQL enum with existing rows referencing those values, and dropping them would need a
@@ -20,6 +20,7 @@ import type { NotifyPorts } from "./ports";
 import {
   renderJobDeadAlert,
   renderPaymentDiscrepancyAlert,
+  renderPaymentGatewayFailureAlert,
   renderPrintFailedAlert,
   renderUnackedAlert,
 } from "./templates-alerts";
@@ -289,6 +290,35 @@ export const handleAlertPaymentDiscrepancy: JobHandler = async (job, ports) => {
   );
 };
 
+/** SPRINT-18.3: gateway incident. Raised at most once per window by raisePaymentGatewayIncident. */
+export const handleAlertPaymentGatewayFailure: JobHandler = async (job, ports) => {
+  const p = payloadOf<{
+    orderId?: string;
+    classification?: string | null;
+    internalReason?: string | null;
+    gatewayResponseCode?: string | null;
+    gatewayOrigin?: string | null;
+    gatewayEnvironment?: string | null;
+    firstSeenAt?: string | null;
+    windowMinutes?: number | null;
+  }>(job.payload);
+  if (!p.orderId) throw new PermanentJobError("Payment-gateway alert payload is missing orderId.");
+  return deliverManagerAlert(
+    job,
+    ports,
+    renderPaymentGatewayFailureAlert({
+      orderId: p.orderId,
+      classification: p.classification ?? null,
+      internalReason: p.internalReason ?? null,
+      gatewayResponseCode: p.gatewayResponseCode ?? null,
+      gatewayOrigin: p.gatewayOrigin ?? null,
+      gatewayEnvironment: p.gatewayEnvironment ?? null,
+      firstSeenAt: p.firstSeenAt ?? null,
+      windowMinutes: p.windowMinutes ?? null,
+    }),
+  );
+};
+
 export const JOB_HANDLERS: Record<JobType, JobHandler> = {
   [JobType.SMS_ORDER_CONFIRMATION]: handleSmsOrderConfirmation,
   [JobType.SMS_ORDER_READY]: handleSmsOrderReady,
@@ -298,4 +328,5 @@ export const JOB_HANDLERS: Record<JobType, JobHandler> = {
   [JobType.ALERT_MANAGER_JOB_DEAD]: handleAlertJobDead,
   [JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED]: handleAlertOrderUnacknowledged,
   [JobType.ALERT_MANAGER_PAYMENT_DISCREPANCY]: handleAlertPaymentDiscrepancy,
+  [JobType.ALERT_MANAGER_PAYMENT_GATEWAY_FAILURE]: handleAlertPaymentGatewayFailure,
 };

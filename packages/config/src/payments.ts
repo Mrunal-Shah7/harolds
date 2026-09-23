@@ -1,26 +1,24 @@
-// SPRINT-17: NMI gateway credentials and endpoint selection.
+// SPRINT-17 / SPRINT-18.2: NMI gateway credentials and endpoint selection.
 //
 // The sandbox and live key triples live side by side in .env so switching environments is one
 // variable, not a credential swap. Only the ACTIVE environment's keys are ever read or
 // validated — the inactive triple may legitimately be blank.
 import { env } from "./env";
+import { nmiGatewayUrls, type NmiGatewayUrls } from "./nmi-gateway";
 
-/**
- * Gateway base URLs.
- *
- * These are NOT interchangeable: a sandbox account posting to secure.nmi.com is rejected with
- * "Sandbox accounts must use a sandbox domain", and a live account has no presence on the
- * sandbox host. Verified against the gateway, not inferred from the docs.
+/*
+ * Where requests are addressed is NOT decided here. The gateway host comes from the reseller
+ * (Merchant Pay Connect for this MID), not from NMI, and it is stated once, in `nmi-gateway.ts`.
+ * The sandbox and live gateways are not interchangeable — an account is only accepted by its own
+ * gateway — so the host always follows `NMI_ENVIRONMENT`, together with the key triple.
  */
-export const NMI_SANDBOX_BASE_URL = "https://sandbox.nmi.com/api";
-export const NMI_PRODUCTION_BASE_URL = "https://secure.nmi.com/api";
 
 export type NmiConfig = {
   environment: "sandbox" | "production";
-  baseUrl: string;
+  gateway: NmiGatewayUrls;
   /** Server-side only. Never sent to the browser, never logged. */
   securityKey: string;
-  /** Public — safe to inline in the client bundle for Collect.js. */
+  /** Public — handed to Collect.js in the browser by the checkout layout. */
   tokenizationKey: string;
   /** Server-side only. Verifies inbound webhook signatures. */
   webhookSigningKey: string;
@@ -81,9 +79,32 @@ export function getNmiConfig(): NmiConfig {
 
   return {
     environment,
-    baseUrl: isProduction ? NMI_PRODUCTION_BASE_URL : NMI_SANDBOX_BASE_URL,
+    gateway: nmiGatewayUrls(environment),
     securityKey,
     tokenizationKey,
     webhookSigningKey,
+  };
+}
+
+/** The only NMI values the browser may see: where Collect.js loads from, and the public key. */
+export type NmiBrowserConfig = {
+  collectJsUrl: string;
+  tokenizationKey: string;
+};
+
+/**
+ * Collect.js configuration for the active environment, resolved per request on the server.
+ *
+ * Deliberately does not go through `getNmiConfig`: rendering checkout must not require the
+ * security key, and a blank tokenization key renders "Payments are not configured yet" rather
+ * than crashing the page. A production start already refuses an incomplete triple.
+ */
+export function getNmiBrowserConfig(): NmiBrowserConfig {
+  const environment = env.NMI_ENVIRONMENT;
+  return {
+    collectJsUrl: nmiGatewayUrls(environment).collectJsUrl,
+    tokenizationKey: clean(
+      environment === "production" ? env.NMI_TOKENIZATION_KEY_LIVE : env.NMI_TOKENIZATION_KEY_SANDBOX,
+    ),
   };
 }

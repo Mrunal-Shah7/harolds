@@ -1,4 +1,4 @@
-// SPRINT-2: mock response envelope helpers — same shapes as apps/web/src/lib/api.ts
+// SPRINT-2 / SPRINT-18.3: mock response envelope helpers — same shapes as apps/web/src/lib/api.ts
 import {
   API_CONTRACT_VERSION,
   API_ERROR_STATUS,
@@ -43,6 +43,8 @@ export const FORCE_ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   [ApiErrorCode.INTERNAL_ERROR]: "An unexpected error occurred.",
   [ApiErrorCode.PAYMENT_DECLINED]: "Card was declined.",
   [ApiErrorCode.PAYMENT_FAILED]: "Payment could not be confirmed.",
+  [ApiErrorCode.PAYMENT_UNAVAILABLE]:
+    "Online payments are temporarily unavailable, and nothing was charged. Please try again in a few minutes, or call the store to place your order.",
   [ApiErrorCode.IDEMPOTENCY_CONFLICT]: "Idempotency key conflict.",
   [ApiErrorCode.UNAUTHORIZED]: "Unauthorized.",
 };

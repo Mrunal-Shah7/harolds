@@ -1,4 +1,4 @@
-// SPRINT-8: admin order listing and detail — redacted contacts in lists; full history on detail.
+// SPRINT-8 / SPRINT-18.3: admin order listing and detail — redacted contacts in lists; full history on detail.
 import { DateTime } from "luxon";
 import { OrderStatus, PaymentStatus } from "@harolds/types";
 import { prisma } from "./client";
@@ -87,6 +87,7 @@ export async function getAdminOrderDetail(id: string, timeZone: string) {
         include: { actedBy: { select: { id: true, displayName: true, role: true } } },
       },
       statusEvents: { orderBy: { createdAt: "asc" } },
+      paymentAttempts: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!order) return null;
@@ -196,6 +197,27 @@ export async function getAdminOrderDetail(id: string, timeZone: string) {
       user: e.userId ? (actorById.get(e.userId) ?? null) : null,
       createdAt: e.createdAt.toISOString(),
       createdAtLocal: formatStoreDateTime(e.createdAt, timeZone),
+    })),
+    // SPRINT-18.3: every sale attempt and what the gateway said — enough to diagnose a decline
+    // without the gateway portal. The transaction id is shown redacted like every other payment
+    // id on this screen; the full id is on the row and in the payment.outcome log line.
+    paymentAttempts: order.paymentAttempts.map((a) => ({
+      id: a.id,
+      createdAt: a.createdAt.toISOString(),
+      createdAtLocal: formatStoreDateTime(a.createdAt, timeZone),
+      amountCents: a.amountCents,
+      gatewayEnvironment: a.gatewayEnvironment,
+      gatewayOrigin: a.gatewayOrigin,
+      classification: a.classification,
+      internalReason: a.internalReason,
+      gatewayResponse: a.gatewayResponse,
+      gatewayResponseCode: a.gatewayResponseCode,
+      gatewayResponseText: a.gatewayResponseText,
+      avsResponse: a.avsResponse,
+      cvvResponse: a.cvvResponse,
+      authCode: a.authCode,
+      gatewayTransactionIdRedacted: redactPaymentId(a.gatewayTransactionId),
+      httpStatus: a.httpStatus,
     })),
   };
 }

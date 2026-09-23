@@ -1,4 +1,5 @@
 // SPRINT-17: recovery from an interrupted charge — the branches where money decisions are made.
+// SPRINT-18.3: updated for the ChargePayment argument and the attempt record on every outcome.
 //
 // `claimOrderForCharge` (tested in packages/db) guarantees only ONE request may call the gateway.
 // This file tests what the LOSER does, which is where a double charge would actually happen: it
@@ -20,7 +21,7 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { prisma, claimOrderForCharge } from "@harolds/db";
 import { JobType, OrderStatus, PaymentStatus } from "@harolds/types";
-import type { NormalizedPayment, PaymentOutcome } from "@harolds/payments";
+import type { NormalizedPayment, PaymentAttemptRecord, PaymentOutcome } from "@harolds/payments";
 import {
   chargeExistingPending,
   AmbiguousPaymentReason,
@@ -131,6 +132,30 @@ function gatewaySale(overrides: Partial<NormalizedPayment> = {}): NormalizedPaym
   };
 }
 
+/** SPRINT-18.3: the sale input a checkout request carries. */
+const TEST_PAYMENT = { paymentToken: "tok_test", billingZip: "60633" };
+
+/** SPRINT-18.3: the gateway record every outcome now carries. Content is irrelevant here. */
+function fakeAttempt(
+  classification: PaymentAttemptRecord["classification"],
+  internalReason: string,
+): PaymentAttemptRecord {
+  return {
+    gatewayEnvironment: "sandbox",
+    gatewayOrigin: "https://gateway.test",
+    classification,
+    internalReason,
+    gatewayResponse: null,
+    gatewayResponseCode: null,
+    gatewayResponseText: null,
+    avsResponse: null,
+    cvvResponse: null,
+    authCode: null,
+    gatewayTransactionId: null,
+    httpStatus: null,
+  };
+}
+
 /** Records whether the gateway was contacted at all. */
 function makeDeps(over: Partial<ChargeDeps> & { charged?: string[] } = {}): ChargeDeps {
   const charged = over.charged ?? [];
@@ -144,9 +169,14 @@ function makeDeps(over: Partial<ChargeDeps> & { charged?: string[] } = {}): Char
         status: "completed",
         rawStatus: "100",
         cardLast4: "1111",
+        attempt: fakeAttempt("APPROVED", "APPROVED"),
       } satisfies PaymentOutcome;
     }) as ChargeDeps["createPayment"],
     findPaymentByOrderId: async () => null,
+    // SPRINT-18.3: recording and alerting are exercised in payment-classification.test.ts. Here
+    // they are inert, so these tests stay about the claim and cannot trip the global alert window.
+    recordPaymentAttempt: async () => null,
+    raisePaymentGatewayIncident: async () => false,
     now: () => FUTURE_NOW.getTime(),
     ...over,
   };
@@ -164,7 +194,7 @@ describe("recovery: a claim that may still be live", () => {
 
     const result = await chargeExistingPending(
       order,
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({
         charged,
         findPaymentByOrderId: async () => {
@@ -189,7 +219,7 @@ describe("recovery: a claim that may still be live", () => {
 
     const result = await chargeExistingPending(
       order,
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({
         charged,
         findPaymentByOrderId: async () => {
@@ -212,7 +242,7 @@ describe("recovery: an abandoned claim", () => {
 
     const result = await chargeExistingPending(
       order,
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({ charged, findPaymentByOrderId: async () => null }),
     );
 
@@ -233,7 +263,7 @@ describe("recovery: an abandoned claim", () => {
 
     const result = await chargeExistingPending(
       order,
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({ charged, findPaymentByOrderId: async () => gatewaySale() }),
     );
 
@@ -252,7 +282,7 @@ describe("recovery: an abandoned claim", () => {
 
     const result = await chargeExistingPending(
       order,
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({
         charged,
         findPaymentByOrderId: async () => gatewaySale({ amountCents: TOTAL_CENTS - 100 }),
@@ -280,7 +310,7 @@ describe("recovery: an abandoned claim", () => {
 
     const result = await chargeExistingPending(
       order,
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({
         charged,
         findPaymentByOrderId: async () => gatewaySale({ status: "failed" }),
@@ -306,7 +336,7 @@ describe("a definite decline is reported as a decline, not as an unknown outcome
 
     const result = await chargeExistingPending(
       order,
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({
         charged,
         createPayment: (async (input) => {
@@ -316,6 +346,7 @@ describe("a definite decline is reported as a decline, not as an unknown outcome
             paymentId: "txn_declined",
             reason: "Your card has insufficient funds for this purchase.",
             code: "INSUFFICIENT_FUNDS",
+            attempt: fakeAttempt("DECLINED", "INSUFFICIENT_FUNDS"),
           };
         }) as ChargeDeps["createPayment"],
       }),
@@ -337,13 +368,14 @@ describe("a definite decline is reported as a decline, not as an unknown outcome
     const order = await claimedOrder(AGED);
     await chargeExistingPending(
       order,
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({
         createPayment: (async () => ({
           kind: "declined",
           paymentId: "txn_declined",
           reason: "Your card was declined. Please try a different payment method.",
           code: "CARD_DECLINED",
+          attempt: fakeAttempt("DECLINED", "DO_NOT_HONOR"),
         })) as ChargeDeps["createPayment"],
       }),
     );
@@ -352,7 +384,7 @@ describe("a definite decline is reported as a decline, not as an unknown outcome
       where: { id: order.id },
       include: { lines: true },
     });
-    const replay = await chargeExistingPending(reloaded, "tok_test", makeDeps());
+    const replay = await chargeExistingPending(reloaded, TEST_PAYMENT, makeDeps());
     assert.equal(replay.ok, false);
     if (replay.ok) throw new Error("unreachable");
     assert.equal(replay.code, ApiErrorCode.PAYMENT_DECLINED);
@@ -365,12 +397,13 @@ describe("the ambiguous path says WHY, without claiming to know the outcome", ()
     const order = await claimedOrder(AGED);
     const result = await chargeExistingPending(
       order,
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({
         createPayment: (async () => ({
           kind: "transport_failure",
           message: "Could not reach the payment processor.",
           paymentId: null,
+          attempt: fakeAttempt("COMMUNICATION_FAILURE", "GATEWAY_UNREACHABLE"),
         })) as ChargeDeps["createPayment"],
       }),
     );
@@ -385,7 +418,7 @@ describe("the ambiguous path says WHY, without claiming to know the outcome", ()
 
   it("names a live claim distinctly from a gateway that never answered", async () => {
     const order = await claimedOrder(YOUNG);
-    const result = await chargeExistingPending(order, "tok_test", makeDeps());
+    const result = await chargeExistingPending(order, TEST_PAYMENT, makeDeps());
     assert.equal(result.ok, false);
     if (result.ok) throw new Error("unreachable");
     assert.equal(result.details?.reason, AmbiguousPaymentReason.CHARGE_IN_PROGRESS);
@@ -403,7 +436,7 @@ describe("recovery: an order that no longer needs charging", () => {
 
     const result = await chargeExistingPending(
       { ...order, processorPaymentId: "txn_done" },
-      "tok_test",
+      TEST_PAYMENT,
       makeDeps({ charged }),
     );
 

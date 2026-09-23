@@ -1,7 +1,8 @@
-// SPRINT-2 / SPRINT-3 / SPRINT-4: validate docs/openapi/v1.yaml against published surface
+// SPRINT-2 / SPRINT-3 / SPRINT-4 / SPRINT-18.3: validate docs/openapi/v1.yaml against published surface
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import SwaggerParser from "@apidevtools/swagger-parser";
+import { API_CONTRACT_VERSION } from "@harolds/types";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const specPath = path.join(rootDir, "docs/openapi/v1.yaml");
@@ -35,6 +36,7 @@ const EXPECTED_ERROR_CODES = [
   "INTERNAL_ERROR",
   "PAYMENT_DECLINED",
   "PAYMENT_FAILED",
+  "PAYMENT_UNAVAILABLE",
   "IDEMPOTENCY_CONFLICT",
   "UNAUTHORIZED",
 ] as const;
@@ -82,8 +84,11 @@ async function main(): Promise<void> {
     }
   }
 
-  if (api.info?.version !== "1.2.0") {
-    throw new Error(`Expected info.version "1.2.0", got ${String(api.info?.version)}`);
+  // SPRINT-18.3: compared against the code's own contract constant, not a literal. The literal
+  // was left at 1.2.0 when the contract moved to 1.3.0, and because this check fails first it
+  // silently disabled the drift check that runs after it (since Sprint 17).
+  if (api.info?.version !== API_CONTRACT_VERSION) {
+    throw new Error(`Expected info.version "${API_CONTRACT_VERSION}", got ${String(api.info?.version)}`);
   }
 
   console.log(`OK — ${documented.length} paths, ${codes.length} error codes, version ${api.info?.version}`);

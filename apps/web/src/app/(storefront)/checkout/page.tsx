@@ -1,5 +1,7 @@
 "use client";
 
+// SPRINT-18.3: billing ZIP beside the card fields; declines show the server's customer-safe
+// sentence; PAYMENT_UNAVAILABLE (a gateway incident) is not treated as a decline.
 // Design v1.1 — checkout. A paper band holding the two-column `.co-grid`: contact and tip cards
 // on the left, the order summary card on the right with board leaders in the totals, the quote
 // note, the payment chips and the pay button.
@@ -32,6 +34,7 @@ import { formatCents } from "@/lib/money";
 import { StorefrontHeader } from "@/components/storefront/header";
 import { CartSheet } from "@/components/storefront/cart-sheet";
 import { hasAnyError, validateCheckout, validateCustomTip } from "@/lib/checkout-validation";
+import { normalizeBillingZip } from "@/lib/billing-zip";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { NmiPaymentForm, requestTokenize } from "@/components/storefront/nmi-payment-form";
 
@@ -54,6 +57,12 @@ export default function CheckoutPage() {
   // tolerates it from older clients, but this one has stopped claiming a preference it cannot act on.
 
   const [customTip, setCustomTip] = useState("");
+  /**
+   * SPRINT-18.3: the billing ZIP for AVS. An ordinary input, not a Collect.js field: a postal
+   * code is not cardholder data, so it changes nothing about PCI scope. Sent with the order,
+   * passed to the gateway, and stored nowhere.
+   */
+  const [billingZip, setBillingZip] = useState("");
   /** Whole-order instruction for the kitchen. Sent as CreateOrderRequest.customerNote. */
   const [orderNote, setOrderNote] = useState("");
   /** "Back to cart" reopens the cart as the sheet it is everywhere else, not a separate page. */
@@ -137,7 +146,7 @@ export default function CheckoutPage() {
 
   // Every field is checked on every render so the Pay button and the messages agree about
   // whether the form is submittable. The server re-checks all of it; see checkout-validation.ts.
-  const fieldErrors = validateCheckout({ firstName, lastName, phone, email, customTip, orderNote });
+  const fieldErrors = validateCheckout({ firstName, lastName, phone, email, customTip, orderNote, billingZip });
   const formValid = !hasAnyError(fieldErrors);
   const canSubmitForm = formValid && quote?.orderable;
 
@@ -166,6 +175,7 @@ export default function CheckoutPage() {
         cart,
         customer,
         paymentToken: token,
+        billingZip: normalizeBillingZip(billingZip) ?? undefined,
         idempotencyKey,
         customerNote: note,
       });
@@ -183,10 +193,17 @@ export default function CheckoutPage() {
           // dead order and checkout.ts replays the cached decline forever, trapping the
           // customer. The nonce rotates ONLY here, never on the ambiguous PAYMENT_FAILED path.
           rotateSessionNonce();
+          // SPRINT-18.3: the server's sentence, not a fixed one. It is customer-safe by
+          // construction (never a fraud disposition, never raw gateway text) and it is the only
+          // place a customer learns the expiry or security code was wrong — which they can fix.
           setSubmitError({
-            message: "That card was declined. Try a different card.",
+            message: err.message || "That card was declined. Try a different card.",
             retryable: true,
           });
+        } else if (err.code === "PAYMENT_UNAVAILABLE") {
+          // SPRINT-18.3: the gateway is failing on OUR side. Nothing was charged and nothing is
+          // wrong with the card, so no nonce rotation and no lockout: the same order is retried.
+          setSubmitError({ message: err.message, retryable: true });
         } else if (err.code === "PAYMENT_FAILED") {
           setSubmitError({
             // PAYMENT_FAILED is emitted ONLY on the ambiguous class (transport failure /
@@ -230,6 +247,7 @@ export default function CheckoutPage() {
       email: true,
       customTip: true,
       orderNote: true,
+      billingZip: true,
     });
     if (!canSubmitForm) return;
 
@@ -551,6 +569,31 @@ export default function CheckoutPage() {
                     onError={handleTokenError}
                     disabled={!quote?.orderable}
                   />
+                  {/* SPRINT-18.3: beside the card fields, because it belongs to the card. */}
+                  <div className="field" style={{ marginTop: 12 }}>
+                    <label htmlFor="billing-zip">Billing ZIP code</label>
+                    <input
+                      id="billing-zip"
+                      value={billingZip}
+                      onChange={(e) => setBillingZip(e.target.value)}
+                      onBlur={() => markTouched("billingZip")}
+                      aria-invalid={errorFor("billingZip") ? true : undefined}
+                      aria-describedby={errorFor("billingZip") ? "billing-zip-help billing-zip-err" : "billing-zip-help"}
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="billing postal-code"
+                      maxLength={10}
+                      disabled={!quote?.orderable}
+                    />
+                    <p className="help" id="billing-zip-help">
+                      The ZIP on your card&apos;s statement. Your bank uses it to confirm the card is yours.
+                    </p>
+                    {errorFor("billingZip") ? (
+                      <p className="field-err" id="billing-zip-err" role="alert">
+                        {errorFor("billingZip")}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 

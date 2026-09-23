@@ -1,6 +1,7 @@
-// SPRINT-9: health check fails when the database is down or the worker is stale.
+// SPRINT-9 / SPRINT-18.2: health check fails when the database is down or the worker is stale.
 import assert from "node:assert/strict";
 import { describe, it, afterEach } from "node:test";
+import { activeNmiGateway, env, nmiGatewayUrls } from "@harolds/config";
 import { getHealthSnapshot } from "./health";
 import { markWorkerPass, resetWorkerHeartbeat } from "./worker-heartbeat";
 import { captureException, clearCapturedErrors, recentCapturedErrors } from "./errors";
@@ -35,6 +36,22 @@ describe("health snapshot", () => {
     assert.equal(snap.ok, true);
     assert.equal(snap.checks.database, "up");
     assert.equal(snap.checks.worker, "up");
+  });
+
+  it("reports the gateway and Collect.js URL of the server's own environment", async () => {
+    const original = env.NMI_ENVIRONMENT;
+    try {
+      for (const environment of ["sandbox", "production"] as const) {
+        env.NMI_ENVIRONMENT = environment;
+        const snap = await getHealthSnapshot(new Date(), { databaseUp: async () => true });
+        const expected = nmiGatewayUrls(environment);
+        assert.equal(snap.paymentEnvironment, environment);
+        assert.equal(snap.paymentGatewayOrigin, expected.origin);
+        assert.equal(snap.collectJsUrl, expected.collectJsUrl);
+      }
+    } finally {
+      env.NMI_ENVIRONMENT = original;
+    }
   });
 });
 
@@ -111,7 +128,7 @@ describe("bounded JSON", () => {
 describe("security headers and print auth", () => {
   it("sets CSP, frame options, nosniff, and referrer policy", () => {
     const headers = browserSecurityHeaders({ isHttps: true, isProduction: true });
-    assert.match(headers["Content-Security-Policy"] ?? "", /nmi\.com/);
+    assert.ok((headers["Content-Security-Policy"] ?? "").includes(activeNmiGateway().origin));
     assert.equal(headers["X-Frame-Options"], "DENY");
     assert.equal(headers["X-Content-Type-Options"], "nosniff");
     assert.match(headers["Strict-Transport-Security"] ?? "", /max-age=/);

@@ -1,5 +1,7 @@
 // SPRINT-1: Prisma schema — complete data model for menu, ordering, fulfilment, and operations.
 // Later sprints add rows, not tables. All money is integer US cents (*Cents suffix). No soft deletes.
+// SPRINT-18.3: exception to "rows, not tables" — PaymentAttempt, because an order can see more
+// than one sale attempt and each one's gateway answer must survive the next.
 
 generator client {
   provider = "prisma-client-js"
@@ -71,6 +73,9 @@ enum JobType {
   ALERT_MANAGER_ORDER_UNACKNOWLEDGED
   // SPRINT-4: payment amount mismatch / reconciliation discrepancy
   ALERT_MANAGER_PAYMENT_DISCREPANCY
+  // SPRINT-18.3: the gateway failed in a way that is not a card decline (configuration,
+  // communication, rejected request). One alert per incident window, not one per order.
+  ALERT_MANAGER_PAYMENT_GATEWAY_FAILURE
 }
 
 // SPRINT-2: admin auth roles
@@ -320,6 +325,8 @@ model Order {
   refunds        ProcessorRefund[]
   // SPRINT-6: kitchen status transitions (attribution)
   statusEvents   OrderStatusEvent[]
+  // SPRINT-18.3: one row per sale sent to the gateway, approved or not.
+  paymentAttempts PaymentAttempt[]
 
   // SPRINT-2: uniqueness is (businessDate, orderSequence); orderNumber is indexed for lookup only
   @@unique([businessDate, orderSequence])
@@ -851,4 +858,62 @@ model SeoRouteOverride {
   noindex         Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+/// SPRINT-18.3: what the gateway said about one sale attempt — approved, declined, or failed.
+/// Enough to diagnose a decline without opening the gateway portal, and what is produced if a
+/// charge is disputed. NEVER card data: no PAN, expiry, security code, payment token, and no
+/// billing ZIP (sent to the gateway for AVS and deliberately not kept). Card last four stays on
+/// Order.cardLast4 as before.
+///
+/// There is no processor response code column: Merchant Pay Connect's Payment API does not
+/// return one (docs/SPRINT-18-3-NOTES.md §1). `gatewayResponseText` is the closest it offers.
+model PaymentAttempt {
+  id                   String                       @id @default(cuid())
+  orderId              String
+  createdAt            DateTime                     @default(now())
+  amountCents          Int
+  /// sandbox | production — the NMI_ENVIRONMENT the attempt ran under.
+  gatewayEnvironment   String
+  /// Origin the sale was POSTed to, e.g. the Merchant Pay Connect host.
+  gatewayOrigin        String
+  classification       PaymentAttemptClassification
+  /// What actually happened, in our vocabulary (e.g. DO_NOT_HONOR, MERCHANT_ACCOUNT_INACTIVE).
+  /// Internal only — never shown to a customer.
+  internalReason       String
+  /// Gateway `response`: 1 approved, 2 declined, 3 error. Null when no answer was received.
+  gatewayResponse      String?
+  /// Gateway `response_code` from the Result Code Table (100, 201, 411, ...).
+  gatewayResponseCode  String?
+  /// Gateway `responsetext`, truncated. The gateway's words, not the customer's.
+  gatewayResponseText  String?
+  /// Gateway `avsresponse` (AVS Response Codes table).
+  avsResponse          String?
+  /// Gateway `cvvresponse` (CVV Response Codes table).
+  cvvResponse          String?
+  /// Gateway `authcode` on approvals.
+  authCode             String?
+  /// Gateway `transactionid` — the key for finding this attempt in the gateway portal.
+  gatewayTransactionId String?
+  /// HTTP status when the gateway answered with something other than 200.
+  httpStatus           Int?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([classification, createdAt])
+  @@index([gatewayTransactionId])
+}
+
+/// SPRINT-18.3: a decline is a statement about the customer's card; every other non-approval is
+/// a statement about us, the gateway, or the network, and must never be reported as a decline.
+enum PaymentAttemptClassification {
+  APPROVED
+  DECLINED
+  /// The gateway rejected our request (300, 301 rate limit, 400, 430, 440, 441).
+  GATEWAY_FAILURE
+  /// Merchant account or credential problem (410, 411, 460, missing local credentials).
+  CONFIGURATION_FAILURE
+  /// No usable answer: timeout, network error, non-200, or 420 / 421.
+  COMMUNICATION_FAILURE
 }

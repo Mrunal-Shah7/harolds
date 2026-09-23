@@ -1,27 +1,31 @@
-// SPRINT-4 / SPRINT-17: NMI gateway client — the ONLY module in this repo that speaks to the
+// SPRINT-4 / SPRINT-17 / SPRINT-18.2 / SPRINT-18.3: NMI gateway client — the ONLY module in this repo that speaks to the
 // payment gateway. All callers go through the functions exported here, and nothing about NMI's
 // wire format (form-encoded requests, XML query responses, numeric response codes) escapes it.
-import { env, getNmiConfig } from "@harolds/config";
+import { env, getNmiConfig, nmiGatewayUrls } from "@harolds/config";
 
-import { classifyNmiResult, classifyTransportError, NmiResponse, PaymentClientError } from "./errors";
+import { classifyRefundResult, classifyTransportError, NmiResponse, PaymentClientError } from "./errors";
 import {
   logPaymentAttempt,
   logPaymentOutcome,
   logRefundAttempt,
   logRefundOutcome,
   logTransportFailure,
+  logUnmappedResultCode,
   logWebhookVerification,
 } from "./logger";
 import { fromGatewayAmount, MoneyError, toGatewayAmount } from "./money";
-import type {
-  CreatePaymentInput,
-  NormalizedPayment,
-  NormalizedRefund,
-  PaymentEnvironmentName,
-  PaymentOutcome,
-  RefundOutcome,
-  RefundPaymentInput,
-  VerifyWebhookSignatureInput,
+import { classifySaleResult, CustomerMessage } from "./result-codes";
+import {
+  PaymentDeclineCode,
+  type CreatePaymentInput,
+  type NormalizedPayment,
+  type NormalizedRefund,
+  type PaymentAttemptRecord,
+  type PaymentEnvironmentName,
+  type PaymentOutcome,
+  type RefundOutcome,
+  type RefundPaymentInput,
+  type VerifyWebhookSignatureInput,
 } from "./types";
 
 /**
@@ -78,7 +82,8 @@ async function postToGateway(
 
   const body = new URLSearchParams({ ...params, security_key: config.securityKey });
 
-  const response = await fetch(`${config.baseUrl}/${endpoint}.php`, {
+  const url = endpoint === "query" ? config.gateway.queryUrl : config.gateway.transactUrl;
+  const response = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: body.toString(),
@@ -86,7 +91,7 @@ async function postToGateway(
   });
 
   if (!response.ok) {
-    throw new GatewayTransportError(`Gateway returned HTTP ${response.status}.`);
+    throw new GatewayTransportError(`Gateway returned HTTP ${response.status}.`, response.status);
   }
 
   const text = await response.text();
@@ -95,24 +100,45 @@ async function postToGateway(
 
 /** Internal marker for "the call did not complete" — never leaves this module. */
 class GatewayTransportError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly httpStatus: number | null = null,
+  ) {
     super(message);
     this.name = "GatewayTransportError";
   }
 }
 
+/**
+ * The documented Payment API response fields (Merchant Pay Connect "Transaction Response
+ * Variables": response, responsetext, authcode, transactionid, avsresponse, cvvresponse,
+ * orderid, response_code). There is no processor response code in the Payment API response.
+ */
 function readResult(body: URLSearchParams): {
   response: string;
   responseCode: string;
   responseText: string;
   transactionId: string;
+  avsResponse: string;
+  cvvResponse: string;
+  authCode: string;
 } {
   return {
     response: body.get("response") ?? "",
     responseCode: body.get("response_code") ?? "",
     responseText: body.get("responsetext") ?? "",
     transactionId: body.get("transactionid") ?? "",
+    avsResponse: body.get("avsresponse") ?? "",
+    cvvResponse: body.get("cvvresponse") ?? "",
+    authCode: body.get("authcode") ?? "",
   };
+}
+
+const RESPONSE_TEXT_MAX = 200;
+
+function present(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 /**
@@ -144,79 +170,178 @@ function parseAmountOrThrow(amount: string | null, context: string): number {
   }
 }
 
+/**
+ * Send a sale and report what happened. Never throws for a gateway answer or a transport
+ * failure: every outcome comes back with its `attempt` record, so the caller can persist it.
+ *
+ * SPRINT-18.3: the answer is read through the Merchant Pay Connect Result Code Table
+ * (`result-codes.ts`). Declines, incidents (definitely not processed, not the card's fault) and
+ * ambiguous outcomes (may have charged) are three different kinds, and only the first is ever
+ * reported to a customer as a decline.
+ */
 export async function createPayment(input: CreatePaymentInput): Promise<PaymentOutcome> {
+  const gateway = nmiGatewayUrls(env.NMI_ENVIRONMENT);
+  const blankAttempt: Omit<PaymentAttemptRecord, "classification" | "internalReason"> = {
+    gatewayEnvironment: gateway.environment,
+    gatewayOrigin: gateway.origin,
+    gatewayResponse: null,
+    gatewayResponseCode: null,
+    gatewayResponseText: null,
+    avsResponse: null,
+    cvvResponse: null,
+    authCode: null,
+    gatewayTransactionId: null,
+    httpStatus: null,
+  };
+
   logPaymentAttempt({
     orderId: input.orderId,
     correlationId: input.correlationId,
     amountCents: input.amountCents,
     tokenProvided: Boolean(input.paymentToken),
+    billingZipProvided: Boolean(input.billingZip),
   });
 
   // Amount validation happens before the call so a malformed total can never be sent.
   const amount = toGatewayAmount(input.amountCents);
 
+  const params: Record<string, string> = {
+    type: "sale",
+    payment_token: input.paymentToken,
+    amount,
+    orderid: input.orderId,
+    order_description: `Order ${input.orderReference}`,
+    currency: "USD",
+  };
+  // `zip` is the Payment API's "Card billing zip code". It is what AVS compares; it is never
+  // stored or logged by this system.
+  if (input.billingZip) params.zip = input.billingZip;
+
   let outcome: PaymentOutcome;
   try {
-    const body = (await postToGateway("transact", {
-      type: "sale",
-      payment_token: input.paymentToken,
-      amount,
-      orderid: input.orderId,
-      order_description: `Order ${input.orderReference}`,
-      currency: "USD",
-    })) as URLSearchParams;
-
+    const body = (await postToGateway("transact", params)) as URLSearchParams;
     const result = readResult(body);
+    const read = classifySaleResult(result);
+    if (read.unmapped) {
+      logUnmappedResultCode({
+        orderId: input.orderId,
+        gatewayResponse: result.response || null,
+        gatewayResponseCode: result.responseCode || null,
+        fallbackReason: read.internalReason,
+      });
+    }
 
-    if (result.response === NmiResponse.APPROVED) {
-      if (!result.transactionId) {
-        throw new PaymentClientError("Gateway approved the sale but returned no transaction id.");
-      }
-      outcome = {
-        kind: "succeeded",
-        paymentId: result.transactionId,
-        // Trust the amount WE sent, not an echo: the gateway omits `amount` on some
-        // approvals, and a missing echo must not be read as a different charge.
-        amountCents: input.amountCents,
-        status: "completed",
-        rawStatus: result.responseCode,
-        cardLast4: extractCardLast4(body.get("cc_number")),
-      };
-    } else {
-      const classification = classifyNmiResult(result, "payment");
-      if (classification.outcome === "client_error") {
-        throw classification.error;
-      }
-      outcome =
-        classification.outcome === "declined_payment"
+    const attempt: PaymentAttemptRecord = {
+      ...blankAttempt,
+      classification: read.classification,
+      internalReason: read.internalReason,
+      gatewayResponse: present(result.response),
+      gatewayResponseCode: present(result.responseCode),
+      gatewayResponseText: present(result.responseText)?.slice(0, RESPONSE_TEXT_MAX) ?? null,
+      avsResponse: present(result.avsResponse),
+      cvvResponse: present(result.cvvResponse),
+      authCode: present(result.authCode),
+      gatewayTransactionId: present(result.transactionId),
+    };
+
+    switch (read.handling) {
+      case "approved":
+        outcome = result.transactionId
           ? {
-              kind: "declined",
-              // A decline can still carry a transaction id; keep it so the failure is traceable.
-              paymentId: result.transactionId || null,
-              reason: classification.reason,
-              code: classification.code,
+              kind: "succeeded",
+              paymentId: result.transactionId,
+              // Trust the amount WE sent, not an echo: the gateway omits `amount` on some
+              // approvals, and a missing echo must not be read as a different charge.
+              amountCents: input.amountCents,
+              status: "completed",
+              rawStatus: result.responseCode,
+              cardLast4: extractCardLast4(body.get("cc_number")),
+              attempt,
             }
           : {
+              // Approved with no id to point at: money may have moved and we cannot say where.
               kind: "transport_failure",
-              message: classification.message,
-              paymentId: result.transactionId || null,
+              message: "Gateway approved the sale but returned no transaction id.",
+              paymentId: null,
+              attempt: { ...attempt, classification: "GATEWAY_FAILURE", internalReason: "APPROVED_WITHOUT_TRANSACTION_ID" },
             };
+        break;
+      case "decline":
+        outcome = {
+          kind: "declined",
+          // A decline can still carry a transaction id; keep it so the failure is traceable.
+          paymentId: result.transactionId || null,
+          reason: CustomerMessage[read.customerMessage],
+          code: read.declineCode ?? PaymentDeclineCode.GENERIC_DECLINE,
+          attempt,
+        };
+        break;
+      case "incident":
+        outcome = { kind: "unavailable", message: CustomerMessage.PAYMENTS_UNAVAILABLE, attempt };
+        break;
+      case "ambiguous":
+        outcome = {
+          kind: "transport_failure",
+          message: "The payment processor request could not be confirmed.",
+          paymentId: result.transactionId || null,
+          attempt,
+        };
+        break;
     }
   } catch (err) {
-    if (err instanceof PaymentClientError) throw err;
-    const classification = classifyTransportError(err);
-    outcome = { kind: "transport_failure", message: classification.message, paymentId: null };
+    if (err instanceof PaymentClientError) {
+      // Only thrown before anything is sent: the active credential triple is incomplete.
+      outcome = {
+        kind: "unavailable",
+        message: CustomerMessage.PAYMENTS_UNAVAILABLE,
+        attempt: { ...blankAttempt, classification: "CONFIGURATION_FAILURE", internalReason: "LOCAL_CREDENTIALS_MISSING" },
+      };
+    } else if (err instanceof GatewayTransportError && err.httpStatus === 429) {
+      // Merchant Pay Connect "System-Wide Rate Limit": HTTP 429, the request was not processed.
+      outcome = {
+        kind: "unavailable",
+        message: CustomerMessage.PAYMENTS_UNAVAILABLE,
+        attempt: { ...blankAttempt, classification: "GATEWAY_FAILURE", internalReason: "RATE_LIMITED_HTTP_429", httpStatus: 429 },
+      };
+    } else {
+      const classification = classifyTransportError(err);
+      const httpStatus = err instanceof GatewayTransportError ? err.httpStatus : null;
+      const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+      outcome = {
+        kind: "transport_failure",
+        message: classification.message,
+        paymentId: null,
+        attempt: {
+          ...blankAttempt,
+          classification: "COMMUNICATION_FAILURE",
+          internalReason: httpStatus ? `GATEWAY_HTTP_${httpStatus}` : timedOut ? "GATEWAY_TIMEOUT" : "GATEWAY_UNREACHABLE",
+          httpStatus,
+        },
+      };
+    }
   }
 
   if (outcome.kind === "transport_failure") {
     logTransportFailure({ operation: "createPayment", message: outcome.message, paymentId: outcome.paymentId });
   }
+  const a = outcome.attempt;
   logPaymentOutcome({
     orderId: input.orderId,
+    orderReference: input.orderReference,
     correlationId: input.correlationId,
     amountCents: input.amountCents,
     outcomeKind: outcome.kind,
-    paymentId: outcome.paymentId,
+    paymentId: outcome.kind === "unavailable" ? null : outcome.paymentId,
+    gatewayEnvironment: a.gatewayEnvironment,
+    gatewayOrigin: a.gatewayOrigin,
+    classification: a.classification,
+    internalReason: a.internalReason,
+    gatewayResponse: a.gatewayResponse,
+    gatewayResponseCode: a.gatewayResponseCode,
+    gatewayResponseText: a.gatewayResponseText,
+    avsResult: a.avsResponse,
+    securityCodeResult: a.cvvResponse,
+    httpStatus: a.httpStatus,
   });
   return outcome;
 }
@@ -337,7 +462,7 @@ export async function refundPayment(input: RefundPaymentInput): Promise<RefundOu
         status: useVoid ? "voided" : "completed",
       };
     } else {
-      const classification = classifyNmiResult(result, "refund");
+      const classification = classifyRefundResult(result);
       if (classification.outcome === "client_error") {
         throw classification.error;
       }
@@ -393,40 +518,60 @@ export async function getRefund(refundId: string): Promise<NormalizedRefund | nu
 }
 
 /**
- * Verify an NMI webhook signature over the RAW request body.
+ * Verify an NMI webhook signature over the RAW request bytes.
  *
- * NMI signs `<timestamp>.<raw body>` with HMAC-SHA256 under the account's webhook signing
- * key and sends `webhook-signature: t=<timestamp>,s=<hex digest>`. The body must be the
- * exact bytes received — re-serialising the parsed JSON changes the digest.
+ * NMI signs `<nonce>.<raw body>` with HMAC-SHA256 under the account's webhook signing key and
+ * sends `webhook-signature: t=<nonce>,s=<hex digest>`. The body is HMAC'd as the exact bytes
+ * received — never a decoded string, never re-serialised JSON — because either changes the digest.
+ *
+ * `t` is a random per-delivery NONCE, not a timestamp (NMI's own verification example names it
+ * `$nonce`), so there is no clock to check it against: a "stale timestamp" window would reject
+ * every real delivery. Replays are absorbed by `event_id` dedupe in the webhook handler.
  */
 export async function verifyWebhookSignature(input: VerifyWebhookSignatureInput): Promise<boolean> {
   const { createHmac, timingSafeEqual } = await import("node:crypto");
   const config = getNmiConfig();
-  const rawBody = typeof input.body === "string" ? input.body : input.body.toString("utf8");
 
+  const segments = input.signatureHeader.split(",");
   const parts = new Map<string, string>();
-  for (const segment of input.signatureHeader.split(",")) {
+  for (const segment of segments) {
     const [key, ...rest] = segment.trim().split("=");
     if (key && rest.length > 0) parts.set(key, rest.join("="));
   }
 
-  const timestamp = parts.get("t");
+  const nonce = parts.get("t");
   const provided = parts.get("s");
-  let isValid = false;
+  let failure: WebhookVerificationFailure | null = null;
 
-  if (timestamp && provided) {
+  if (!nonce || !provided) {
+    failure = "malformed_header";
+  } else {
     const expected = createHmac("sha256", config.webhookSigningKey)
-      .update(`${timestamp}.${rawBody}`)
+      .update(`${nonce}.`, "utf8")
+      .update(input.body)
       .digest("hex");
     const expectedBuf = Buffer.from(expected, "utf8");
     const providedBuf = Buffer.from(provided, "utf8");
     // Compare in constant time, and only when lengths match — timingSafeEqual throws otherwise.
-    isValid = expectedBuf.length === providedBuf.length && timingSafeEqual(expectedBuf, providedBuf);
+    if (expectedBuf.length !== providedBuf.length) failure = "digest_length_mismatch";
+    else if (!timingSafeEqual(expectedBuf, providedBuf)) failure = "digest_mismatch";
   }
 
-  logWebhookVerification({ valid: isValid });
-  return isValid;
+  // Shapes and sizes only — never the header, the nonce, the digest, the key, or the body.
+  logWebhookVerification({
+    valid: failure === null,
+    reason: failure ?? "verified",
+    gatewayEnvironment: config.environment,
+    bodyBytes: input.body.byteLength,
+    headerSegments: segments.length,
+    nonceChars: nonce?.length ?? 0,
+    digestChars: provided?.length ?? 0,
+    digestIsHex: provided ? /^[0-9a-f]+$/i.test(provided) : false,
+  });
+  return failure === null;
 }
+
+type WebhookVerificationFailure = "malformed_header" | "digest_length_mismatch" | "digest_mismatch";
 
 // ─── query.php XML ───────────────────────────────────────────────────────────
 // query.php is the one NMI endpoint that answers in XML rather than form encoding. The

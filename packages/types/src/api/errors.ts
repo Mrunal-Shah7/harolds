@@ -1,4 +1,4 @@
-// SPRINT-4: API error codes — stable machine-readable identifiers; part of the frozen contract.
+// SPRINT-4 / SPRINT-18.3: API error codes — stable machine-readable identifiers; part of the frozen contract.
 export const ApiErrorCode = {
   NOT_FOUND: "NOT_FOUND",
   VALIDATION_ERROR: "VALIDATION_ERROR",
@@ -10,6 +10,12 @@ export const ApiErrorCode = {
   PAYMENT_DECLINED: "PAYMENT_DECLINED",
   /** Payment could not be confirmed (transport / unknown). Customer must not blindly retry. */
   PAYMENT_FAILED: "PAYMENT_FAILED",
+  /**
+   * SPRINT-18.3 (additive): the gateway definitely did not process the sale because of a problem
+   * on OUR side — merchant configuration, a rejected request, a processor error. Not a decline:
+   * nothing is wrong with the card, nothing was charged, and the same checkout may be retried.
+   */
+  PAYMENT_UNAVAILABLE: "PAYMENT_UNAVAILABLE",
   /** Same client idempotency key reused with a different cart. */
   IDEMPOTENCY_CONFLICT: "IDEMPOTENCY_CONFLICT",
   /** Webhook signature verification failed. */
@@ -28,6 +34,7 @@ export const API_ERROR_STATUS: Record<ApiErrorCode, number> = {
   INTERNAL_ERROR: 500,
   PAYMENT_DECLINED: 402,
   PAYMENT_FAILED: 502,
+  PAYMENT_UNAVAILABLE: 503,
   IDEMPOTENCY_CONFLICT: 409,
   UNAUTHORIZED: 401,
 };

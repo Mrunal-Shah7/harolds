@@ -1,13 +1,14 @@
 // SPRINT-11 / SPRINT-17: one structured startup line — what this instance can actually do.
 // `smsConfigured` is gone: SMS was removed, so email is the only notification channel and
 // `emailConfigured` false now means customers get NO confirmation and alerts go nowhere.
-// SPRINT-12 / SPRINT-17: include Collect.js client-build identifier presence.
+// SPRINT-12 / SPRINT-17 / SPRINT-18.2: include the Collect.js URL this instance will serve and
+// whether the active tokenization key is set (resolved per request; nothing is build-time now).
 import {
   emitLog,
   env,
+  getNmiBrowserConfig,
   getPrinterConfig,
   managerDestinationProblems,
-  publicPaymentIdsPresentAtBuild,
 } from "@harolds/config";
 import { getStoreConfig } from "@harolds/db";
 import { getPaymentEnvironment } from "@harolds/payments";
@@ -38,14 +39,15 @@ export async function runStartupChecks(): Promise<void> {
   }
 
   const printers = getPrinterConfig();
-  const paymentClientIdsAtBuild = publicPaymentIdsPresentAtBuild(process.env);
+  const collectJs = getNmiBrowserConfig();
   emitLog(
     "info",
     "app.startup_summary",
     {
       nodeEnv: env.NODE_ENV,
       paymentEnvironment: getPaymentEnvironment(),
-      paymentClientIdsAtBuild,
+      collectJsUrl: collectJs.collectJsUrl,
+      collectJsKeyConfigured: collectJs.tokenizationKey.length > 0,
       emailConfigured: configured(env.EMAIL_API_KEY) && configured(env.EMAIL_FROM_ADDRESS),
       alertingConfigured,
       alertingDetail,

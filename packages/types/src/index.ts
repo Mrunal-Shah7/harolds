@@ -1,4 +1,4 @@
-// SPRINT-1: shared domain enums and types re-exported for non-database consumers.
+// SPRINT-1 / SPRINT-18.3: shared domain enums and types re-exported for non-database consumers.
 // Values mirror the Prisma schema enums exactly so application code never imports the DB client for types.
 
 export const OrderStatus = {
@@ -61,6 +61,8 @@ export const JobType = {
   ALERT_MANAGER_JOB_DEAD: "ALERT_MANAGER_JOB_DEAD",
   ALERT_MANAGER_ORDER_UNACKNOWLEDGED: "ALERT_MANAGER_ORDER_UNACKNOWLEDGED",
   ALERT_MANAGER_PAYMENT_DISCREPANCY: "ALERT_MANAGER_PAYMENT_DISCREPANCY",
+  // SPRINT-18.3: gateway configuration / communication / rejection — an incident, not a decline.
+  ALERT_MANAGER_PAYMENT_GATEWAY_FAILURE: "ALERT_MANAGER_PAYMENT_GATEWAY_FAILURE",
 } as const;
 export type JobType = (typeof JobType)[keyof typeof JobType];
 
@@ -74,6 +76,7 @@ export const ALL_JOB_TYPES = [
   JobType.ALERT_MANAGER_JOB_DEAD,
   JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED,
   JobType.ALERT_MANAGER_PAYMENT_DISCREPANCY,
+  JobType.ALERT_MANAGER_PAYMENT_GATEWAY_FAILURE,
 ] as const satisfies readonly JobType[];
 
 export const MANAGER_ALERT_JOB_TYPES = [
@@ -81,6 +84,7 @@ export const MANAGER_ALERT_JOB_TYPES = [
   JobType.ALERT_MANAGER_JOB_DEAD,
   JobType.ALERT_MANAGER_ORDER_UNACKNOWLEDGED,
   JobType.ALERT_MANAGER_PAYMENT_DISCREPANCY,
+  JobType.ALERT_MANAGER_PAYMENT_GATEWAY_FAILURE,
 ] as const satisfies readonly JobType[];
 
 export function isManagerAlertJobType(type: string): boolean {

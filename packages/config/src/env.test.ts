@@ -1,4 +1,4 @@
-// SPRINT-5: printer configuration is required — the app must refuse to start without it
+// SPRINT-5 / SPRINT-18.2: printer configuration is required — the app must refuse to start without it
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";
@@ -90,26 +90,77 @@ describe("parseEnv production provider requirements", () => {
         EMAIL_API_KEY: "re_x",
         EMAIL_FROM_ADDRESS: "orders@example.com",
         PRINTER_SDP_SHARED_SECRET: "a".repeat(32),
-        NEXT_PUBLIC_NMI_TOKENIZATION_KEY: "sandbox-tokenization-key",
-        NEXT_PUBLIC_NMI_ENVIRONMENT: "sandbox",
       }),
     );
     assert.equal(env.NODE_ENV, "production");
   });
 
-  it("refuses production start when the public Collect.js key is missing", () => {
-    assert.throws(
-      () =>
-        parseEnv(
-          baseEnv({
-            NODE_ENV: "production",
-            EMAIL_API_KEY: "re_x",
-            EMAIL_FROM_ADDRESS: "orders@example.com",
-            PRINTER_SDP_SHARED_SECRET: "a".repeat(32),
-          }),
-        ),
-      /NEXT_PUBLIC_NMI_TOKENIZATION_KEY/,
+  // SPRINT-18.2: the Collect.js key is the ACTIVE triple's tokenization key, resolved per request.
+  // There is no NEXT_PUBLIC_ copy to be missing, stale, or different.
+  const productionReady = {
+    NODE_ENV: "production",
+    EMAIL_API_KEY: "re_x",
+    EMAIL_FROM_ADDRESS: "orders@example.com",
+    PRINTER_SDP_SHARED_SECRET: "a".repeat(32),
+  };
+
+  it("starts in production on the live gateway with only the live triple set", () => {
+    const env = parseEnv(
+      baseEnv({
+        ...productionReady,
+        NMI_ENVIRONMENT: "production",
+        NMI_SECURITY_KEY_SANDBOX: undefined,
+        NMI_TOKENIZATION_KEY_SANDBOX: undefined,
+        NMI_WEBHOOK_SIGNING_KEY_SANDBOX: undefined,
+        NMI_SECURITY_KEY_LIVE: "live-security-key",
+        NMI_TOKENIZATION_KEY_LIVE: "live-tokenization-key",
+        NMI_WEBHOOK_SIGNING_KEY_LIVE: "live-signing-key",
+      }),
     );
+    assert.equal(env.NMI_ENVIRONMENT, "production");
+  });
+
+  it("refuses production start when the active tokenization key is missing", () => {
+    assert.throws(
+      () => parseEnv(baseEnv({ ...productionReady, NMI_TOKENIZATION_KEY_SANDBOX: "" })),
+      /NMI_TOKENIZATION_KEY_SANDBOX: required in production/,
+    );
+  });
+
+  it("names variables, never values, when the live triple is incomplete", () => {
+    const sentinel = "SENTINEL-CREDENTIAL-VALUE";
+    try {
+      parseEnv(
+        baseEnv({
+          ...productionReady,
+          NMI_ENVIRONMENT: "production",
+          NMI_SECURITY_KEY_LIVE: sentinel,
+          NMI_TOKENIZATION_KEY_LIVE: sentinel,
+          NMI_WEBHOOK_SIGNING_KEY_LIVE: "",
+          NMI_SECURITY_KEY_SANDBOX: sentinel,
+        }),
+      );
+      assert.fail("expected throw");
+    } catch (err) {
+      const text = (err as Error).message;
+      assert.match(text, /NMI_WEBHOOK_SIGNING_KEY_LIVE/);
+      assert.equal(text.includes(sentinel), false);
+    }
+  });
+
+  it("refuses an unrecognised NMI_ENVIRONMENT instead of falling through to sandbox", () => {
+    for (const value of ["Production", "live", " production"]) {
+      assert.throws(() => parseEnv(baseEnv({ NMI_ENVIRONMENT: value })), /NMI_ENVIRONMENT/);
+    }
+  });
+
+  it("does not read the retired NEXT_PUBLIC_NMI_* variables", () => {
+    const env = parseEnv(
+      baseEnv({ NEXT_PUBLIC_NMI_ENVIRONMENT: "production", NEXT_PUBLIC_NMI_TOKENIZATION_KEY: "stale" }),
+    ) as Record<string, unknown>;
+    assert.equal("NEXT_PUBLIC_NMI_ENVIRONMENT" in env, false);
+    assert.equal("NEXT_PUBLIC_NMI_TOKENIZATION_KEY" in env, false);
+    assert.equal(env.NMI_ENVIRONMENT, "sandbox");
   });
 
   it("skips production provider guards when compiling (next build sets NEXT_PHASE)", () => {

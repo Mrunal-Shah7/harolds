@@ -1,6 +1,6 @@
 "use client";
 
-// SPRINT-8: admin application shell and screens — role nav, dense tables, confirmation.
+// SPRINT-8 / SPRINT-18.3: admin application shell and screens — role nav, dense tables, confirmation.
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -1682,6 +1682,39 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
                     : ""}
                 </td>
                 <td className="adm-money">{money(Number(line.lineTotalCents))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {/* SPRINT-18.3: what the gateway said about every sale attempt, so a decline can be
+          diagnosed here without the gateway portal. "Declined" is about the card; anything
+          else is an incident on our side, the gateway's, or the network's. */}
+      <h2>Payment attempts</h2>
+      <div className="adm-table-wrap">
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>When</th><th>Result</th><th>Reason</th><th>Gateway code</th><th>Gateway text</th>
+              <th>AVS</th><th>CVV</th><th>Auth</th><th>Transaction</th><th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {((order.paymentAttempts as Array<Record<string, unknown>>) ?? []).map((a) => (
+              <tr key={String(a.id)}>
+                <td>{String(a.createdAtLocal)}</td>
+                <td>{String(a.classification)}</td>
+                <td>{String(a.internalReason)}</td>
+                <td>
+                  {a.gatewayResponseCode ? String(a.gatewayResponseCode) : "—"}
+                  {a.httpStatus ? ` (HTTP ${String(a.httpStatus)})` : ""}
+                </td>
+                <td>{a.gatewayResponseText ? String(a.gatewayResponseText) : "—"}</td>
+                <td>{a.avsResponse ? String(a.avsResponse) : "—"}</td>
+                <td>{a.cvvResponse ? String(a.cvvResponse) : "—"}</td>
+                <td>{a.authCode ? String(a.authCode) : "—"}</td>
+                <td>{a.gatewayTransactionIdRedacted ? String(a.gatewayTransactionIdRedacted) : "—"}</td>
+                <td className="adm-money">{money(Number(a.amountCents))}</td>
               </tr>
             ))}
           </tbody>

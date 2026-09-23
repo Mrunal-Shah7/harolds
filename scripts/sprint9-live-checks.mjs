@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPRINT-9: live printer-rate poll + webhook burst + header/health checks against a running server.
+// SPRINT-9 / SPRINT-18.2: live printer-rate poll + webhook burst + header/health checks against a running server.
 const base = process.env.APP_BASE_URL || "http://127.0.0.1:3000";
 const secret = process.env.PRINTER_SDP_SHARED_SECRET;
 if (!secret) {
@@ -23,7 +23,7 @@ async function waitForUp() {
 
 const health = await waitForUp();
 const healthJson = await health.json();
-console.log(`health status=${health.status} ok=${healthJson.data?.ok} db=${healthJson.data?.checks?.database} worker=${healthJson.data?.checks?.worker} gateway=${healthJson.data?.paymentEnvironment}`);
+console.log(`health status=${health.status} ok=${healthJson.data?.ok} db=${healthJson.data?.checks?.database} worker=${healthJson.data?.checks?.worker} gateway=${healthJson.data?.paymentEnvironment} collectJs=${healthJson.data?.collectJsUrl}`);
 
 const home = await fetch(`${base}/`);
 const csp = home.headers.get("content-security-policy") ?? "";
@@ -31,7 +31,18 @@ const frame = home.headers.get("x-frame-options");
 const nosniff = home.headers.get("x-content-type-options");
 const cors = home.headers.get("access-control-allow-origin");
 const reqId = home.headers.get("x-request-id");
-console.log(`headers cspGateway=${csp.includes("nmi.com")} frame=${frame} nosniff=${nosniff} cors=${cors ?? "none"} requestId=${Boolean(reqId)}`);
+// SPRINT-18.2: the expected gateway comes from health, not a literal here — the host is stated
+// once, in packages/config/src/nmi-gateway.ts. Every directive Collect.js needs must allow it.
+const gatewayOrigin = healthJson.data?.paymentGatewayOrigin ?? "";
+const directivesWithGateway = ["script-src", "style-src", "frame-src", "connect-src"].filter((name) =>
+  csp.split(";").some((d) => d.trim().startsWith(`${name} `) && d.split(/\s+/).includes(gatewayOrigin)),
+);
+const cspGateway = gatewayOrigin.length > 0 && directivesWithGateway.length === 4;
+console.log(`headers cspGateway=${cspGateway} gatewayOrigin=${gatewayOrigin || "missing"} frame=${frame} nosniff=${nosniff} cors=${cors ?? "none"} requestId=${Boolean(reqId)}`);
+if (!cspGateway) {
+  console.error(`CSP does not allow the active gateway on every Collect.js directive (has: ${directivesWithGateway.join(",") || "none"})`);
+  process.exit(1);
+}
 
 const menu = await fetch(`${base}/api/v1/menu`);
 console.log(`menu status=${menu.status}`);

@@ -1,4 +1,4 @@
-# SPRINT-2 / SPRINT-3 / SPRINT-12: Harold's Chicken Oak Lawn — public Menu + Store Status + Quote API (v1)
+# SPRINT-2 / SPRINT-3 / SPRINT-12 / SPRINT-18.2 / SPRINT-18.3: Harold's Chicken Oak Lawn — public Menu + Store Status + Quote API (v1)
 # Contract version 1.3.0 — additive extension of 1.2.0 (images, announcements, closed reason).
 openapi: 3.0.3
 info:
@@ -697,7 +697,7 @@ paths:
       summary: NMI webhook receiver (NOT storefront)
       description: |
         NMI only. Verifies the HMAC-SHA256 `webhook-signature` header over the raw body
-        (signed as `<timestamp>.<body>`). Exactly-once by event id. A backstop rather than the
+        (signed as `<nonce>.<body>`, verified over the raw bytes). Exactly-once by event id. A backstop rather than the
         primary path to PAID — the sale's outcome is already known synchronously at checkout.
       operationId: postNmiWebhook
       responses:
@@ -717,6 +717,9 @@ paths:
             Process, database, and worker are up.
             `data.ok` is true. `data.paymentEnvironment` is `sandbox` or `production`.
             Additive Sprint 9 fields: `data.checks.database`, `data.checks.worker`, `data.worker.lastPassAt`.
+            Additive Sprint 18.2 fields: `data.paymentGatewayOrigin` (origin the gateway APIs are
+            called on) and `data.collectJsUrl` (the Collect.js URL `/checkout` renders), both
+            resolved from the same `NMI_ENVIRONMENT` as `data.paymentEnvironment`.
         '503':
           description: |
             Additive Sprint 9 — process is reachable but a dependency is down
@@ -837,6 +840,10 @@ components:
         - INTERNAL_ERROR
         - PAYMENT_DECLINED
         - PAYMENT_FAILED
+        # SPRINT-18.3 (additive): HTTP 503. The gateway definitely did not process the sale,
+        # for a reason on our side (merchant configuration, rejected request, processor error).
+        # Not a decline; nothing was charged; the same checkout may be retried.
+        - PAYMENT_UNAVAILABLE
         - IDEMPOTENCY_CONFLICT
         - UNAUTHORIZED
 
@@ -1438,5 +1445,10 @@ components:
             # compatibility, never read or stored. Omit it in new clients.
             smsConsent: { type: boolean, deprecated: true }
         paymentToken: { type: string }
+        # SPRINT-18.3 (additive): ZIP on the card's billing statement, sent to the gateway for
+        # AVS and never stored. Five digits or ZIP+4; the server keeps the first five.
+        billingZip:
+          type: string
+          example: "60633-1234"
         idempotencyKey: { type: string }
         customerNote: { type: string, nullable: true }

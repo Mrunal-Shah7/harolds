@@ -1,4 +1,4 @@
-// SPRINT-1 / SPRINT-5: config package public exports
+// SPRINT-1 / SPRINT-5 / SPRINT-18.2: config package public exports
 export { env, parseEnv, type Env } from "./env";
 export { getPrinterConfig, isKnownPrinterSerial, type PrinterConfig } from "./printers";
 export {
@@ -52,15 +52,15 @@ export {
   isPlaceholderManagerEmail,
 } from "./production-guards";
 export {
-  assertPublicPaymentIdentifiersForBuild,
-  missingPublicPaymentIdentifiers,
-  publicPaymentIdsPresentAtBuild,
-  type PublicPaymentsEnv,
-} from "./payments-public";
-export {
   getNmiConfig,
+  getNmiBrowserConfig,
   missingNmiCredentials,
-  NMI_SANDBOX_BASE_URL,
-  NMI_PRODUCTION_BASE_URL,
   type NmiConfig,
+  type NmiBrowserConfig,
 } from "./payments";
+export {
+  activeNmiGateway,
+  nmiGatewayUrls,
+  type NmiEnvironment,
+  type NmiGatewayUrls,
+} from "./nmi-gateway";

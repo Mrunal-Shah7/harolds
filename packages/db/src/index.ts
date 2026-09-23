@@ -1,4 +1,4 @@
-// SPRINT-1 / SPRINT-2: database package public surface
+// SPRINT-1 / SPRINT-2 / SPRINT-18.3: database package public surface
 export { prisma, PrismaClient } from "./client";
 export * from "./generated/prisma";
 export { getStoreConfig, invalidateStoreConfigCache } from "./store-config";
@@ -104,6 +104,14 @@ export {
 export type { PrintSweepConfig, PrintQueueReport, CompletionResult } from "./print-jobs";
 export { runReconciliation, sweepAbandonedOrders } from "./reconcile";
 export type { ReconcileFinding, GatewayPaymentProbe } from "./reconcile";
+// SPRINT-18.3: per-attempt gateway record and the rate-limited gateway incident alert
+export {
+  recordPaymentAttempt,
+  raisePaymentGatewayIncident,
+  listPaymentAttempts,
+  PAYMENT_GATEWAY_ALERT_WINDOW_MS,
+} from "./payment-attempts";
+export type { PaymentAttemptInput, PaymentAttemptClassificationValue } from "./payment-attempts";
 
 // SPRINT-6: kitchen display — PIN auth, order status machine, queue, unacked alerts
 export {
