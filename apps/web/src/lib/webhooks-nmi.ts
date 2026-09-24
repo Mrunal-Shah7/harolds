@@ -9,6 +9,7 @@ import { JobType, JobStatus, OrderStatus, PaymentStatus } from "@harolds/types";
 import { emitLog, getPrinterConfig } from "@harolds/config";
 import {
   prisma,
+  bookRefundFromProcessor,
   findOrderByProcessorPaymentId,
   markOrderPaidAndAllocate,
   markOrderPaymentFailed,
@@ -226,24 +227,15 @@ async function reconcileRefundEvent(
     return { outcome: "AMOUNT_UNREADABLE", orderId: order.id };
   }
 
-  const nextRefunded = Math.min(order.totalCents, order.refundedCents + amountCents);
-  const fully = nextRefunded >= order.totalCents;
-
-  await prisma.order.update({
-    where: { id: order.id },
-    data: {
-      refundedCents: nextRefunded,
-      paymentStatus: fully ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED,
-      status: fully ? OrderStatus.REFUNDED : order.status,
-    },
+  const booked = await bookRefundFromProcessor({
+    orderId: order.id,
+    amountCents,
+    processorRefundId: refundTransactionId,
   });
-
-  await prisma.processorRefund.updateMany({
-    where: { processorRefundId: refundTransactionId },
-    data: { status: "COMPLETED" },
-  });
-
-  return { outcome: fully ? "FULLY_REFUNDED" : "PARTIAL_REFUND", orderId: order.id };
+  if (!booked.applied) {
+    return { outcome: "ALREADY_APPLIED", orderId: order.id };
+  }
+  return { outcome: booked.fully ? "FULLY_REFUNDED" : "PARTIAL_REFUND", orderId: order.id };
 }
 
 /** Parse a gateway decimal-dollar amount ("-12.34", "12.34", 12.34) into whole cents. */

@@ -8,7 +8,7 @@ loadDotenv({ path: path.join(rootDir, ".env") });
 
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { JobType, OrderStatus, PaymentStatus } from "@harolds/types";
+import { OrderStatus, PaymentStatus } from "@harolds/types";
 import { prisma } from "./client";
 import {
   applyAutomaticPrintTransition,

@@ -4,6 +4,7 @@ import { OrderStatus, PaymentStatus } from "@harolds/types";
 import { prisma } from "./client";
 import { maskName, redactEmail, redactPaymentId, redactPhone } from "./admin-redact";
 import { AdminValidationError } from "./admin-menu";
+import { remainingAfterReservation, reservedRefundCentsByOrderIds } from "./refunds";
 
 export type AdminOrderListQuery = {
   from: Date;
@@ -57,8 +58,10 @@ export async function listAdminOrders(query: AdminOrderListQuery) {
     },
   });
 
+  const reservedByOrder = await reservedRefundCentsByOrderIds(rows.map((row) => row.id));
   return rows.map((row) => {
     const name = maskName(row.customerFirstName, row.customerLastName);
+    const reservedCents = reservedByOrder.get(row.id) ?? 0;
     return {
       id: row.id,
       orderNumber: row.orderNumber,
@@ -69,7 +72,8 @@ export async function listAdminOrders(query: AdminOrderListQuery) {
       paymentStatus: row.paymentStatus,
       totalCents: row.totalCents,
       refundedCents: row.refundedCents,
-      remainingRefundableCents: row.totalCents - row.refundedCents,
+      reservedRefundCents: reservedCents,
+      remainingRefundableCents: remainingAfterReservation(row.totalCents, row.refundedCents, reservedCents),
       createdAt: row.createdAt.toISOString(),
       paidAt: row.paidAt?.toISOString() ?? null,
     };
@@ -116,6 +120,9 @@ export async function getAdminOrderDetail(id: string, timeZone: string) {
           select: { id: true, displayName: true, role: true },
         });
   const actorById = new Map(actors.map((a) => [a.id, a]));
+  const reservedCents = order.refunds
+    .filter((r) => r.status === "PENDING" || r.status === "UNKNOWN")
+    .reduce((sum, r) => sum + r.amountCents, 0);
 
   return {
     id: order.id,
@@ -133,7 +140,8 @@ export async function getAdminOrderDetail(id: string, timeZone: string) {
     tipCents: order.tipCents,
     totalCents: order.totalCents,
     refundedCents: order.refundedCents,
-    remainingRefundableCents: order.totalCents - order.refundedCents,
+    reservedRefundCents: reservedCents,
+    remainingRefundableCents: remainingAfterReservation(order.totalCents, order.refundedCents, reservedCents),
     taxRateBps: order.taxRateBps,
     customerNote: order.customerNote,
     staffNote: order.staffNote,
@@ -222,8 +230,12 @@ export async function getAdminOrderDetail(id: string, timeZone: string) {
   };
 }
 
-export function remainingRefundableCents(totalCents: number, refundedCents: number): number {
-  return totalCents - refundedCents;
+export function remainingRefundableCents(
+  totalCents: number,
+  refundedCents: number,
+  reservedCents = 0,
+): number {
+  return remainingAfterReservation(totalCents, refundedCents, reservedCents);
 }
 
 export function assertRefundAmount(amountCents: number, remaining: number): void {

@@ -77,13 +77,20 @@ export type {
 // SPRINT-4: refunds / cancellation / reconciliation (DB-only helpers; gateway wired at app/CLI)
 export {
   findRefundByIdempotencyKey,
+  reservedRefundCents,
+  reservedRefundCentsByOrderIds,
+  remainingAfterReservation,
   createPendingRefundRow,
+  reserveRefundRow,
   completeRefundRow,
   applyRefundToOrder,
+  bookRefundFromProcessor,
   cancelUnpaidOrder,
   markOrderCancelledAfterRefund,
   getOrderWithLines,
+  OPEN_REFUND_STATUSES,
 } from "./refunds";
+export type { BookRefundResult } from "./refunds";
 export {
   claimNextPrintJob,
   touchPrinterHeartbeat,

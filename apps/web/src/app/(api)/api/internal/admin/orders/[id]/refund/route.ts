@@ -1,5 +1,12 @@
 // SPRINT-8: POST /api/internal/admin/orders/[id]/refund — calls Sprint 4 refundOrder.
-import { assertRefundAmount, getOrderWithLines, parseCurrencyInput, recordAdminAudit } from "@harolds/db";
+import {
+  assertRefundAmount,
+  getOrderWithLines,
+  parseCurrencyInput,
+  recordAdminAudit,
+  remainingAfterReservation,
+  reservedRefundCents,
+} from "@harolds/db";
 import { AdminErrorCode } from "@harolds/types";
 import { refundOrder } from "@/lib/refunds";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -26,7 +33,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     }
     const order = await getOrderWithLines(id);
     if (!order) return adminFail(AdminErrorCode.NOT_FOUND, "Order not found.");
-    const remaining = order.totalCents - order.refundedCents;
+    const remaining = remainingAfterReservation(
+      order.totalCents,
+      order.refundedCents,
+      await reservedRefundCents(id),
+    );
     let amount: number;
     if (typeof body.price === "string" && body.price.trim()) {
       amount = parseCurrencyInput(body.price);
@@ -64,7 +75,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     });
     return adminOk({
       refundedCents: result.order.refundedCents,
-      remainingRefundableCents: result.order.totalCents - result.order.refundedCents,
+      remainingRefundableCents: remainingAfterReservation(
+        result.order.totalCents,
+        result.order.refundedCents,
+        await reservedRefundCents(id),
+      ),
       paymentStatus: result.order.paymentStatus,
       status: result.order.status,
       processorRefundId: result.processorRefundId ? "recorded" : null,

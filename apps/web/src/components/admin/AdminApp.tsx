@@ -1877,6 +1877,11 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
           <p>Tip {money(Number(order.tipCents))}</p>
           <p><strong>Total {money(Number(order.totalCents))}</strong></p>
           <p>Refunded {money(Number(order.refundedCents))} · remaining {money(remaining)}</p>
+          {Number(order.reservedRefundCents ?? 0) > 0 ? (
+            <p className="adm-muted">
+              {money(Number(order.reservedRefundCents))} awaiting gateway confirmation and not refundable again.
+            </p>
+          ) : null}
         </div>
         <div className="adm-card">
           <h2>Status</h2>
@@ -1907,6 +1912,7 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
         <button
           type="button"
           className="adm-btn adm-btn-warn"
+          disabled={remaining <= 0}
           onClick={() => {
             const raw = window.prompt("Partial refund amount in dollars (e.g. 5.00)");
             if (!raw) return;

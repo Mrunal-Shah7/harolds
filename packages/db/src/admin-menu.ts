@@ -14,7 +14,13 @@ export class AdminValidationError extends Error {
 }
 
 export function parseCurrencyInput(raw: string): number {
-  const cents = dollarsToCents(raw);
+  let cents: number;
+  try {
+    cents = dollarsToCents(raw);
+  } catch {
+    // A plain Error here would reach the admin as a 500; this is a typo, so say so.
+    throw new AdminValidationError(`"${raw}" is not a dollar amount. Enter an amount like 5.00.`);
+  }
   if (cents < 0) {
     throw new AdminValidationError("Price cannot be negative.");
   }

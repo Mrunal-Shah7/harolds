@@ -33,7 +33,6 @@ export type HandlerSuccess = {
 
 export type JobHandler = (job: ClaimedBackgroundJob, ports: NotifyPorts) => Promise<HandlerSuccess>;
 
-const E164 = /^\+[1-9]\d{7,14}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function orderIdOf(job: ClaimedBackgroundJob): string {

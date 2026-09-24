@@ -13,6 +13,8 @@ import { after, afterEach, before, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { env } from "@harolds/config";
 import { prisma } from "@harolds/db";
+import { OrderStatus, PaymentStatus } from "@harolds/types";
+import { refundOrder } from "./refunds";
 import { POST } from "../app/(api)/api/v1/webhooks/nmi/route";
 
 const PREFIX = "s182-";
@@ -21,6 +23,7 @@ const ORIGINAL_ENV = { ...env };
 
 async function cleanup(): Promise<void> {
   await prisma.processorWebhookEvent.deleteMany({ where: { eventId: { startsWith: PREFIX } } });
+  await prisma.order.deleteMany({ where: { clientIdempotencyKey: { startsWith: PREFIX } } });
 }
 
 before(async () => {
@@ -114,4 +117,166 @@ describe("NMI webhook route", () => {
     assert.match(text, /"reason":"missing_header"/);
     assert.equal(text.includes(id), false);
   });
+
+  it("does not add an admin-confirmed refund a second time when the webhook arrives", async () => {
+    const { order, key } = await paidOrder();
+    const refunded = await refundOrder({
+      orderId: order.id,
+      amountCents: 250,
+      clientIdempotencyKey: `${key}-p`,
+      refundPaymentFn: async ({ amountCents }) => ({
+        kind: "succeeded",
+        refundId: `rfd_${key}`,
+        amountCents,
+        status: "COMPLETED",
+      }),
+    });
+    assert.equal(refunded.ok, true);
+    if (!refunded.ok) return;
+
+    const eventId = `${PREFIX}refund-dup-${Date.now()}`;
+    const body = refundEventBytes({
+      eventId,
+      orderId: order.id,
+      refundTransactionId: `rfd_${key}`,
+      amount: "-2.50",
+    });
+    const res = await deliver(body, signature(body));
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.outcome, "ALREADY_APPLIED");
+
+    const after = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    assert.equal(after.refundedCents, 250);
+    assert.equal(after.paymentStatus, PaymentStatus.PARTIALLY_REFUNDED);
+  });
+
+  it("books a portal refund once and ignores a later event for the same processor id", async () => {
+    const { order } = await paidOrder();
+    const refundTransactionId = `rfd_portal_${order.id}`;
+    const firstId = `${PREFIX}portal-a-${Date.now()}`;
+    const firstBody = refundEventBytes({
+      eventId: firstId,
+      orderId: order.id,
+      refundTransactionId,
+      amount: "-4.00",
+    });
+    const first = await deliver(firstBody, signature(firstBody));
+    assert.equal(first.status, 200);
+    assert.equal(first.json.data.outcome, "PARTIAL_REFUND");
+
+    const mid = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    assert.equal(mid.refundedCents, 400);
+
+    const secondId = `${PREFIX}portal-b-${Date.now()}`;
+    const secondBody = refundEventBytes({
+      eventId: secondId,
+      orderId: order.id,
+      refundTransactionId,
+      amount: "-4.00",
+    });
+    const second = await deliver(secondBody, signature(secondBody));
+    assert.equal(second.status, 200);
+    assert.equal(second.json.data.outcome, "ALREADY_APPLIED");
+
+    const after = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    assert.equal(after.refundedCents, 400);
+  });
+
+  it("confirms an unconfirmed admin refund from the webhook without double-counting", async () => {
+    const { order, key } = await paidOrder();
+    const unknown = await refundOrder({
+      orderId: order.id,
+      amountCents: 250,
+      clientIdempotencyKey: `${key}-u`,
+      refundPaymentFn: async () => ({
+        kind: "transport_failure",
+        message: "timeout",
+        refundId: `rfd_${key}_u`,
+      }),
+    });
+    assert.equal(unknown.ok, false);
+    assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).refundedCents, 0);
+
+    const eventId = `${PREFIX}refund-confirm-${Date.now()}`;
+    const body = refundEventBytes({
+      eventId,
+      orderId: order.id,
+      refundTransactionId: `rfd_${key}_u`,
+      amount: "-2.50",
+    });
+    const res = await deliver(body, signature(body));
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.outcome, "PARTIAL_REFUND");
+
+    const after = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    assert.equal(after.refundedCents, 250);
+    const rows = await prisma.processorRefund.findMany({ where: { orderId: order.id } });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]?.status, "COMPLETED");
+  });
 });
+
+let orderSequence = 182_000;
+
+function refundEventBytes(input: {
+  eventId: string;
+  orderId: string;
+  refundTransactionId: string;
+  amount: string;
+}): Buffer {
+  return Buffer.from(
+    JSON.stringify({
+      event_id: input.eventId,
+      event_type: "transaction.refund.success",
+      event_body: {
+        transaction_id: input.refundTransactionId,
+        order_id: input.orderId,
+        amount: input.amount,
+        action: { action_type: "refund", amount: input.amount },
+      },
+    }),
+    "utf8",
+  );
+}
+
+async function paidOrder() {
+  const key = `${PREFIX}${Math.random().toString(16).slice(2)}`;
+  const order = await prisma.order.create({
+    data: {
+      orderNumber: `HC-WH-${key.slice(-4)}`,
+      orderSequence: orderSequence++,
+      businessDate: new Date("2099-09-25T00:00:00.000Z"),
+      customerFirstName: "Webhook",
+      customerLastName: "Refund",
+      customerPhone: "+17085550889",
+      customerEmail: "s182ref@example.com",
+      subtotalCents: 800,
+      taxCents: 80,
+      tipCents: 120,
+      totalCents: 1000,
+      taxRateBps: 1010,
+      taxAppliedPreDiscount: true,
+      paymentStatus: PaymentStatus.CAPTURED,
+      status: OrderStatus.PAID,
+      paidAt: new Date(),
+      processorPaymentId: `pay_${key}`,
+      lookupToken: key,
+      clientIdempotencyKey: key,
+      cartFingerprint: key,
+      lines: {
+        create: [
+          {
+            quantity: 1,
+            itemName: "2pc Dark",
+            unitPriceCents: 800,
+            modifierTotalCents: 0,
+            effectiveUnitPriceCents: 800,
+            lineTotalCents: 800,
+            selectedModifiers: [],
+          },
+        ],
+      },
+    },
+  });
+  return { order, key };
+}

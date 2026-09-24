@@ -1,16 +1,21 @@
-// SPRINT-4 / SPRINT-17: refund + cancellation orchestration (uses @harolds/payments at the app boundary)
+// SPRINT-4 / SPRINT-17 / SPRINT-18.3: refund + cancellation orchestration (uses @harolds/payments at the app boundary)
 import {
-  applyRefundToOrder,
+  bookRefundFromProcessor,
   cancelUnpaidOrder,
   completeRefundRow,
-  createPendingRefundRow,
   findRefundByIdempotencyKey,
   getOrderWithLines,
   markOrderCancelledAfterRefund,
+  remainingAfterReservation,
+  reservedRefundCents,
+  reserveRefundRow,
   type OrderWithLines,
 } from "@harolds/db";
-import { refundPayment } from "@harolds/payments";
+import { PaymentClientError, refundPayment } from "@harolds/payments";
 import { OrderStatus, PaymentStatus } from "@harolds/types";
+
+const UNCONFIRMED_REFUND_MESSAGE =
+  "Refund could not be confirmed. The amount stays reserved until the gateway confirms it. Do not issue another refund for the same amount.";
 
 export type RefundResult =
   | { ok: true; order: OrderWithLines; refundedCents: number; processorRefundId: string | null }
@@ -31,16 +36,11 @@ export async function refundOrder(args: {
 
   const existing = await findRefundByIdempotencyKey(args.clientIdempotencyKey);
   if (existing) {
-    const refreshed = await getOrderWithLines(order.id);
-    return {
-      ok: true,
-      order: refreshed!,
-      refundedCents: refreshed!.refundedCents,
-      processorRefundId: existing.processorRefundId,
-    };
+    return replayExistingRefund(order.id, existing);
   }
 
-  const remaining = order.totalCents - order.refundedCents;
+  const reserved = await reservedRefundCents(order.id);
+  const remaining = remainingAfterReservation(order.totalCents, order.refundedCents, reserved);
   const amount = args.amountCents === "full" ? remaining : args.amountCents;
   if (!Number.isInteger(amount) || amount <= 0) {
     return { ok: false, code: "VALIDATION", message: "Refund amount must be a positive integer." };
@@ -53,46 +53,80 @@ export async function refundOrder(args: {
     };
   }
 
-  const refundRow = await createPendingRefundRow({
+  const reservedRow = await reserveRefundRow({
     orderId: order.id,
     amountCents: amount,
     clientIdempotencyKey: args.clientIdempotencyKey,
     actedByUserId: args.actedByUserId ?? null,
   });
+  if (!reservedRow.ok) {
+    if (reservedRow.reason === "DUPLICATE") {
+      return replayExistingRefund(order.id, reservedRow.existing);
+    }
+    return {
+      ok: false,
+      code: "VALIDATION",
+      message: `Refund exceeds remaining refundable amount (${reservedRow.remainingCents} cents).`,
+    };
+  }
+  const refundRow = reservedRow.row;
 
   const chargeRefund = args.refundPaymentFn ?? refundPayment;
-  const outcome = await chargeRefund({
-    paymentId: order.processorPaymentId,
-    amountCents: amount,
-    correlationId: args.clientIdempotencyKey,
-  });
+  let outcome: Awaited<ReturnType<typeof refundPayment>>;
+  try {
+    outcome = await chargeRefund({
+      paymentId: order.processorPaymentId,
+      amountCents: amount,
+      correlationId: args.clientIdempotencyKey,
+    });
+  } catch (err) {
+    // `auth` and `invalid_request` mean the gateway never processed the refund (missing
+    // credentials, or a request it rejected), so the reservation is released. Anything else,
+    // including an approval that came back without a transaction id, may have moved money
+    // and stays reserved as UNKNOWN.
+    const notProcessed =
+      err instanceof PaymentClientError && (err.kind === "auth" || err.kind === "invalid_request");
+    await completeRefundRow({
+      refundRowId: refundRow.id,
+      processorRefundId: null,
+      status: notProcessed ? "FAILED" : "UNKNOWN",
+    });
+    if (notProcessed) {
+      return { ok: false, code: "VALIDATION", message: `Refund was not sent: ${err.message}` };
+    }
+    return { ok: false, code: "TRANSPORT", message: UNCONFIRMED_REFUND_MESSAGE };
+  }
 
   if (outcome.kind === "declined") {
     await completeRefundRow({ refundRowId: refundRow.id, processorRefundId: null, status: "DECLINED" });
     return { ok: false, code: "DECLINED", message: outcome.reason };
   }
-  if (outcome.kind === "transport_failure") {
-    await completeRefundRow({
+  if (outcome.kind === "transport_failure" || !("refundId" in outcome) || !outcome.refundId) {
+    const moved = await completeRefundRow({
       refundRowId: refundRow.id,
-      processorRefundId: outcome.refundId,
+      processorRefundId: outcome.kind === "transport_failure" ? outcome.refundId : null,
       status: "UNKNOWN",
     });
+    if (!moved) {
+      // The webhook confirmed this refund while the gateway call was still timing out.
+      const settled = await findRefundByIdempotencyKey(args.clientIdempotencyKey);
+      if (settled) return replayExistingRefund(order.id, settled);
+    }
     return {
       ok: false,
       code: "TRANSPORT",
-      message: "Refund could not be confirmed. Do not retry blindly.",
+      message: UNCONFIRMED_REFUND_MESSAGE,
     };
   }
 
-  const updated = await applyRefundToOrder({
+  await bookRefundFromProcessor({
     orderId: order.id,
-    addRefundedCents: outcome.amountCents,
-  });
-  await completeRefundRow({
-    refundRowId: refundRow.id,
+    amountCents: outcome.amountCents,
     processorRefundId: outcome.refundId,
-    status: "COMPLETED",
+    refundRowId: refundRow.id,
   });
+  const updated = await getOrderWithLines(order.id);
+  if (!updated) return { ok: false, code: "NOT_FOUND", message: "Order not found." };
 
   return {
     ok: true,
@@ -100,6 +134,29 @@ export async function refundOrder(args: {
     refundedCents: updated.refundedCents,
     processorRefundId: outcome.refundId,
   };
+}
+
+async function replayExistingRefund(
+  orderId: string,
+  existing: { status: string; processorRefundId: string | null },
+): Promise<RefundResult> {
+  const refreshed = await getOrderWithLines(orderId);
+  if (!refreshed) return { ok: false, code: "NOT_FOUND", message: "Order not found." };
+  if (existing.status === "COMPLETED") {
+    return {
+      ok: true,
+      order: refreshed,
+      refundedCents: refreshed.refundedCents,
+      processorRefundId: existing.processorRefundId,
+    };
+  }
+  if (existing.status === "DECLINED") {
+    return { ok: false, code: "DECLINED", message: "That refund was declined. Do not retry the same request." };
+  }
+  if (existing.status === "FAILED") {
+    return { ok: false, code: "VALIDATION", message: "That refund was never sent to the gateway. Start a new refund." };
+  }
+  return { ok: false, code: "TRANSPORT", message: UNCONFIRMED_REFUND_MESSAGE };
 }
 
 export async function cancelOrder(

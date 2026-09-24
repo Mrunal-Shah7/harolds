@@ -2,7 +2,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { formatCents } from "@harolds/pricing";
-import { formatStoreLocalTime } from "./time";
 import {
   renderPaymentDiscrepancyAlert,
   renderPrintFailedAlert,

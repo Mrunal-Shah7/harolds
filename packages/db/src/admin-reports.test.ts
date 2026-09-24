@@ -12,7 +12,7 @@ import { OrderStatus, PaymentStatus } from "@harolds/types";
 import { quoteCart, toMenuCatalog } from "@harolds/pricing";
 import { prisma } from "./client";
 import { salesReport, salesReportToCsv } from "./admin-reports";
-import { assertRefundAmount } from "./admin-orders";
+import { assertRefundAmount, remainingRefundableCents } from "./admin-orders";
 import { applyRefundToOrder } from "./refunds";
 import { fetchItemsForQuote } from "./repositories/catalog";
 import { getStoreConfig } from "./store-config";
@@ -185,5 +185,7 @@ describe("sales report", () => {
   it("rejects a refund above the remaining ceiling", () => {
     assert.throws(() => assertRefundAmount(500, 400), /exceeds remaining/);
     assertRefundAmount(400, 400);
+    assert.equal(remainingRefundableCents(1000, 250, 400), 350);
+    assert.equal(remainingRefundableCents(1000, 1000, 0), 0);
   });
 });

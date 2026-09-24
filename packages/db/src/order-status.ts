@@ -1,6 +1,6 @@
 // SPRINT-6: order status transition table — the only place legal kitchen/print status changes are decided.
 // SPRINT-7 / SPRINT-17: the READY transition no longer enqueues a customer notification.
-import { JobStatus, JobType, OrderStatus } from "@harolds/types";
+import { OrderStatus } from "@harolds/types";
 import { emitLog } from "@harolds/config";
 import { prisma } from "./client";
 import { AdminValidationError } from "./admin-menu";
