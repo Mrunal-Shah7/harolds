@@ -29,6 +29,8 @@ function groupRule(group: MenuModifierGroup): string {
 
 export function ItemModal({ item, onClose }: { item: MenuItemSummary | null; onClose: () => void }) {
   const { addLine } = useCart();
+  // Held so the sheet still has something to slide away after `item` is cleared.
+  const [held, setHeld] = useState<MenuItemSummary | null>(item);
   const [detail, setDetail] = useState<MenuItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -38,6 +40,10 @@ export function ItemModal({ item, onClose }: { item: MenuItemSummary | null; onC
   // The rule turns red only after a first attempt to submit, never on open. A form that is red
   // before it has been touched teaches people to ignore red.
   const [attempted, setAttempted] = useState(false);
+
+  useEffect(() => {
+    if (item) setHeld(item);
+  }, [item]);
 
   useEffect(() => {
     if (!item) return;
@@ -116,20 +122,20 @@ export function ItemModal({ item, onClose }: { item: MenuItemSummary | null; onC
 
   return (
     <Dialog open={Boolean(item)} onClose={onClose} labelledBy="item-modal-title">
-      {!item ? null : (
+      {!held ? null : (
         <>
           <div className="img">
             <MenuImage
-              name={item.name}
-              derivatives={item.imageDerivatives}
-              imageUrl={item.imageUrl}
+              name={held.name}
+              derivatives={held.imageDerivatives}
+              imageUrl={held.imageUrl}
               priority
             />
           </div>
 
           <div className="inner">
-            <h3 id="item-modal-title">{item.name}</h3>
-            {item.description ? <p className="desc">{item.description}</p> : null}
+            <h3 id="item-modal-title">{held.name}</h3>
+            {held.description ? <p className="desc">{held.description}</p> : null}
 
             {loading ? (
               <div className="mgroup">

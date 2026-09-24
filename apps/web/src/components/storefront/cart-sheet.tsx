@@ -9,15 +9,16 @@
 // charged; see CartLine.unitPriceCents for why a client figure exists at all. What is shown here
 // deliberately excludes tax and tip, which is why it is labelled "Items" and not "Total".
 //
-// "Go to checkout" does not leave for checkout immediately: it swaps this sheet to a suggestions
-// step first, so sides and drinks are offered where the order is being reviewed rather than on a
-// page of their own.
+// Sliding the checkout rail all the way does not leave immediately: it swaps this sheet to a
+// suggestions step first, so sides and drinks are offered where the order is being reviewed
+// rather than on a page of their own.
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import type { FullMenu, MenuItemSummary } from "@harolds/types";
 import { Sheet } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/ui/feedback";
+import { SlideToAction } from "@/components/storefront/slide-to-action";
 import { useCart } from "@/lib/cart-context";
 import { formatCents } from "@/lib/money";
 import { getFullMenu } from "@/lib/storefront-api";
@@ -210,14 +211,7 @@ export function CartSheet({ open, onClose }: { open: boolean; onClose: () => voi
           <span className="amt t-nums">{formatCents(subtotalCents)}</span>
         </div>
         <p className="note">Tax and any tip are added at checkout, where the store quotes it.</p>
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{ width: "100%", height: 52 }}
-          onClick={() => setStep("suggest")}
-        >
-          Go to checkout
-        </button>
+        <SlideToAction label="Slide to checkout" onComplete={() => setStep("suggest")} />
       </>
     ) : (
       <>
@@ -230,14 +224,7 @@ export function CartSheet({ open, onClose }: { open: boolean; onClose: () => voi
           <button type="button" className="btn btn-ghost" onClick={() => setStep("cart")}>
             Back
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ flex: 1, height: 52 }}
-            onClick={goCheckout}
-          >
-            Continue to checkout
-          </button>
+          <SlideToAction label="Slide to checkout" onComplete={goCheckout} />
         </div>
       </>
     );
@@ -245,7 +232,14 @@ export function CartSheet({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Sheet open={open} onClose={onClose} title={title} footer={footer}>
       {lines.length === 0 ? (
-        <EmptyState message="Your cart is empty." actionLabel="Browse the menu" onAction={onClose} />
+        <EmptyState
+          message="Your cart is empty."
+          actionLabel="Browse the menu"
+          onAction={() => {
+            onClose();
+            router.push("/menu");
+          }}
+        />
       ) : step === "suggest" ? (
         <>
           <p className="sug-lead">

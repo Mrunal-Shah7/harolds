@@ -36,15 +36,14 @@ export function StoreStatusPill({
 }: {
   status: StoreStatus;
   /**
-   * One word and the dot, nothing else. The menu page's header has to hold the logo, the state
-   * and the cart on a single row, and the full sentence is what pushes it onto a second line.
+   * One word and the dot, nothing else — "OPEN" or "CLOSED" — so the pill fits the logo's row.
    * The complete state is still one tap away in the sheet.
    */
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { label, open: isOpen } = storeStatusLabel(status);
-  const shown = compact ? (isOpen ? "Open" : "Closed") : label;
+  const shown = compact ? (isOpen ? "OPEN" : "CLOSED") : label;
 
   return (
     <>

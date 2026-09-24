@@ -28,6 +28,7 @@ const STATUS_LABELS: Record<string, string> = {
   // through to -1, blanking the whole timeline on the one screen the customer was watching.
   PICKED_UP: "Picked up",
   CANCELLED: "Cancelled",
+  REFUNDED: "Refunded",
 };
 
 /** The three points of the timeline, and which one each order status sits on. */
@@ -139,25 +140,31 @@ export default function OrderStatusPage() {
 
   const active = stepIndex(order.status);
   const cancelled = order.status === "CANCELLED";
+  const refunded = order.status === "REFUNDED";
+  const closed = cancelled || refunded;
   const pickedUp = order.status === "PICKED_UP";
   const ready = order.status === "READY";
 
-  // The hero speaks in whichever tense the order is actually in. Three distinct moments, so
-  // three distinct headlines — a collected order must never still read "We're on it".
-  const eyebrow = cancelled
-    ? "Order cancelled"
-    : pickedUp
-      ? "Order complete · picked up"
-      : ready
-        ? "Order ready · paid"
-        : "Order placed · paid";
-  const headline = cancelled
-    ? "This order was cancelled"
-    : pickedUp
-      ? "Thanks — enjoy"
-      : ready
-        ? "Come and get it"
-        : "We're on it";
+  // The hero speaks in whichever tense the order is actually in. A refunded or cancelled
+  // order must never still read "We're on it" or ask anyone to come to the counter.
+  const eyebrow = refunded
+    ? "Order refunded"
+    : cancelled
+      ? "Order cancelled"
+      : pickedUp
+        ? "Order complete · picked up"
+        : ready
+          ? "Order ready · paid"
+          : "Order placed · paid";
+  const headline = refunded
+    ? "This order was refunded"
+    : cancelled
+      ? "This order was cancelled"
+      : pickedUp
+        ? "Thanks — enjoy"
+        : ready
+          ? "Come and get it"
+          : "We're on it";
 
   const pickedUpTime = order.pickedUpAt
     ? new Date(order.pickedUpAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
@@ -179,9 +186,11 @@ export default function OrderStatusPage() {
               <TicketChip orderNumber={order.orderNumber} size="lg" />
             ) : null}
 
-            {cancelled ? (
+            {closed ? (
               <p style={{ marginTop: 32, color: "var(--danger)" }}>
-                {STATUS_LABELS[order.status] ?? order.status}
+                {refunded
+                  ? "The payment was returned to the card that placed this order."
+                  : (STATUS_LABELS[order.status] ?? order.status)}
               </p>
             ) : (
               <div className="timeline">
@@ -204,7 +213,7 @@ export default function OrderStatusPage() {
             {/* One line, three tenses. An estimate is only worth showing while the order is still
                 being cooked — once it is ready the estimate is behind the facts, and once it is
                 collected the only useful thing to say is thank you. */}
-            {cancelled ? null : pickedUp ? (
+            {closed ? null : pickedUp ? (
               <p style={{ fontSize: "var(--body-lg)", marginTop: 24 }}>
                 {pickedUpTime ? (
                   <>
@@ -238,9 +247,13 @@ export default function OrderStatusPage() {
             ) : null}
 
             <p style={{ color: "var(--ink-muted)", marginTop: 8 }}>
-              {pickedUp
-                ? "Receipt sent by email."
-                : "Give your order number at the counter. Receipt sent by email."}
+              {refunded
+                ? "Nothing more is due. The kitchen will not prepare this order."
+                : cancelled
+                  ? "This order will not be prepared."
+                  : pickedUp
+                    ? "Receipt sent by email."
+                    : "Give your order number at the counter. Receipt sent by email."}
             </p>
           </div>
         </div>
@@ -287,7 +300,7 @@ export default function OrderStatusPage() {
                 ) : null}
                 <div className="leader grand">
                   <span style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>
-                    Charged
+                    {refunded ? "Refunded" : "Charged"}
                   </span>
                   <span className="dots" />
                   <span className="amt">{formatCents(order.totalCents)}</span>
@@ -295,12 +308,17 @@ export default function OrderStatusPage() {
               </div>
 
               <p className="quote-note">
-                Show this page at pickup. Pickup only — no delivery.
+                {refunded
+                  ? "The original charge was reversed. Keep this page as your record."
+                  : cancelled
+                    ? "This order was cancelled and will not be picked up."
+                    : "Show this page at pickup. Pickup only — no delivery."}
               </p>
             </div>
           </div>
         </div>
 
+        {closed ? null : (
         <div className="band b-roast" style={{ padding: "48px 0" }}>
           <div className="container" style={{ textAlign: "center" }}>
             <p className="eyebrow" style={{ marginBottom: 16 }}>
@@ -341,6 +359,7 @@ export default function OrderStatusPage() {
             )}
           </div>
         </div>
+        )}
       </main>
     </div>
   );

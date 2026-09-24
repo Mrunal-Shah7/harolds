@@ -3,7 +3,7 @@
 // SPRINT-8 / SPRINT-18.3: admin application shell and screens — role nav, dense tables, confirmation.
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { formatCents } from "@harolds/pricing";
 import { adminApi } from "@/components/admin/admin-api";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
@@ -38,7 +38,8 @@ export function AdminApp() {
   return (
     <>
       {section === "" && <DashboardView timezone={timezone} />}
-      {section === "categories" && <CategoriesView />}
+      {section === "categories" && !id && <CategoriesView />}
+      {section === "categories" && id && <CategoryView id={id} />}
       {section === "menu" && !id && <MenuView />}
       {section === "menu" && id === "curation" && <CurationView />}
       {section === "menu" && id === "new" && <NewItemView />}
@@ -191,10 +192,61 @@ type AdminCategory = {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
   imageUrl?: string | null;
   isActive?: boolean;
   sortOrder?: number;
+  updatedAt?: string;
 };
+
+/** How close to a scroll edge the pointer must be before the list starts moving. */
+const DRAG_SCROLL_EDGE_PX = 72;
+/** Fastest step, when the pointer is at or past the edge. */
+const DRAG_SCROLL_MAX_PX = 24;
+
+/**
+ * HTML5 drag calls preventDefault on dragover so a drop is legal, and that also
+ * kills the browser's own auto-scroll. Walk the table's overflow ancestors (and
+ * the window) and scroll any that the pointer is pressing against.
+ */
+function autoScrollDuringDrag(from: HTMLElement | null, y: number) {
+  const scrollers: Array<{ top: number; bottom: number; by: (dy: number) => void }> = [];
+  let el: HTMLElement | null = from;
+  while (el) {
+    const { overflowY } = getComputedStyle(el);
+    if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight + 1) {
+      const node = el;
+      const r = node.getBoundingClientRect();
+      scrollers.push({ top: r.top, bottom: r.bottom, by: (dy) => { node.scrollTop += dy; } });
+    }
+    el = el.parentElement;
+  }
+  const root = document.scrollingElement ?? document.documentElement;
+  if (root.scrollHeight > root.clientHeight + 1) {
+    scrollers.push({
+      top: 0,
+      bottom: window.innerHeight,
+      by: (dy) => {
+        // scrollBy is unreliable during an HTML5 drag in Chromium; mutating
+        // the scrolling element's scrollTop is what actually moves the page.
+        const before = root.scrollTop;
+        root.scrollTop += dy;
+        if (root.scrollTop === before) window.scrollBy(0, dy);
+      },
+    });
+  }
+  for (const s of scrollers) {
+    let dy = 0;
+    if (y < s.top + DRAG_SCROLL_EDGE_PX) {
+      const t = Math.min(1, Math.max(0, (s.top + DRAG_SCROLL_EDGE_PX - y) / DRAG_SCROLL_EDGE_PX));
+      dy = -Math.ceil(DRAG_SCROLL_MAX_PX * t);
+    } else if (y > s.bottom - DRAG_SCROLL_EDGE_PX) {
+      const t = Math.min(1, Math.max(0, (y - (s.bottom - DRAG_SCROLL_EDGE_PX)) / DRAG_SCROLL_EDGE_PX));
+      dy = Math.ceil(DRAG_SCROLL_MAX_PX * t);
+    }
+    if (dy) s.by(dy);
+  }
+}
 
 /**
  * Categories, on their own screen.
@@ -207,7 +259,17 @@ type AdminCategory = {
 function CategoriesView() {
   const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [reordering, setReordering] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const [flash, setFlash] = useFlash();
+  const categoriesRef = useRef(categories);
+  categoriesRef.current = categories;
+  const dragSnapshot = useRef<AdminCategory[] | null>(null);
+  const didDrop = useRef(false);
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const overIdRef = useRef(overId);
+  overIdRef.current = overId;
 
   const load = useCallback(() => {
     adminApi<AdminCategory[]>("/api/internal/admin/menu/categories")
@@ -216,6 +278,36 @@ function CategoriesView() {
       .finally(() => setLoaded(true));
   }, [setFlash]);
   useEffect(load, [load]);
+
+  // While a row is held, keep scrolling the panel (or the window) if the pointer
+  // sits in the top or bottom edge. dragover only fires on move, so a rAF loop
+  // uses the last known Y and keeps going when the pointer is held still.
+  useEffect(() => {
+    if (!draggingId) return;
+    let pointer: { x: number; y: number } | null = null;
+    let raf = 0;
+
+    function onDragOver(e: globalThis.DragEvent) {
+      pointer = { x: e.clientX, y: e.clientY };
+    }
+
+    function step() {
+      if (pointer) {
+        autoScrollDuringDrag(tableWrapRef.current, pointer.y);
+        const hit = document.elementFromPoint(pointer.x, pointer.y);
+        const id = hit?.closest("[data-category-id]")?.getAttribute("data-category-id");
+        if (id && id !== overIdRef.current) setOverId(id);
+      }
+      raf = requestAnimationFrame(step);
+    }
+
+    document.addEventListener("dragover", onDragOver);
+    raf = requestAnimationFrame(step);
+    return () => {
+      document.removeEventListener("dragover", onDragOver);
+      cancelAnimationFrame(raf);
+    };
+  }, [draggingId]);
 
   /**
    * The storefront's category rail tile. Uploaded through the same content-addressed pipeline as
@@ -242,7 +334,90 @@ function CategoriesView() {
     }
   }
 
-  if (!loaded) return <AdminTableSkeleton rows={6} cols={5} />;
+  /**
+   * This table's row order is the /menu tab and section order. A drop (or an arrow key on the
+   * handle) writes the full sequence through the atomic reorder endpoint so /menu never sees a
+   * half-applied shuffle. The handle locks while the write is in flight.
+   */
+  async function persistOrder(next: AdminCategory[], previous: AdminCategory[]) {
+    if (next.length === 0) return;
+    if (next.every((c, i) => c.id === previous[i]?.id)) return;
+    setCategories(next);
+    setReordering(true);
+    try {
+      await adminApi("/api/internal/admin/menu/reorder", {
+        method: "POST",
+        body: JSON.stringify({ kind: "categories", orderedIds: next.map((c) => c.id) }),
+      });
+      setFlash({ kind: "ok", text: "Menu order saved. /menu shows this sequence now." });
+    } catch (e) {
+      setCategories(previous);
+      setFlash({ kind: "err", text: e instanceof Error ? e.message : "Order not saved." });
+    } finally {
+      setReordering(false);
+    }
+  }
+
+  function moveAt(list: AdminCategory[], from: number, to: number): AdminCategory[] {
+    if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+    const next = [...list];
+    const [row] = next.splice(from, 1);
+    if (!row) return list;
+    next.splice(to, 0, row);
+    return next;
+  }
+
+  async function moveCategory(index: number, direction: -1 | 1) {
+    const next = moveAt(categories, index, index + direction);
+    await persistOrder(next, categories);
+  }
+
+  function onHandleDragStart(e: DragEvent<HTMLButtonElement>, id: string) {
+    if (reordering) {
+      e.preventDefault();
+      return;
+    }
+    didDrop.current = false;
+    dragSnapshot.current = categories;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.setData("application/x-harolds-category", id);
+    setDraggingId(id);
+  }
+
+  function onRowDragOver(e: DragEvent<HTMLTableRowElement>, id: string) {
+    if (!draggingId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (overId !== id) setOverId(id);
+  }
+
+  async function onRowDrop(e: DragEvent<HTMLTableRowElement>, targetId: string) {
+    if (!draggingId) return;
+    e.preventDefault();
+    didDrop.current = true;
+    const previous = dragSnapshot.current ?? categoriesRef.current;
+    const next = moveAt(
+      previous,
+      previous.findIndex((c) => c.id === draggingId),
+      previous.findIndex((c) => c.id === targetId),
+    );
+    setOverId(null);
+    setDraggingId(null);
+    dragSnapshot.current = null;
+    await persistOrder(next, previous);
+  }
+
+  function onHandleDragEnd() {
+    if (!didDrop.current && dragSnapshot.current) {
+      setCategories(dragSnapshot.current);
+    }
+    dragSnapshot.current = null;
+    setDraggingId(null);
+    setOverId(null);
+  }
+
+  if (!loaded) return <AdminTableSkeleton rows={6} cols={6} />;
 
   return (
     <>
@@ -253,14 +428,16 @@ function CategoriesView() {
         </div>
       </div>
       <p className="adm-lead">
-        The sections the storefront groups items into, and the order they appear in. A category
-        with no rail image falls back to its first initial, which is the design&apos;s placeholder.
+        The sections the storefront groups items into. Open a category to rename it. This
+        table&apos;s order is the /menu tab and section order &mdash; drag a row by the handle
+        to move it. A category with no rail image falls back to its first initial, which is the
+        design&apos;s placeholder.
       </p>
       <FlashBar flash={flash} />
 
       <AdminForm
         title="New category"
-        description="Slug is derived from the name unless you set one. It appears in the storefront URL."
+        description="Slug is derived from the name unless you set one. It appears in the storefront URL. A new category lands at the end of the menu."
         label="Create category"
         onSubmit={async (formEl) => {
           const form = new FormData(formEl);
@@ -282,15 +459,56 @@ function CategoriesView() {
       </AdminForm>
 
       <h2>All categories</h2>
-      <div className="adm-table-wrap">
+      <div className="adm-table-wrap" ref={tableWrapRef}>
         <table className="adm-table">
           <thead>
-            <tr><th>Name</th><th>Slug</th><th>Rail image</th><th>Active</th><th></th></tr>
+            <tr><th>Order</th><th>Name</th><th>Slug</th><th>Rail image</th><th>Active</th><th></th></tr>
           </thead>
           <tbody>
-            {categories.map((c) => (
-              <tr key={c.id}>
-                <td style={{ fontWeight: 600 }}>{c.name}</td>
+            {categories.map((c, index) => {
+              const dragIndex = draggingId ? categories.findIndex((row) => row.id === draggingId) : -1;
+              const dropClass =
+                draggingId && overId === c.id && draggingId !== c.id
+                  ? dragIndex >= 0 && index > dragIndex
+                    ? "adm-drop-below"
+                    : "adm-drop-above"
+                  : undefined;
+              return (
+              <tr
+                key={c.id}
+                data-category-id={c.id}
+                className={[draggingId === c.id ? "adm-dragging" : null, dropClass].filter(Boolean).join(" ") || undefined}
+                onDragOver={(e) => onRowDragOver(e, c.id)}
+                onDrop={(e) => void onRowDrop(e, c.id)}
+              >
+                <td>
+                  <div className="adm-order">
+                    <button
+                      type="button"
+                      className="adm-drag"
+                      draggable={!reordering}
+                      disabled={reordering}
+                      aria-label={`Drag to reorder ${c.name}. Arrow keys also move it.`}
+                      onDragStart={(e) => onHandleDragStart(e, c.id)}
+                      onDragEnd={onHandleDragEnd}
+                      onKeyDown={(e) => {
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          void moveCategory(index, -1);
+                        } else if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          void moveCategory(index, 1);
+                        }
+                      }}
+                    >
+                      <span className="adm-drag-grip" aria-hidden="true" />
+                    </button>
+                    <span className="adm-order-n">{index + 1}</span>
+                  </div>
+                </td>
+                <td style={{ fontWeight: 600 }}>
+                  <Link className="adm-link" href={`/admin/categories/${c.id}`}>{c.name}</Link>
+                </td>
                 <td className="adm-muted">{c.slug}</td>
                 <td>
                   <div className="adm-imgcell">
@@ -334,6 +552,10 @@ function CategoriesView() {
                   )}
                 </td>
                 <td>
+                  <div className="adm-imgcell">
+                  <Link className="adm-btn adm-btn-ghost" href={`/admin/categories/${c.id}`}>
+                    Edit
+                  </Link>
                   <button
                     type="button"
                     className="adm-btn adm-btn-ghost"
@@ -358,12 +580,88 @@ function CategoriesView() {
                   >
                     {c.isActive === false ? "Reactivate" : "Deactivate"}
                   </button>
+                  </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
+    </>
+  );
+}
+
+/**
+ * One category. Name, slug, and the optional description that sits under the /menu heading.
+ * Image, order, and active stay on the list — those are one-tap actions, not a form.
+ */
+function CategoryView({ id }: { id: string }) {
+  const [category, setCategory] = useState<AdminCategory | null>(null);
+  const [flash, setFlash] = useFlash();
+  const load = useCallback(() => {
+    adminApi<AdminCategory>(`/api/internal/admin/menu/categories/${id}`)
+      .then(setCategory)
+      .catch((e: unknown) => setFlash({ kind: "err", text: e instanceof Error ? e.message : "Failed" }));
+  }, [id, setFlash]);
+  useEffect(load, [load]);
+
+  if (!category) return <AdminFormSkeleton fields={3} />;
+
+  return (
+    <>
+      <div className="adm-top">
+        <h1 className="adm-h1">{category.name}</h1>
+        <div className="right">
+          <Link className="adm-btn adm-btn-ghost" href="/admin/categories">Back to categories</Link>
+        </div>
+      </div>
+      <p className="adm-lead">
+        The name is what /menu tabs and section headings show. The slug is the category&apos;s
+        URL key &mdash; leave it unless you intend to change those links. Items stay in this
+        category when you rename it.
+      </p>
+      <FlashBar flash={flash} />
+      <AdminForm
+        key={`${category.id}-${category.updatedAt ?? category.slug}`}
+        title="Category details"
+        description="Renaming does not move or hide items. They keep this category under the new name."
+        label="Save category"
+        onSubmit={async (formEl) => {
+          const form = new FormData(formEl);
+          try {
+            await adminApi(`/api/internal/admin/menu/categories/${id}`, {
+              method: "PATCH",
+              body: JSON.stringify({
+                name: form.get("name"),
+                slug: form.get("slug"),
+                description: form.get("description") || null,
+              }),
+            });
+            setFlash({ kind: "ok", text: "Category saved. /menu shows the new name now." });
+            load();
+          } catch (err) {
+            setFlash({ kind: "err", text: err instanceof Error ? err.message : "Not saved." });
+          }
+        }}
+      >
+        <label className="adm-field">
+          Name
+          <input name="name" required defaultValue={category.name} />
+        </label>
+        <label className="adm-field">
+          Slug
+          <input name="slug" required defaultValue={category.slug} />
+        </label>
+        <label className="adm-field adm-form-wide">
+          Description
+          <textarea
+            name="description"
+            defaultValue={category.description ?? ""}
+            placeholder="Optional. Shown under the section heading on /menu."
+          />
+        </label>
+      </AdminForm>
     </>
   );
 }
@@ -454,8 +752,6 @@ function MenuView() {
         <h2>Menu items</h2>
         <div className="right">
           <Link className="adm-btn adm-btn-save" href="/admin/menu/new">Add item</Link>
-          <Link className="adm-btn adm-btn-ghost" href="/admin/categories">Categories</Link>
-          <Link className="adm-btn adm-btn-ghost" href="/admin/menu/curation">Featured</Link>
         </div>
       </div>
       <p className="adm-lead">

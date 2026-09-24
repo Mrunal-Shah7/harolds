@@ -79,7 +79,6 @@ export function StorefrontFooter({ status }: { status: StoreStatus }) {
           <span>
             © {new Date().getFullYear()} {status.storeName}
           </span>
-          <span>Prices set at the board</span>
         </div>
       </div>
     </footer>

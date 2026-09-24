@@ -6,7 +6,7 @@
 // data lands.
 //
 // A skeleton's dimensions must match the loaded content. Each block below mirrors the design v1.1
-// component it stands in for — the header's 64px row and its mobile sub-row, the hero's poster
+// component it stands in for — the header's 64px row, the hero's poster
 // lines, the category rail's 88px circles, the product grid's breakpoints — so nothing shifts on
 // arrival. Every block is a `.skel` on sunk paper; no new shapes are introduced here.
 import { ItemCardSkeleton } from "@/components/ui/feedback";
@@ -21,13 +21,10 @@ function HeaderSkeleton() {
     <header className="sf-header">
       <div className="container">
         <div className="wordmark">
-          <img src="/logo.jpeg" alt="" width={1320} height={588} />
+          <img src="/logo.png" alt="" width={1314} height={580} />
         </div>
-        <Bar style={{ height: 40, width: 240, borderRadius: 999 }} />
+        <Bar style={{ height: 32, width: 72, borderRadius: 999 }} />
         <Bar style={{ height: 44, width: 110, borderRadius: 999, marginLeft: "auto" }} />
-      </div>
-      <div className="subrow">
-        <Bar style={{ height: 36, width: 220, borderRadius: 999 }} />
       </div>
     </header>
   );
@@ -63,14 +60,17 @@ export function HomeSkeleton() {
     <div className="sf-page" role="status" aria-label="Loading the menu">
       <HeaderSkeleton />
       <main>
-        <section className="band b-paper textured">
+        <section className="band b-paper textured hero">
           <div className="container">
             <Bar style={{ height: 16, width: 200, marginBottom: 20 }} />
             <Bar style={{ height: 56, width: "70%", marginBottom: 10 }} />
             <Bar style={{ height: 56, width: "55%", marginBottom: 10 }} />
             <Bar style={{ height: 56, width: "62%" }} />
             <Bar style={{ height: 26, width: "45%", margin: "24px 0 32px" }} />
-            <Bar style={{ height: 52, width: 200, borderRadius: 999 }} />
+            <div className="hero-actions">
+              <Bar style={{ height: 52, borderRadius: 999 }} />
+              <Bar style={{ height: 52, borderRadius: 999 }} />
+            </div>
           </div>
         </section>
 
@@ -91,9 +91,11 @@ export function HomeSkeleton() {
         <section className="band b-paper textured">
           <div className="container">
             <Bar style={{ height: 36, width: 280 }} />
-            <div className="grid-products">
+            <div className="item-rail">
               {Array.from({ length: 3 }).map((_, i) => (
-                <ItemCardSkeleton key={i} />
+                <div key={i} role="listitem">
+                  <ItemCardSkeleton />
+                </div>
               ))}
             </div>
           </div>

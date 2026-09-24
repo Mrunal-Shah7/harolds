@@ -272,7 +272,7 @@ export default function CheckoutPage() {
   if (lines.length === 0) {
     return (
       <div className="sf-page">
-        <StorefrontHeader status={status} showCart={false} />
+        <StorefrontHeader status={status} showCart={false} compactStatus />
         <main>
           <div className="band b-paper textured">
             <div className="container">
@@ -292,7 +292,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="sf-page">
-      <StorefrontHeader status={status} showCart={false} />
+      <StorefrontHeader status={status} showCart={false} compactStatus />
 
       <main>
         <div className="band b-paper textured" style={{ paddingTop: 40 }}>

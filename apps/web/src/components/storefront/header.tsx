@@ -9,8 +9,8 @@
 //
 // The theme toggle that used to sit here is hidden — light only, for now. See app/layout.tsx.
 //
-// SCREEN FIT ONLY: below 768px the status pill renders in a sub-row beneath the logo and cart,
-// because the three cannot share one 64px row at 390px. Same element, same styling.
+// The short "OPEN" pill stays on the logo's row. The long "ready in 20 min" sentence is what
+// used to drop under it on a phone; that sentence still lives in the hours sheet, one tap away.
 import Link from "next/link";
 import type { StoreStatus } from "@harolds/types";
 import { useCart } from "@/lib/cart-context";
@@ -25,8 +25,8 @@ export function StorefrontHeader({
   status?: StoreStatus | null;
   onCartClick?: () => void;
   /**
-   * Menu page: the state collapses to a dot and one word and stays on the logo's row, instead of
-   * dropping to a second line under it. See StoreStatusPill's `compact`.
+   * One word ("OPEN") on the logo's row, instead of the long "ready in 20 min" sentence. The
+   * complete state is still one tap away in the hours sheet.
    */
   compactStatus?: boolean;
   /** Checkout hides the cart button: the cart is the page, so a control that reopens it is noise. */
@@ -39,7 +39,7 @@ export function StorefrontHeader({
       <div className="container">
         <Link href="/" className="wordmark" aria-label="Harold's Chicken Burnham, home">
           {/* Intrinsic size given so the row reserves its space before the image decodes. */}
-          <img src="/logo.jpeg" alt="Harold's Chicken" width={1320} height={588} />
+          <img src="/logo.png" alt="Harold's Chicken" width={1314} height={580} />
         </Link>
 
         {status ? <StoreStatusPill status={status} compact={compactStatus} /> : null}

@@ -35,6 +35,11 @@ type CollectJS = {
     validCss?: Record<string, string>;
     focusCss?: Record<string, string>;
     placeholderCss?: Record<string, string>;
+    /** Required by Collect.js even when wallets are unused — omit them and it logs
+     *  "Could not create PaymentRequestAbstraction". */
+    currency: string;
+    country: string;
+    price: string;
     fields: Record<string, CollectJSFieldConfig>;
     callback: (response: CollectJSResponse) => void;
     validationCallback?: (
@@ -125,6 +130,13 @@ export function NmiPaymentForm({
     try {
       window.CollectJS.configure({
         variant: "inline",
+        // Collect.js always constructs an internal PaymentRequest (Apple/Google Pay plumbing)
+        // during configure, even for a card-only inline form. Without these three it logs
+        // "Could not create PaymentRequestAbstraction" and the Next overlay treats it as a
+        // console error. Checkout does not offer wallets; the figures are stubs.
+        currency: "USD",
+        country: "US",
+        price: "1.00",
         // Our own CSS is handed over explicitly rather than sniffed: styleSniffer guesses from
         // the host page and produces fields that drift from the rest of the form.
         styleSniffer: false,

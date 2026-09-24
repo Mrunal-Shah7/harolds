@@ -769,6 +769,14 @@ a.wordmark {
   height: 40px;
   width: auto;
   max-width: none;
+  display: block;
+  border: 0;
+  background: transparent;
+}
+@media (min-width: 768px) {
+  .wordmark img {
+    height: 52px;
+  }
 }
 @media (max-width: 767px) {
   .sf-header .container {
@@ -840,6 +848,29 @@ a.wordmark {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.status-pill.compact {
+  flex: none;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  min-height: 0;
+}
+.status-pill.compact .dot {
+  width: 6px;
+  height: 6px;
+}
+@media (min-width: 768px) {
+  .status-pill.compact {
+    gap: 7px;
+    padding: 6px 12px;
+    font-size: 0.875rem;
+  }
+  .status-pill.compact .dot {
+    width: 8px;
+    height: 8px;
+  }
+}
 .cart-btn {
   margin-left: auto;
   position: relative;
@@ -870,7 +901,8 @@ a.wordmark {
   }
 }
 @media (max-width: 767px) {
-  .sf-header .container > .status-pill {
+  /* The long sentence still drops under the row. The one-word pill stays with the logo. */
+  .sf-header .container > .status-pill:not(.compact) {
     display: none;
   }
 }
@@ -911,6 +943,17 @@ a.wordmark {
    without one the type is unreadable over a light or busy image. The scrim is a
    paper-tinted wash, not a black one, so the band still reads as paper.
    ----------------------------------------------------------------------------- */
+.hero {
+  padding-top: 28px;
+  padding-bottom: 36px;
+}
+@media (max-width: 767px) {
+  .hero {
+    padding-top: 16px;
+    padding-bottom: 20px;
+  }
+}
+
 .hero.has-banner {
   position: relative;
   background-size: cover;
@@ -955,24 +998,58 @@ a.wordmark {
 .hero h1 .accent {
   color: var(--brand-text);
 }
-.hero p {
-  font-size: var(--body-lg);
-  color: var(--ink-muted);
-  max-width: 520px;
+.hero .eyebrow {
+  font-size: 0.875rem;
+}
+.hero-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+.hero-place-icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  stroke-width: 2.25;
+}
+.hero-lede {
+  max-width: 36em;
   margin: 20px 0 32px;
 }
-/* Pickup and delivery sit side by side, wrapping rather than shrinking on a narrow screen. */
-.hero-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
+@media (min-width: 768px) {
+  .hero .eyebrow {
+    font-size: 1.125rem;
+  }
 }
-.hero-meta {
-  display: flex;
+/* Pickup and delivery share one row and the same width, including on a phone. */
+.hero-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 24px;
+  max-width: 520px;
+}
+.hero-actions .btn {
+  width: 100%;
+  min-width: 0;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.cat-jump {
+  padding-top: 24px;
+  padding-bottom: 40px;
+}
+.cat-jump-kicker {
+  margin-bottom: 16px;
+  font-size: 0.875rem;
+}
+@media (min-width: 768px) {
+  .cat-jump {
+    padding-top: 28px;
+  }
+  .cat-jump-kicker {
+    font-size: 1.125rem;
+  }
 }
 
 .cat-rail {
@@ -1030,6 +1107,40 @@ a.wordmark {
   text-transform: uppercase;
   font-weight: 600;
   color: var(--ink);
+}
+
+/* Home "Most ordered": the same horizontal rail as .cat-rail, but for product cards.
+   A half-cut card at the edge is the affordance that this row scrolls. */
+.item-rail {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  margin-top: 32px;
+  padding: 4px;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.item-rail::-webkit-scrollbar {
+  display: none;
+}
+.item-rail > [role="listitem"] {
+  flex: 0 0 min(300px, 78vw);
+  min-width: 0;
+}
+.item-rail .pcard {
+  height: 100%;
+}
+.item-rail .pcard .tap {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
 .grid-products {
@@ -1215,6 +1326,8 @@ a.wordmark {
   align-items: flex-end;
   justify-content: center;
   padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 .overlay.on {
   display: flex;
@@ -1230,9 +1343,35 @@ a.wordmark {
   width: 100%;
   max-width: 560px;
   max-height: 92vh;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-radius: var(--r-lg) var(--r-lg) 0 0;
   box-shadow: var(--ev-overlay);
+  cursor: default;
+}
+.modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-handle {
+  display: none;
+}
+.modal.is-dragging,
+.modal.is-pulled {
+  animation: none;
+  touch-action: none;
+  transform: translateY(var(--sheet-y, 0px));
+}
+.modal.is-dragging .modal-body {
+  overflow: hidden;
+  touch-action: none;
+}
+.modal.is-closing {
+  animation: sf-slide-down var(--dur-slow) var(--ease-out) forwards;
 }
 @media (min-width: 768px) {
   .modal {
@@ -1429,6 +1568,80 @@ a.wordmark {
   font-size: var(--body-sm);
   color: var(--ink-muted);
   margin-bottom: 12px;
+}
+.slide-act {
+  position: relative;
+  width: 100%;
+  height: 56px;
+  border-radius: var(--r-pill);
+  background: var(--brand);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+.slide-act:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.slide-act-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 56px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--display-sm);
+  color: #fff;
+  pointer-events: none;
+  opacity: calc(1 - var(--slide-ratio, 0) * 1.35);
+}
+.slide-act-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-pill);
+  background: #fff;
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--ev-raised);
+  transform: translateX(var(--thumb-x, 0px));
+  cursor: grab;
+  touch-action: none;
+}
+.slide-act.is-dragging .slide-act-thumb {
+  cursor: grabbing;
+  transition: none;
+}
+.slide-act:not(.is-dragging) .slide-act-thumb,
+.slide-act:not(.is-dragging) .slide-act-label {
+  transition:
+    transform var(--t-slow) var(--ease),
+    opacity var(--t-slow) var(--ease);
+}
+.slide-act-thumb svg {
+  width: 26px;
+  height: 26px;
+}
+.slide-act:not(.is-dragging):not(.is-done) .slide-act-thumb svg {
+  animation: slide-act-nudge 1.2s var(--ease) infinite;
+}
+@keyframes slide-act-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
+  }
 }
 
 /* The bottom-anchored variant of the sheet — store hours on a phone. */
@@ -1689,7 +1902,7 @@ a.wordmark {
   }
 }
 .sf-footer h4 {
-  font-size: var(--label);
+  font-size: 0.875rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 600;
@@ -1881,7 +2094,7 @@ html[data-theme="dark"] .sf-root .sf-header {
     height: 44px;
     padding: 0 18px;
   }
-  .status-pill {
+  .status-pill:not(.compact) {
     min-height: 44px;
   }
   a.wordmark {
@@ -1937,6 +2150,15 @@ html[data-theme="dark"] .sf-root .sf-header {
   .cat-tile {
     scroll-snap-align: start;
   }
+  .item-rail {
+    margin-inline: -16px;
+    padding-left: 28px;
+    padding-right: 16px;
+    scroll-snap-type: x proximity;
+  }
+  .item-rail > [role="listitem"] {
+    scroll-snap-align: start;
+  }
 
   /* NOTE: the checkout summary is deliberately NOT reordered above the form. `order` moves a
      grid item visually without moving it in the DOM, so a keyboard or screen-reader user would
@@ -1949,6 +2171,31 @@ html[data-theme="dark"] .sf-root .sf-header {
   }
   .modal {
     max-height: 88dvh;
+  }
+  .modal-handle {
+    display: block;
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 4px;
+    margin: 0;
+    padding: 14px 0 12px;
+    box-sizing: content-box;
+    background: var(--surface);
+    flex: none;
+    touch-action: none;
+  }
+  .modal .img {
+    touch-action: none;
+  }
+  .modal-handle::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto;
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
   }
   .modal .inner {
     padding: 20px 16px;
@@ -2380,8 +2627,12 @@ html[data-theme="dark"] .sf-root .sf-header {
 }
 .sug-actions {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+.sug-actions .btn-ghost {
+  align-self: flex-start;
 }
 
 /* ---------- checkout: inline errors, back row, decoy ---------- */
@@ -2403,6 +2654,13 @@ html[data-theme="dark"] .sf-root .sf-header {
   align-items: center;
   margin-bottom: 16px;
   flex-wrap: wrap;
+}
+@media (max-width: 767px) {
+  .co-back {
+    justify-content: space-between;
+    gap: 0;
+    flex-wrap: nowrap;
+  }
 }
 
 /* Off-screen rather than display:none, because some automation skips hidden inputs and the
@@ -2450,6 +2708,14 @@ html[data-theme="dark"] .sf-root .sf-header {
     opacity: 1;
   }
 }
+@keyframes sf-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
 @keyframes sf-slide-right {
   from {
     transform: translateX(100%);
@@ -2458,12 +2724,28 @@ html[data-theme="dark"] .sf-root .sf-header {
     transform: none;
   }
 }
+@keyframes sf-slide-left {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
 @keyframes sf-slide-up {
   from {
     transform: translateY(100%);
   }
   to {
     transform: none;
+  }
+}
+@keyframes sf-slide-down {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateY(100%);
   }
 }
 @keyframes sf-pop {
@@ -2485,12 +2767,29 @@ html[data-theme="dark"] .sf-root .sf-header {
 .sheet.sheet-bottom.on {
   animation: sf-slide-up var(--dur-slow) var(--ease-out);
 }
+.sheet.on.is-closing {
+  animation: sf-slide-left var(--dur-slow) var(--ease-out) forwards;
+  pointer-events: none;
+}
+.sheet.sheet-bottom.on.is-closing {
+  animation: sf-slide-down var(--dur-slow) var(--ease-out) forwards;
+}
+.overlay.on.is-closing {
+  animation: sf-fade-out var(--dur-base) ease forwards;
+  pointer-events: none;
+}
 .overlay.on {
   animation: sf-fade-in var(--dur-base) ease;
 }
 .modal.on,
 .dialog.on {
-  animation: sf-fade-up var(--dur-base) var(--ease-out);
+  animation: sf-slide-up var(--dur-slow) var(--ease-out);
+}
+/* Beats `.modal.on` so a pull-down is not swallowed by the enter animation's transform. */
+.modal.on.is-dragging,
+.modal.on.is-pulled {
+  animation: none;
+  transform: translateY(var(--sheet-y, 0px));
 }
 
 /* The cart bar is the one element that appears because of something the customer just did. */
@@ -2543,10 +2842,17 @@ html[data-theme="dark"] .sf-root .sf-header {
  * asking because motion makes them ill.
  */
 @media (prefers-reduced-motion: reduce) {
+  .slide-act:not(.is-dragging):not(.is-done) .slide-act-thumb svg {
+    animation: none;
+  }
   .sheet.on,
   .sheet.sheet-bottom.on,
+  .sheet.on.is-closing,
+  .sheet.sheet-bottom.on.is-closing,
   .overlay.on,
+  .overlay.on.is-closing,
   .modal.on,
+  .modal.is-closing,
   .dialog.on,
   .cart-bar.on,
   .qty-count,

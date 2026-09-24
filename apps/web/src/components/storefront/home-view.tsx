@@ -9,6 +9,7 @@
 // slides that lie — is worse than a headline.
 import { useState } from "react";
 import Link from "next/link";
+import { MapPin } from "lucide-react";
 import type { FullMenu, MenuItemSummary, StoreStatus } from "@harolds/types";
 import { StorefrontHeader } from "@/components/storefront/header";
 import { AnnouncementStrip } from "@/components/storefront/announcement-strip";
@@ -44,7 +45,7 @@ export function HomeView({
   if (!menu || !status) {
     return (
       <div className="sf-page">
-        <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} />
+        <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} compactStatus />
         <main>
           <ErrorState
             message="We couldn't load the menu. Try again."
@@ -72,7 +73,7 @@ export function HomeView({
 
   return (
     <div className="sf-page">
-      <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} />
+      <StorefrontHeader status={status} onCartClick={() => setCartOpen(true)} compactStatus />
       <AnnouncementStrip announcement={status.announcement} />
 
       <main>
@@ -86,8 +87,11 @@ export function HomeView({
           }
         >
           <div className="container">
-            <p className="eyebrow">
-              {status.city}, {status.state} · Pickup only
+            <p className="eyebrow hero-place">
+              <MapPin className="hero-place-icon" aria-hidden="true" />
+              <span>
+                {status.city}, {status.state}
+              </span>
             </p>
             <h1 style={{ marginTop: 12 }}>
               Fries under.
@@ -96,9 +100,8 @@ export function HomeView({
               <br />
               <span className="accent">75 years loud.</span>
             </h1>
-            <p>
-              Fried to order, the way the South Side has eaten it — order ahead, skip the line,
-              pick it up hot.
+            <p className="eyebrow hero-lede">
+              Fried to order, the way the South Side has eaten it.
             </p>
             <div className="hero-actions">
               <Link href="/menu" className="btn btn-primary btn-lg">
@@ -115,11 +118,6 @@ export function HomeView({
                 Order delivery
               </a>
             </div>
-            <div className="hero-meta">
-              <span className="badge badge-neutral">Guest checkout</span>
-              <span className="badge badge-neutral">Paid online</span>
-              <span className="badge badge-neutral">Card · Apple Pay · Google Pay · Cash App</span>
-            </div>
             {/* Browsing stays available when closed; only checkout is blocked, and it is blocked
                 at the point of blocking with an explanation. */}
             {closed ? (
@@ -129,12 +127,9 @@ export function HomeView({
         </section>
 
         {categories.length > 0 ? (
-          <section
-            className="band b-sunk textured"
-            style={{ paddingTop: 40, paddingBottom: 40 }}
-          >
+          <section className="band b-sunk textured cat-jump">
             <div className="container">
-              <p className="eyebrow" style={{ marginBottom: 16 }}>
+              <p className="eyebrow cat-jump-kicker">
                 Straight to a section
               </p>
               <CategoryRail
@@ -156,15 +151,16 @@ export function HomeView({
               <p style={{ color: "var(--ink-muted)", marginTop: 8 }}>
                 What the neighborhood keeps coming back for.
               </p>
-              <div className="grid-products">
+              <div className="item-rail" role="list" aria-label="Most ordered items">
                 {mostOrdered.map((item, i) => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    priority={i === 0}
-                    onOpen={setSelected}
-                    onQuickAdd={hasRequiredGroups(item) ? undefined : quickAdd}
-                  />
+                  <div key={item.id} role="listitem">
+                    <ItemCard
+                      item={item}
+                      priority={i === 0}
+                      onOpen={setSelected}
+                      onQuickAdd={hasRequiredGroups(item) ? undefined : quickAdd}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
