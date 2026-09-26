@@ -4463,7 +4463,6 @@ select[multiple] {
     <button class="chrome-tab" onclick="openItem()">Item modal</button>
     <button class="chrome-tab" onclick="openCart()">Cart sheet</button>
     <button class="chrome-tab" onclick="openHours()">Hours sheet</button>
-    <button class="chrome-tab" onclick="toggleToast()">Undo toast</button>
   </div>
 
   <div class="chrome-row chrome-sub" id="sub-adm" hidden>
@@ -5404,15 +5403,7 @@ select[multiple] {
     </div>
   </div>
 
-  <!-- ============ UNDO TOAST — the one permitted actionable toast ============ -->
-  <div id="undo-toast" style="display:none">
-    <div style="position:fixed;left:0;right:0;bottom:0;z-index:var(--z-toast);display:flex;justify-content:center;padding:0 16px;padding-bottom:max(16px,env(safe-area-inset-bottom));pointer-events:none">
-      <div class="animate-slide-in-bottom" style="pointer-events:auto;margin-bottom:80px;display:flex;align-items:center;gap:16px;background:var(--roast);color:var(--ink-on-roast);border-radius:var(--r-md);box-shadow:var(--ev-overlay);padding:12px 16px">
-        <p>Removed Coleslaw.</p>
-        <button type="button" class="btn btn-ghost btn-sm" style="color:var(--flame)" onclick="toggleToast()">Undo</button>
-      </div>
-    </div>
-  </div>
+  <!-- SPRINT-19: the undo toast was removed from the app; removal is simply removal. -->
 
 </div>
 
@@ -6421,7 +6412,7 @@ select[multiple] {
     <li><strong>Most ordered is curated from the Menu table.</strong> A toggle on every row, beside Sold out. The list is hand-picked, not a sales figure, and an empty list hides the storefront band entirely. The Curation page now manages Featured only — two controls for one list is how the two disagree.</li>
     <li><strong>The kitchen board is one grid, not three status columns.</strong> Cards are ordered by age and each carries its own next action. This is the one change that alters how expo staff scan the board during a rush.</li>
     <li><strong>An explicit audio-unlock panel</strong> over the board, because Android will not play the chime until the page has been touched once.</li>
-    <li><strong>Screens v1.1 never drew:</strong> admin sign-in, Dashboard, Modifiers, Store, Jobs, Staff and the item and group editors; the kitchen PIN pad and cancel confirmation; the storefront's hours sheet, route-level skeletons, error state and undo toast. All are built from the design's own primitives — no new visual language.</li>
+    <li><strong>Screens v1.1 never drew:</strong> admin sign-in, Dashboard, Modifiers, Store, Jobs, Staff and the item and group editors; the kitchen PIN pad and cancel confirmation; the storefront's hours sheet, route-level skeletons, error state. (The undo toast was drawn here until Sprint 19 removed it from the app.) All are built from the design's own primitives — no new visual language.</li>
 
     <h2>Deliberate departures, and why</h2>
     <li><strong>Checkout takes first and last name.</strong> v1.1 drew a single "Name" field. The required set predates the design and changing a validation rule is not a design change. The SMS-consent row that used to sit beside it went with the SMS subsystem in Sprint 17.</li>
@@ -6502,10 +6493,6 @@ function openCart(){ document.getElementById('ov-cart').classList.add('on'); doc
 function closeCart(){ document.getElementById('ov-cart').classList.remove('on'); document.getElementById('cart-sheet').classList.remove('on') }
 function openHours(){ document.getElementById('ov-hours').classList.add('on'); document.getElementById('hours-sheet').classList.add('on') }
 function closeHours(){ document.getElementById('ov-hours').classList.remove('on'); document.getElementById('hours-sheet').classList.remove('on') }
-function toggleToast(){
-  var t = document.getElementById('undo-toast');
-  t.style.display = t.style.display === 'none' ? 'block' : 'none';
-}
 
 /* The theme toggle is gone from the header (light only, for now), so nothing calls a
    toggleTheme here either. The dark CSS is still present and still correct; it simply has

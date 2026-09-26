@@ -1,19 +1,19 @@
 "use client";
 
-// The storefront's polite live region and the undo toast.
+// The storefront's polite live region for cart changes.
 //
 // One region announces cart changes so a screen-reader user hears the result of an action
-// instead of inferring it. The undo toast is the ONE permitted actionable toast — removal must be
-// undoable rather than confirmed. Nothing is lost if it is ignored: the line stays removed.
-// It sits on the roast surface with the flame action, so it reads as the system speaking rather
-// than as part of the page.
+// instead of inferring it.
+//
+// SPRINT-19: the "Removed X. Undo" toast is gone, at the operator's request. A removal from a
+// stepper or the cart is now simply a removal. The line stays removed. The cart still records the
+// last removal for its undo API, but nothing offers it, so the record is cleared straight away
+// rather than left to linger.
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/lib/cart-context";
 
-const UNDO_WINDOW_MS = 8000;
-
 export function CartAnnouncer() {
-  const { totalItems, lastRemoved, undoRemove, dismissUndo } = useCart();
+  const { totalItems, lastRemoved, dismissUndo } = useCart();
   const [message, setMessage] = useState("");
   const previousCount = useRef<number | null>(null);
 
@@ -33,41 +33,12 @@ export function CartAnnouncer() {
   }, [totalItems]);
 
   useEffect(() => {
-    if (!lastRemoved) return;
-    const timer = setTimeout(dismissUndo, UNDO_WINDOW_MS);
-    return () => clearTimeout(timer);
+    if (lastRemoved) dismissUndo();
   }, [lastRemoved, dismissUndo]);
 
   return (
-    <>
-      <div aria-live="polite" aria-atomic="true" className="sr-only">
-        {message}
-      </div>
-
-      {lastRemoved ? (
-        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-toast flex justify-center px-4">
-          <div
-            className="animate-slide-in-bottom pointer-events-auto mb-20 flex items-center gap-4 md:mb-4"
-            style={{
-              background: "var(--roast)",
-              color: "var(--ink-on-roast)",
-              borderRadius: "var(--r-md)",
-              boxShadow: "var(--ev-overlay)",
-              padding: "12px 16px",
-            }}
-          >
-            <p>Removed {lastRemoved.line.item.name}.</p>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={undoRemove}
-              style={{ color: "var(--flame)" }}
-            >
-              Undo
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </>
+    <div aria-live="polite" aria-atomic="true" className="sr-only">
+      {message}
+    </div>
   );
 }

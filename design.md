@@ -320,7 +320,7 @@ Item modal: full-bleed 4:3 image, name, description, modifier groups, quantity s
 ### Cart
 Mobile: sticky bottom bar above the safe area, appearing only when non-empty. Desktop: sheet from the right. Line items show name, modifiers in `body-sm` `ink-muted`, stepper, and quantity.
 
-The "Anything else?" suggestions step uses the same control as a menu card: `Add +` until the item is in the cart, then the quantity stepper, which returns to `Add +` at zero. A suggestion added by mistake can always be taken out (Sprint 19). <!-- SPRINT-19 -->
+The "Anything else?" suggestions step uses the same control as a menu card: `Add +` until the item is in the cart, then the quantity stepper, which returns to `Add +` at zero. A suggestion added by mistake can always be taken out (Sprint 19). <!-- SPRINT-19 --> Removing an item shows **no toast**. The stepper or the line simply changes, and screen readers hear it through the polite live region.
 
 **No monetary figure is computed in the browser, anywhere, ever.** The storefront quotes at checkout; the cart therefore lists contents and count, and checkout states the cost. If a running cart total is wanted, it is a debounced server quote scoped to cart mutations and it is planned as the behaviour change it is.
 

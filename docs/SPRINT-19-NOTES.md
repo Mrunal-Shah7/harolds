@@ -546,5 +546,10 @@ These were reported by the operator from `haroldsburnham.com/checkout`, plus one
 4. **"Anything else?" could only add.** A suggestion already in the cart showed "Added (n)", which only added
    another.
    - **Fix:** it now shows the menu card's quantity stepper (`incrementItem` / `decrementItem` / `isAtItemLimit`, the
-     same cart functions), which returns to "Add +" at zero. Removing the last one offers the cart's existing undo.
+     same cart functions), which returns to "Add +" at zero. Removing the last one removes it (see 5).
    - `design.md` (Cart) and `harolds-design-v1_1.html` are updated.
+5. **The "Removed X. Undo" toast is gone,** at the operator's request. `CartAnnouncer` now renders only the
+   screen-reader live region, which still says "Removed from cart. N items in your cart." The cart context keeps
+   its `lastRemoved` / `undoRemove` API unchanged, but nothing offers undo, so the announcer clears the record
+   immediately. The toast is also removed from `harolds-design-v1_1.html` (the block, its toolbar button and its
+   toggle).
