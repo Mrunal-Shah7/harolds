@@ -204,7 +204,7 @@ The docs say nothing about it. See §3 for the empirical check and the approach 
 - **CSP.**
   - **Both flags off:** byte-identical to the pre-sprint header. This is proven against **literal** fixtures captured from
     `62b4958` (`wallets.test.ts`), and against the running build's header (§7).
-  - **Apple Pay on: no change.** Its only origin, `https://applepay.cdn-apple.com`, is already allowed unconditionally,
+  - **Apple Pay on:** *(superseded by §11.2 — true in Safari only)* **no change.** Its only origin, `https://applepay.cdn-apple.com`, is already allowed unconditionally,
     because Collect.js injects Apple's SDK on every load. The button is an in-page `<apple-pay-button>`, and merchant
     validation goes to `<gateway>/token/apple_pay_create_session.php`, which is already allowed.
   - **Google Pay on:** `script-src` gains `https://pay.google.com`; `frame-src` gains `https://collectcheckout.com` and
@@ -413,7 +413,7 @@ reported the flags each process was given.
 | Flags | `/checkout` CSP versus the pre-sprint header captured from the `62b4958` build |
 |---|---|
 | both off | **byte-identical** |
-| Apple Pay only | **byte-identical** (its origin was already there) |
+| Apple Pay only | first release: byte-identical. **§11.2:** now adds `frame-src https://applepay.cdn-apple.com`, `connect-src https://smp-paymentservices.apple.com` |
 | Google Pay only | adds `script-src https://pay.google.com`, `frame-src https://collectcheckout.com https://pay.google.com`, `connect-src https://pay.google.com` |
 | both on | the same as Google Pay only |
 
@@ -513,3 +513,38 @@ No server, watcher or browser was left running. Scratch files are in the session
 Nothing contacted an MPC host. The only gateway-origin traffic was headless Chrome loading the **generic NMI sandbox**
 `Collect.js` and its field iframes for rendering, plus one `curl` of that `Collect.js` file. No token was created and
 no transaction was sent.
+
+## 11. After the first deploy: four fixes
+
+These were reported by the operator from `haroldsburnham.com/checkout`, plus one found in their screenshot.
+
+1. **Google Pay never appeared.** Collect.js draws the Google Pay iframe inside `tokenPromise.then(…)`, after a token
+   round-trip to the gateway, which is well after `configure()` returns. The availability check looked at the mount
+   **once**, at configure time, found it empty, and never looked again.
+   - **Fix:** the Google mount is watched with a `MutationObserver`, as Apple's already was.
+   - Availability now **latches**: a device that said yes stays yes (`latchAvailability`, tested). Otherwise the
+     momentary empty mount during a price-change re-configure could remove the tab the customer is on and drop them
+     back to Card.
+   - **New diagnostic:** if Google's `isReadyToPay` says yes but Collect.js still hasn't drawn a button 15 s after
+     configure, the page reports it to `/api/internal/client-error` (source `nmi-payment-form:wallets`). That case
+     means the gateway did not offer Google Pay for this account, which is a Merchant Pay Connect setting, not code.
+2. **Apple Pay on Chrome showed a blank sheet.** This corrects §2 and §0.9: "Apple Pay adds no CSP origin" holds
+   **only in Safari**.
+   - In every other browser, Apple's SDK shows its "scan with your iPhone" sheet as an iframe from
+     `https://applepay.cdn-apple.com/applepaycode`. Before that, it checks the merchant's registration at
+     `https://smp-paymentservices.apple.com`. Both were blocked, which produced the broken-frame icon.
+     Source: Apple's public `apple-pay-sdk.js` (`applePayModalOrigin`, the `checkStatus/merchant` fetch).
+   - **Fix:** while Apple Pay is on, `frame-src` gains `https://applepay.cdn-apple.com` and `connect-src` gains
+     `https://smp-paymentservices.apple.com`. The `pay.apple.com` popup is a `window.open`, which CSP doesn't govern.
+   - Both flags off is still byte-identical to the pre-sprint header (tested, and re-proven on the running build).
+3. **A wallet (or Pay) press with empty fields did nothing visible.** The errors were marked on fields far up the
+   page.
+   - **Fix:** `firstInvalidFieldId` (tested, with every id checked against the page) finds the first field with a
+     problem in page order. The page scrolls it to the centre (the sticky header never covers it; the scroll is
+     instant under reduced motion) and focuses it.
+   - This applies to the wallet gate and to the card Pay button.
+4. **"Anything else?" could only add.** A suggestion already in the cart showed "Added (n)", which only added
+   another.
+   - **Fix:** it now shows the menu card's quantity stepper (`incrementItem` / `decrementItem` / `isAtItemLimit`, the
+     same cart functions), which returns to "Add +" at zero. Removing the last one offers the cart's existing undo.
+   - `design.md` (Cart) and `harolds-design-v1_1.html` are updated.

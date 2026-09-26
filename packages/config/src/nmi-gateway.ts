@@ -64,8 +64,11 @@ export function activeNmiGateway(): NmiGatewayUrls {
  * docs/SPRINT-19-NOTES.md §0.9 and §3.
  *
  * - `applePaySdk`: Apple's Pay JS SDK. Collect.js injects it on EVERY checkout load, wallets or
- *   not, so the CSP allows it unconditionally (security.ts). Apple Pay itself adds no other
- *   origin: its button renders in the page and merchant validation goes through the gateway.
+ *   not, so the CSP allows it as a script unconditionally (security.ts). In a browser other than
+ *   Safari, the same SDK shows Apple's "scan with your iPhone" sheet as an iframe from this host
+ *   (`/applepaycode`), so with Apple Pay on it is also a frame source.
+ * - `applePayMerchantCheck`: where Apple's SDK checks, from the browser, that the merchant is
+ *   registered for Apple Pay on the web, before it shows that sheet.
  * - `collectWalletFrames`: Collect.js mounts the Google Pay button as an iframe from this host.
  *   It is hard-coded in the Collect.js build (`googlePayIFrameRootUrl`), not in NMI's CSP list.
  * - `googlePay`: Google's Pay API. Loaded by the checkout ONLY to ask `isReadyToPay`, because
@@ -73,6 +76,7 @@ export function activeNmiGateway(): NmiGatewayUrls {
  */
 export const WALLET_ORIGINS = {
   applePaySdk: "https://applepay.cdn-apple.com",
+  applePayMerchantCheck: "https://smp-paymentservices.apple.com",
   collectWalletFrames: "https://collectcheckout.com",
   googlePay: "https://pay.google.com",
 } as const;

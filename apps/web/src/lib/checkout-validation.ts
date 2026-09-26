@@ -135,3 +135,25 @@ export function validateCheckout(input: {
 export function hasAnyError(errors: CheckoutFieldErrors): boolean {
   return Object.values(errors).some((message) => message !== null);
 }
+
+/**
+ * SPRINT-19: the DOM id of the first field with an error, in the order the fields appear on the
+ * checkout page, or null. Pressing Pay or a wallet button with a problem higher up the page must
+ * take the customer TO it — a message they cannot see is no message.
+ */
+const FIELD_IDS_IN_PAGE_ORDER: ReadonlyArray<[keyof CheckoutFieldErrors, string]> = [
+  ["firstName", "first-name"],
+  ["lastName", "last-name"],
+  ["phone", "phone"],
+  ["email", "email"],
+  ["orderNote", "order-note"],
+  ["customTip", "custom-tip"],
+  ["billingZip", "billing-zip"],
+];
+
+export function firstInvalidFieldId(errors: CheckoutFieldErrors): string | null {
+  for (const [key, id] of FIELD_IDS_IN_PAGE_ORDER) {
+    if (errors[key] !== null) return id;
+  }
+  return null;
+}

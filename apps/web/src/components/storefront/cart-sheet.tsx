@@ -12,6 +12,9 @@
 // Sliding the checkout rail all the way does not leave immediately: it swaps this sheet to a
 // suggestions step first, so sides and drinks are offered where the order is being reviewed
 // rather than on a page of their own.
+//
+// SPRINT-19: a suggestion already in the cart shows the menu card's quantity stepper instead of an
+// "Added (n)" button that could only ever add more — so one added by mistake can be taken out.
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
@@ -101,9 +104,15 @@ function LineNote({
 function Suggestions({
   onAdd,
   alreadyIn,
+  onIncrement,
+  onDecrement,
+  atLimit,
 }: {
   onAdd: (item: MenuItemSummary) => void;
   alreadyIn: (itemId: string) => number;
+  onIncrement: (itemId: string) => void;
+  onDecrement: (itemId: string) => void;
+  atLimit: (item: MenuItemSummary) => boolean;
 }) {
   const [items, setItems] = useState<MenuItemSummary[] | null>(null);
 
@@ -145,20 +154,53 @@ function Suggestions({
     <div className="sug-grid">
       {items.map((item) => {
         const held = alreadyIn(item.id);
+        const limited = atLimit(item);
         return (
           <div key={item.id} className="sug-card">
             <div className="sug-copy">
               <p className="nm">{item.name}</p>
               <p className="pr t-nums">{formatCents(item.basePriceCents)}</p>
             </div>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => onAdd(item)}
-              aria-label={`Add ${item.name}`}
-            >
-              {held > 0 ? `Added (${held})` : "Add +"}
-            </button>
+            {/* The same control as the menu card: once it is in the cart, a stepper, so it can be
+                taken out again. Dropping to zero puts "Add +" back. */}
+            {held > 0 ? (
+              <div className="qty-stepper" role="group" aria-label={`${item.name} quantity`}>
+                <button
+                  type="button"
+                  className="qty-btn"
+                  onClick={() => onDecrement(item.id)}
+                  aria-label={`Remove one ${item.name}`}
+                >
+                  &minus;
+                </button>
+                <span className="qty-count t-nums" aria-live="polite">
+                  {held}
+                </span>
+                <button
+                  type="button"
+                  className="qty-btn"
+                  onClick={() => onIncrement(item.id)}
+                  disabled={limited}
+                  aria-label={
+                    limited
+                      ? `Limit ${item.maxQuantityPerOrder} per order for ${item.name}`
+                      : `Add one more ${item.name}`
+                  }
+                  title={limited ? `Limit ${item.maxQuantityPerOrder} per order` : undefined}
+                >
+                  +
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => onAdd(item)}
+                aria-label={`Add ${item.name}`}
+              >
+                Add +
+              </button>
+            )}
           </div>
         );
       })}
@@ -176,6 +218,9 @@ export function CartSheet({ open, onClose }: { open: boolean; onClose: () => voi
     updateLineNote,
     addLine,
     quantityForItem,
+    incrementItem,
+    decrementItem,
+    isAtItemLimit,
   } = useCart();
   const router = useRouter();
   const [step, setStep] = useState<"cart" | "suggest">("cart");
@@ -247,6 +292,9 @@ export function CartSheet({ open, onClose }: { open: boolean; onClose: () => voi
           </p>
           <Suggestions
             alreadyIn={quantityForItem}
+            onIncrement={incrementItem}
+            onDecrement={decrementItem}
+            atLimit={isAtItemLimit}
             onAdd={(item) =>
               addLine({
                 item,

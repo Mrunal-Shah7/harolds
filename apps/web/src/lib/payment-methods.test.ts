@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 import {
   collectJsWalletOptions,
+  latchAvailability,
   nextTabIndex,
   paymentMethodFromTokenType,
   sheetBlockerMessage,
@@ -18,7 +19,7 @@ import {
   type SheetGateInput,
   type WalletAvailability,
 } from "./payment-methods";
-import { hasAnyError, validateCheckout } from "./checkout-validation";
+import { firstInvalidFieldId, hasAnyError, validateCheckout } from "./checkout-validation";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -58,6 +59,19 @@ describe("tab visibility: flags × availability", () => {
       visiblePaymentMethods({ applePay: true, googlePay: true }, { applePay: true, googlePay: true }),
       ["card", "apple_pay", "google_pay"],
     );
+  });
+});
+
+describe("availability only ever turns on", () => {
+  it("a yes survives a later no (a re-configure briefly empties the wallet mount)", () => {
+    let a: WalletAvailability = { applePay: null, googlePay: null };
+    a = latchAvailability(a, "googlePay", false);
+    assert.equal(a.googlePay, false, "a no before any yes is recorded");
+    a = latchAvailability(a, "googlePay", true);
+    assert.equal(a.googlePay, true, "the button arrived later (after the gateway round-trip)");
+    const same = latchAvailability(a, "googlePay", false);
+    assert.equal(same, a, "a no after a yes changes nothing — the tab the customer is on stays");
+    assert.equal(latchAvailability(a, "applePay", true).applePay, true);
   });
 });
 
@@ -226,5 +240,32 @@ describe("checkout page wiring (source-level: this repository has no DOM harness
     const call = page.slice(page.indexOf("walletSheetBlockers({"), page.indexOf("});", page.indexOf("walletSheetBlockers({")));
     assert.doesNotMatch(call, /walletInProgress/, "the sheet-open lock freezes tip, cart and tabs, not the mount");
     assert.match(call, /submitting,/);
+  });
+});
+
+describe("pressing Pay or a wallet with a problem higher up takes the customer to it", () => {
+  const page = readFileSync(path.join(here, "../app/(storefront)/checkout/page.tsx"), "utf8");
+  const ok = { firstName: "A", lastName: "B", phone: "7085551234", email: "a@example.com", customTip: "", orderNote: "", billingZip: "60633" };
+
+  it("names the FIRST field on the page with a problem", () => {
+    assert.equal(firstInvalidFieldId(validateCheckout(ok)), null);
+    assert.equal(firstInvalidFieldId(validateCheckout({ ...ok, email: "" })), "email");
+    assert.equal(firstInvalidFieldId(validateCheckout({ ...ok, firstName: "", email: "" })), "first-name");
+    assert.equal(firstInvalidFieldId(validateCheckout({ ...ok, billingZip: "" })), "billing-zip");
+    // On a wallet tab the ZIP is not a problem, so it is never the target.
+    assert.equal(firstInvalidFieldId(validateCheckout({ ...ok, billingZip: "" }, { requireBillingZip: false })), null);
+  });
+
+  it("every id it can return exists on the checkout page", () => {
+    for (const id of ["first-name", "last-name", "phone", "email", "order-note", "custom-tip", "billing-zip"]) {
+      assert.match(page, new RegExp(`id="${id}"`), id);
+    }
+  });
+
+  it("both the Pay button and a gated wallet button reveal it", () => {
+    const pay = page.slice(page.indexOf("const handlePayClick = () => {"), page.indexOf("const handlePayClick = () => {") + 900);
+    assert.match(pay, /if \(!formValid\) revealFirstInvalidField\(\);/);
+    const wallet = page.slice(page.indexOf("const handleBlockedWalletPress = () => {"), page.indexOf("const handleBlockedWalletPress = () => {") + 700);
+    assert.match(wallet, /if \(sheetBlockers\[0\] === "fields"\) \{\s*revealFirstInvalidField\(\);/);
   });
 });

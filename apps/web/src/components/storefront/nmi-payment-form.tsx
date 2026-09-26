@@ -11,6 +11,7 @@ import { useNmiCheckoutConfig } from "@/components/storefront/nmi-checkout-confi
 import {
   collectJsWalletOptions,
   GOOGLE_PAY_READY_REQUEST,
+  latchAvailability,
   paymentMethodFromTokenType,
   WALLET_MOUNT_ID,
   type PaymentMethod,
@@ -125,6 +126,15 @@ const FIELD_CSS: Record<string, string> = {
   width: "100%",
   "box-sizing": "border-box",
 };
+
+/** SPRINT-19: a diagnostic line in the server log (never card or contact data). */
+function reportWalletProblem(message: string): void {
+  void fetch("/api/internal/client-error", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message, source: "nmi-payment-form:wallets" }),
+  }).catch(() => undefined);
+}
 
 /** Rendered children appear in a wallet mount only once Collect.js has drawn a button there. */
 function mountHasButton(id: string): boolean {
@@ -320,7 +330,7 @@ export function NmiPaymentForm({
         canPay = false;
       }
       const yes = canPay && mountHasButton(WALLET_MOUNT_ID.apple_pay);
-      setAvailability((prev) => (prev.applePay === yes ? prev : { ...prev, applePay: yes }));
+      setAvailability((prev) => latchAvailability(prev, "applePay", yes));
     };
     check();
     const mount = document.getElementById(WALLET_MOUNT_ID.apple_pay);
@@ -350,10 +360,33 @@ export function NmiPaymentForm({
       cancelled = true;
     };
   }, [wallets.googlePay, wallets.googlePayEnvironment, googleScriptLoaded]);
+  // Collect.js draws the Google Pay iframe only after a token round-trip to the gateway, well after
+  // configure() returns — so the mount is WATCHED, not checked once. (Checking once, the first
+  // release always found it empty and never offered Google Pay.)
   useEffect(() => {
     if (!wallets.googlePay || configuredPriceState === null || googleReady === null) return;
-    const yes = googleReady && mountHasButton(WALLET_MOUNT_ID.google_pay);
-    setAvailability((prev) => (prev.googlePay === yes ? prev : { ...prev, googlePay: yes }));
+    const check = () => {
+      const yes = googleReady && mountHasButton(WALLET_MOUNT_ID.google_pay);
+      setAvailability((prev) => latchAvailability(prev, "googlePay", yes));
+    };
+    check();
+    const mount = document.getElementById(WALLET_MOUNT_ID.google_pay);
+    const observer = mount ? new MutationObserver(check) : null;
+    if (mount && observer) observer.observe(mount, { childList: true });
+    // The one case worth an operator's attention: Google says this device can pay, but Collect.js
+    // never drew the button — the gateway did not offer Google Pay for this account.
+    const diagnose = setTimeout(() => {
+      if (googleReady && !mountHasButton(WALLET_MOUNT_ID.google_pay)) {
+        reportWalletProblem(
+          "Google Pay is enabled and this device can pay, but Collect.js drew no Google Pay button " +
+            "(the gateway did not offer Google Pay for this account — check Merchant Pay Connect).",
+        );
+      }
+    }, 15000);
+    return () => {
+      observer?.disconnect();
+      clearTimeout(diagnose);
+    };
   }, [wallets.googlePay, configuredPriceState, googleReady]);
 
   useEffect(() => {

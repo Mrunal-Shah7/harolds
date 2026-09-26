@@ -124,8 +124,15 @@ describe("wallet CSP", () => {
       assert.equal(contentSecurityPolicy(environment, OFF), PRE_SPRINT_19_CSP[environment]);
     });
 
-    it(`adds nothing for Apple Pay: its SDK host is already allowed (${environment})`, () => {
-      assert.equal(contentSecurityPolicy(environment, { applePay: true, googlePay: false }), PRE_SPRINT_19_CSP[environment]);
+    it(`adds exactly Apple Pay's origins: its sheet's frame host and its merchant check (${environment})`, () => {
+      // Safari needs neither; every other browser shows Apple's QR sheet in an iframe from the SDK
+      // host after a registration check — both blocked left production Chrome with a blank sheet.
+      const change = diff(PRE_SPRINT_19_CSP[environment], contentSecurityPolicy(environment, { applePay: true, googlePay: false }));
+      assert.deepEqual(change.removed, {});
+      assert.deepEqual(change.added, {
+        "frame-src": [WALLET_ORIGINS.applePaySdk],
+        "connect-src": [WALLET_ORIGINS.applePayMerchantCheck],
+      });
     });
 
     it(`adds exactly Google Pay's origins, in exactly its directives (${environment})`, () => {
@@ -138,11 +145,14 @@ describe("wallet CSP", () => {
       });
     });
 
-    it(`with both on equals Google Pay alone (${environment})`, () => {
-      assert.equal(
-        contentSecurityPolicy(environment, { applePay: true, googlePay: true }),
-        contentSecurityPolicy(environment, { applePay: false, googlePay: true }),
-      );
+    it(`with both on adds exactly the union of the two (${environment})`, () => {
+      const change = diff(PRE_SPRINT_19_CSP[environment], contentSecurityPolicy(environment, { applePay: true, googlePay: true }));
+      assert.deepEqual(change.removed, {});
+      assert.deepEqual(change.added, {
+        "script-src": [WALLET_ORIGINS.googlePay],
+        "frame-src": [WALLET_ORIGINS.applePaySdk, WALLET_ORIGINS.collectWalletFrames, WALLET_ORIGINS.googlePay],
+        "connect-src": [WALLET_ORIGINS.applePayMerchantCheck, WALLET_ORIGINS.googlePay],
+      });
     });
   }
 

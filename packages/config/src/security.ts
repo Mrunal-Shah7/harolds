@@ -100,11 +100,15 @@ export function contentSecurityPolicy(
    * checkout page load, which is how a violation report stops being worth reading.
    * The host is `cdn-apple.com` (hyphen) — `cdn.apple.com` is a different name and will not match.
    *
-   * SPRINT-19: it is also everything Apple Pay needs, so PAYMENTS_APPLE_PAY_ENABLED adds nothing
-   * here. Apple Pay's button renders in the page, and Collect.js validates the merchant session
-   * through the gateway, which is already allowed.
+   * SPRINT-19: Safari needs nothing more for Apple Pay — its button renders in the page and
+   * Collect.js validates the merchant session through the gateway. Every OTHER browser gets
+   * Apple's "scan with your iPhone" sheet, which the same SDK shows as an iframe from its own host
+   * after checking the merchant's registration with Apple. Blocking either leaves the customer a
+   * blank sheet (found in production on Chrome), so both are allowed while Apple Pay is on.
    */
   const collectJsApplePay = WALLET_ORIGINS.applePaySdk;
+  const appleFrames = wallets.applePay ? ` ${WALLET_ORIGINS.applePaySdk}` : "";
+  const appleConnect = wallets.applePay ? ` ${WALLET_ORIGINS.applePayMerchantCheck}` : "";
   /**
    * SPRINT-19: Google Pay, ONLY while PAYMENTS_GOOGLE_PAY_ENABLED is on, in exactly the directives
    * it uses: Google's Pay API script and its calls and frames (NMI's Collect.js CSP list), and the
@@ -119,8 +123,8 @@ export function contentSecurityPolicy(
     `style-src 'self' 'unsafe-inline' ${gateway}`,
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
-    `frame-src 'self' ${gateway}${googleFrames}`,
-    `connect-src 'self' ${gateway}${google}`,
+    `frame-src 'self' ${gateway}${appleFrames}${googleFrames}`,
+    `connect-src 'self' ${gateway}${appleConnect}${google}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

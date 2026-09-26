@@ -37,7 +37,12 @@ import {
 import { formatCents } from "@/lib/money";
 import { StorefrontHeader } from "@/components/storefront/header";
 import { CartSheet } from "@/components/storefront/cart-sheet";
-import { hasAnyError, validateCheckout, validateCustomTip } from "@/lib/checkout-validation";
+import {
+  firstInvalidFieldId,
+  hasAnyError,
+  validateCheckout,
+  validateCustomTip,
+} from "@/lib/checkout-validation";
 import { normalizeBillingZip } from "@/lib/billing-zip";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import {
@@ -319,6 +324,22 @@ export default function CheckoutPage() {
   };
   submitOrderRef.current = submitOrder;
 
+  /**
+   * SPRINT-19: bring the first field with a problem into view and put the cursor in it. Pressing
+   * Pay (or a wallet button) near the bottom of the page used to mark the fields at the top as
+   * wrong without showing them, so nothing appeared to happen.
+   */
+  const revealFirstInvalidField = () => {
+    const id = firstInvalidFieldId(fieldErrors);
+    const el = id ? document.getElementById(id) : null;
+    if (!el) return false;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // Centred, so the sticky header never covers it.
+    el.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
+    el.focus({ preventScroll: true });
+    return true;
+  };
+
   const handlePayClick = () => {
     // Attempting to pay marks every field touched, so an empty form explains itself rather than
     // leaving a dead button with no reason given.
@@ -331,7 +352,10 @@ export default function CheckoutPage() {
       orderNote: true,
       billingZip: true,
     });
-    if (!canSubmitForm) return;
+    if (!canSubmitForm) {
+      if (!formValid) revealFirstInvalidField();
+      return;
+    }
 
     // Both checks fail closed and say the same neutral thing: naming the trap teaches whoever
     // tripped it how to avoid the trap.
@@ -374,6 +398,10 @@ export default function CheckoutPage() {
       customTip: true,
       orderNote: true,
     });
+    if (sheetBlockers[0] === "fields") {
+      revealFirstInvalidField();
+      return;
+    }
     if (sheetBlockers[0] === "automated") {
       setSubmitError({
         message: "We couldn't process that. Please review your details and try again.",

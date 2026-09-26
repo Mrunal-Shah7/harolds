@@ -38,6 +38,17 @@ export function visiblePaymentMethods(flags: WalletFlags, availability: WalletAv
   return methods;
 }
 
+/**
+ * SPRINT-19: availability only ever turns ON. A price change re-configures Collect.js, which
+ * re-draws the wallet buttons; a moment with an empty mount must not remove the tab the customer
+ * is on (which would drop them back to Card). A device that could pay a second ago still can.
+ */
+export function latchAvailability(prev: WalletAvailability, key: keyof WalletAvailability, yes: boolean): WalletAvailability {
+  if (prev[key] === true) return prev;
+  if (prev[key] === yes) return prev;
+  return { ...prev, [key]: yes };
+}
+
 /** The strip only exists when there is a choice. Card alone renders exactly the pre-wallet form. */
 export function showTabStrip(methods: readonly PaymentMethod[]): boolean {
   return methods.length > 1;

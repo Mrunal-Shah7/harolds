@@ -47,6 +47,17 @@ This deploys with the Sprint 19 code even while both wallet flags stay off.
 5. **Your local `.env` has `PAYMENTS_GOOGLE_PAY_ENABLED=true` (line 32).** That's fine for a
    development machine on the sandbox. The production `.env` must say `"false"` until step 1 is done.
 
+## After the first deploy
+
+1. **If Google Pay still doesn't appear on Android Chrome after this fix,** look in the server log for a
+   `nmi-payment-form:wallets` browser error saying Collect.js drew no Google Pay button.
+   - If that line is there, the device can pay but the gateway isn't offering Google Pay for this account. That is a
+     Merchant Pay Connect setting to change, not code.
+   - If there is no such line, confirm that production health reports `wallets.googlePay: true`, and that the phone
+     has a card saved in Google Pay.
+2. **Apple Pay in Chrome, Edge and Firefox uses Apple's QR flow** (scan with an iPhone). It needs the two Apple
+   origins that are now allowed while the flag is on. Verify in Phase 7 that the QR sheet renders in desktop Chrome.
+
 ## Found and not fixed
 
 1. **A pending order that predates a price change is a trap for wallets, and was already a trap for
