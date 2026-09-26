@@ -1,4 +1,4 @@
-// SPRINT-8 / SPRINT-18.3: admin order listing and detail — redacted contacts in lists; full history on detail.
+// SPRINT-8 / SPRINT-18.3 / SPRINT-19: admin order listing and detail — redacted contacts in lists; full history on detail.
 import { DateTime } from "luxon";
 import { OrderStatus, PaymentStatus } from "@harolds/types";
 import { prisma } from "./client";
@@ -226,6 +226,9 @@ export async function getAdminOrderDetail(id: string, timeZone: string) {
       authCode: a.authCode,
       gatewayTransactionIdRedacted: redactPaymentId(a.gatewayTransactionId),
       httpStatus: a.httpStatus,
+      // SPRINT-19: how the token was produced, and the brand Collect.js reported.
+      paymentMethod: a.paymentMethod,
+      cardBrand: a.cardBrand,
     })),
   };
 }

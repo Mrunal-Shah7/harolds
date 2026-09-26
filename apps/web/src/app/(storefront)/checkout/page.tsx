@@ -2,6 +2,10 @@
 
 // SPRINT-18.3: billing ZIP beside the card fields; declines show the server's customer-safe
 // sentence; PAYMENT_UNAVAILABLE (a gateway incident) is not treated as a decline.
+// SPRINT-19: payment-method tabs (Card | Apple Pay | Google Pay) behind server-side flags. With
+// both flags off — or no wallet available on this device — there is no tab strip and this is
+// the card checkout it was. A wallet sheet cannot open until the order is valid and Collect.js
+// holds the server's current total; the sheet's amount is that server string, untouched.
 // Design v1.1 — checkout. A paper band holding the two-column `.co-grid`: contact and tip cards
 // on the left, the order summary card on the right with board leaders in the totals, the quote
 // note, the payment chips and the pay button.
@@ -36,7 +40,29 @@ import { CartSheet } from "@/components/storefront/cart-sheet";
 import { hasAnyError, validateCheckout, validateCustomTip } from "@/lib/checkout-validation";
 import { normalizeBillingZip } from "@/lib/billing-zip";
 import { Alert, EmptyState } from "@/components/ui/feedback";
-import { NmiPaymentForm, requestTokenize } from "@/components/storefront/nmi-payment-form";
+import {
+  NmiPaymentForm,
+  requestTokenize,
+  type TokenMeta,
+  type WalletState,
+} from "@/components/storefront/nmi-payment-form";
+import { useNmiCheckoutConfig } from "@/components/storefront/nmi-checkout-config";
+import { PaymentMethodTabs, WalletPanel } from "@/components/storefront/payment-method-tabs";
+import {
+  PAYMENT_METHOD_LABEL,
+  sheetBlockerMessage,
+  visiblePaymentMethods,
+  walletPriceFromQuote,
+  walletSheetBlockers,
+  WALLET_MOUNT_ID,
+  type PaymentMethod,
+} from "@/lib/payment-methods";
+
+/**
+ * A real person needs a few seconds to fill this in. Anything faster is a script, and card
+ * testing is the thing worth slowing down here — it costs the store a fee per attempt.
+ */
+const MIN_FILL_MS = 3000;
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -85,29 +111,58 @@ export default function CheckoutPage() {
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
   const lockoutTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /** SPRINT-19: wallet flags from the server (checkout layout), the selected tab, and the sheet. */
+  const { wallets } = useNmiCheckoutConfig();
+  const walletsOn = wallets.applePay || wallets.googlePay;
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("card");
+  const [walletState, setWalletState] = useState<WalletState>({
+    availability: { applePay: null, googlePay: null },
+    configuredPrice: null,
+  });
+  /** A wallet sheet is open (or opening). Tip, cart and method are frozen until it resolves. */
+  const [walletInProgress, setWalletInProgress] = useState(false);
+  /** The 3 s minimum-fill check, as state, so the wallet gate re-renders when it passes. */
+  const [minFillElapsed, setMinFillElapsed] = useState(false);
+  /** SPRINT-19: only the newest quote request may set the quote; an older one arriving late would
+   *  put a stale total on the wallet sheet. */
+  const quoteSeq = useRef(0);
+
   const refreshQuote = useCallback(async () => {
+    const seq = ++quoteSeq.current;
     setQuoteLoading(true);
     setReasons([]);
     try {
       const [q, s] = await Promise.all([getQuote(toCartRequest()), getStoreStatus()]);
+      if (seq !== quoteSeq.current) return;
       setQuote(q);
       setStatus(s);
     } catch (err) {
+      if (seq !== quoteSeq.current) return;
       if (err instanceof StorefrontApiError && err.code === "VALIDATION_ERROR") {
         const r = (err.details?.reasons as CartValidationReason[] | undefined) ?? [];
         setReasons(r);
         setQuote(null);
       }
     } finally {
-      setQuoteLoading(false);
+      if (seq === quoteSeq.current) setQuoteLoading(false);
     }
   }, [toCartRequest]);
 
+  // SPRINT-19: re-quote on ANY change to what would be ordered. This used to key on the line
+  // COUNT and the tip, so a quantity changed in the cart sheet left the total stale until
+  // something else re-quoted — display-only for a card (the server charges its own total), but a
+  // wallet sheet shows the quoted figure to the customer as what they are paying.
+  const cartKey = JSON.stringify(toCartRequest());
   useEffect(() => {
     if (lines.length === 0) return;
     void refreshQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines.length, tip]);
+  }, [lines.length, cartKey]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinFillElapsed(true), MIN_FILL_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   // The lockout is a persisted DEADLINE, so it survives the reload that used to clear it. One
   // ticker derives the remaining seconds from that deadline on every tick and on mount.
@@ -132,21 +187,35 @@ export default function CheckoutPage() {
   const tipPresets = status?.tipPresetsBps ?? [];
 
   const handleTokenReady = useCallback(
-    async (token: string) => {
-      await submitOrder(token);
+    async (token: string, meta: TokenMeta) => {
+      // SPRINT-19: a wallet sheet has closed with a token; the order request now owns the lock.
+      setWalletInProgress(false);
+      await submitOrder(token, meta);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [firstName, lastName, phone, email],
   );
 
   const handleTokenError = useCallback((message: string) => {
+    setWalletInProgress(false);
     setSubmitting(false);
     setSubmitError({ message, retryable: true });
   }, []);
 
+  // SPRINT-19: which tabs exist, and which is selected. A selected wallet that stops being
+  // offered (its availability answer came back no) falls back to Card.
+  const methods = visiblePaymentMethods(wallets, walletState.availability);
+  const activeMethod: PaymentMethod = methods.includes(selectedMethod) ? selectedMethod : "card";
+  const isWalletTab = activeMethod !== "card";
+
   // Every field is checked on every render so the Pay button and the messages agree about
   // whether the form is submittable. The server re-checks all of it; see checkout-validation.ts.
-  const fieldErrors = validateCheckout({ firstName, lastName, phone, email, customTip, orderNote, billingZip });
+  // SPRINT-19: the billing ZIP is a Card-tab field. On a wallet tab it is not required and not
+  // sent, so a ZIP hidden in the inactive Card panel can never block a wallet payment.
+  const fieldErrors = validateCheckout(
+    { firstName, lastName, phone, email, customTip, orderNote, billingZip },
+    { requireBillingZip: !isWalletTab },
+  );
   const formValid = !hasAnyError(fieldErrors);
   const canSubmitForm = formValid && quote?.orderable;
 
@@ -155,7 +224,7 @@ export default function CheckoutPage() {
     touched[name] ? fieldErrors[name] : null;
   const markTouched = (name: string) => setTouched((prev) => ({ ...prev, [name]: true }));
 
-  const submitOrder = async (token: string) => {
+  const submitOrder = async (token: string, meta: TokenMeta) => {
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -171,13 +240,21 @@ export default function CheckoutPage() {
       // key, so a reload after an ambiguous outcome replays the existing order instead of
       // creating a second chargeable one. Any change to the cart derives a different key.
       const idempotencyKey = await deriveIdempotencyKey(getSessionNonce(), cart, customer);
+      const wallet = meta.method !== "card";
       const order = await createOrder({
         cart,
         customer,
         paymentToken: token,
-        billingZip: normalizeBillingZip(billingZip) ?? undefined,
+        // SPRINT-19: card only. A wallet's billing postal code travels inside its own token.
+        billingZip: wallet ? undefined : (normalizeBillingZip(billingZip) ?? undefined),
         idempotencyKey,
         customerNote: note,
+        // SPRINT-19: how the token was produced, and — for a wallet — the amount its sheet showed,
+        // which the server compares with its own total before charging. Nothing else from the
+        // wallet (name, address, email, phone) is sent: the order uses the pickup details above.
+        paymentMethod: meta.method,
+        ...(wallet && meta.displayedAmount ? { walletDisplayedAmount: meta.displayedAmount } : {}),
+        ...(meta.cardBrand ? { cardBrand: meta.cardBrand } : {}),
       });
       // The deadline belongs to THIS order. Without this, a customer who hit an ambiguous
       // outcome, waited, paid, then started a new cart in the same tab would land on checkout
@@ -220,6 +297,11 @@ export default function CheckoutPage() {
           void refreshQuote();
         } else if (err.code === "STORE_CLOSED" || err.code === "STORE_NOT_ACCEPTING_ORDERS") {
           setSubmitError({ message: err.message, retryable: false });
+        } else if (err.details?.reason === "WALLET_AMOUNT_MISMATCH") {
+          // SPRINT-19: the sheet showed a total the server would not charge. Nothing was charged;
+          // re-quote so the wallet is re-configured with the current total before a retry.
+          setSubmitError({ message: err.message, retryable: true });
+          void refreshQuote();
         } else {
           setSubmitError({ message: err.message, retryable: true });
         }
@@ -230,12 +312,6 @@ export default function CheckoutPage() {
       setSubmitting(false);
     }
   };
-
-  /**
-   * A real person needs a few seconds to fill this in. Anything faster is a script, and card
-   * testing is the thing worth slowing down here — it costs the store a fee per attempt.
-   */
-  const MIN_FILL_MS = 3000;
 
   const handlePayClick = () => {
     // Attempting to pay marks every field touched, so an empty form explains itself rather than
@@ -266,6 +342,88 @@ export default function CheckoutPage() {
     requestTokenize();
   };
 
+  // SPRINT-19: the wallet gate. The sheet may open only when the order is valid (ZIP excepted),
+  // orderable, freshly quoted, and Collect.js holds exactly this quote's total — see
+  // walletSheetBlockers. The same anti-automation checks as the Pay button apply.
+  const walletPrice = walletPriceFromQuote(quote);
+  const sheetBlockers = walletSheetBlockers({
+    fieldsValid: formValid,
+    quoteOrderable: Boolean(quote?.orderable),
+    quoteLoading,
+    submitting,
+    lockoutSeconds,
+    looksAutomated: decoy.trim().length > 0 || !minFillElapsed,
+    quotePrice: walletPrice,
+    configuredPrice: walletState.configuredPrice,
+    walletInProgress,
+  });
+  const walletBlockedMessage = sheetBlockers.length > 0 ? sheetBlockerMessage(sheetBlockers[0]!) : null;
+
+  /** Pressing a gated wallet button explains itself exactly as pressing Pay does. */
+  const handleBlockedWalletPress = () => {
+    setTouched({
+      firstName: true,
+      lastName: true,
+      phone: true,
+      email: true,
+      customTip: true,
+      orderNote: true,
+    });
+    if (sheetBlockers[0] === "automated") {
+      setSubmitError({
+        message: "We couldn't process that. Please review your details and try again.",
+        retryable: true,
+      });
+    }
+  };
+
+  // SPRINT-19: while a sheet is open, nothing that changes the total may change. The sheet is
+  // treated as closed again when the page regains focus (Google's sheet is a separate window), or
+  // when the customer touches the page outside the wallet button (Apple's sheet covers the page,
+  // so a touch on the page means it is gone). The server's amount check stands behind this.
+  useEffect(() => {
+    if (!walletInProgress) return;
+    const release = () => setWalletInProgress(false);
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest(".wallet-mount")) return;
+      release();
+    };
+    const armed = setTimeout(() => {
+      window.addEventListener("focus", release);
+      document.addEventListener("pointerdown", onPointerDown, true);
+    }, 0);
+    return () => {
+      clearTimeout(armed);
+      window.removeEventListener("focus", release);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, [walletInProgress]);
+
+  // Google Pay's button lives in Collect.js's iframe, so the page cannot see the press; it sees
+  // the window lose focus to that iframe instead. Only an ungated button can take that focus
+  // (a gated mount is inert), but the gate is re-checked here all the same.
+  const sheetOpenable = useRef(false);
+  sheetOpenable.current = sheetBlockers.length === 0;
+  useEffect(() => {
+    if (!wallets.googlePay) return;
+    const onBlur = () => {
+      setTimeout(() => {
+        const focused = document.activeElement;
+        if (
+          focused?.tagName === "IFRAME" &&
+          focused.closest(`#${WALLET_MOUNT_ID.google_pay}`) &&
+          sheetOpenable.current
+        ) {
+          setSubmitError(null);
+          setWalletInProgress(true);
+        }
+      }, 0);
+    };
+    window.addEventListener("blur", onBlur);
+    return () => window.removeEventListener("blur", onBlur);
+  }, [wallets.googlePay]);
+
   const fixableReasons = useMemo(() => reasons.filter((r) => !r.isAvailability), [reasons]);
   const availabilityReasons = useMemo(() => reasons.filter((r) => r.isAvailability), [reasons]);
 
@@ -290,6 +448,44 @@ export default function CheckoutPage() {
 
   const payDisabled = !canSubmitForm || submitting || quoteLoading || lockoutSeconds > 0;
 
+  const cardFields = (
+    <NmiPaymentForm
+      onTokenReady={handleTokenReady}
+      onError={handleTokenError}
+      disabled={!quote?.orderable}
+      walletPrice={walletPrice}
+      activeMethod={activeMethod}
+      onWalletState={setWalletState}
+    />
+  );
+  /* SPRINT-18.3: beside the card fields, because it belongs to the card. */
+  const billingZipField = (
+    <div className="field" style={{ marginTop: 12 }}>
+      <label htmlFor="billing-zip">Billing ZIP code</label>
+      <input
+        id="billing-zip"
+        value={billingZip}
+        onChange={(e) => setBillingZip(e.target.value)}
+        onBlur={() => markTouched("billingZip")}
+        aria-invalid={errorFor("billingZip") ? true : undefined}
+        aria-describedby={errorFor("billingZip") ? "billing-zip-help billing-zip-err" : "billing-zip-help"}
+        type="text"
+        inputMode="numeric"
+        autoComplete="billing postal-code"
+        maxLength={10}
+        disabled={!quote?.orderable}
+      />
+      <p className="help" id="billing-zip-help">
+        The ZIP on your card&apos;s statement. Your bank uses it to confirm the card is yours.
+      </p>
+      {errorFor("billingZip") ? (
+        <p className="field-err" id="billing-zip-err" role="alert">
+          {errorFor("billingZip")}
+        </p>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="sf-page">
       <StorefrontHeader status={status} showCart={false} compactStatus />
@@ -305,6 +501,7 @@ export default function CheckoutPage() {
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={() => setCartOpen(true)}
+                disabled={walletInProgress || undefined}
               >
                 &larr; Back to cart
               </button>
@@ -312,6 +509,7 @@ export default function CheckoutPage() {
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={() => router.push("/menu")}
+                disabled={walletInProgress || undefined}
               >
                 Keep shopping
               </button>
@@ -493,6 +691,7 @@ export default function CheckoutPage() {
                         type="button"
                         className="tip"
                         aria-pressed={!tip}
+                        disabled={walletInProgress || undefined}
                         onClick={() => {
                           setCustomTip("");
                           setTip(undefined);
@@ -506,6 +705,7 @@ export default function CheckoutPage() {
                           type="button"
                           className="tip"
                           aria-pressed={tip?.type === "preset" && tip.presetIndex === i}
+                          disabled={walletInProgress || undefined}
                           onClick={() => {
                             setCustomTip("");
                             setTip({ type: "preset", presetIndex: i });
@@ -518,6 +718,7 @@ export default function CheckoutPage() {
                         type="button"
                         className="tip"
                         aria-pressed={tip?.type === "amount"}
+                        disabled={walletInProgress || undefined}
                         onClick={() => setTip({ type: "amount", amountCents: toCents(customTip) })}
                       >
                         Other
@@ -532,6 +733,7 @@ export default function CheckoutPage() {
                           inputMode="decimal"
                           className="t-nums"
                           value={customTip}
+                          disabled={walletInProgress || undefined}
                           onChange={(e) => {
                             const next = e.target.value;
                             setCustomTip(next);
@@ -564,36 +766,66 @@ export default function CheckoutPage() {
 
                 <div className="co-card card">
                   <h3>Payment</h3>
-                  <NmiPaymentForm
-                    onTokenReady={handleTokenReady}
-                    onError={handleTokenError}
-                    disabled={!quote?.orderable}
-                  />
-                  {/* SPRINT-18.3: beside the card fields, because it belongs to the card. */}
-                  <div className="field" style={{ marginTop: 12 }}>
-                    <label htmlFor="billing-zip">Billing ZIP code</label>
-                    <input
-                      id="billing-zip"
-                      value={billingZip}
-                      onChange={(e) => setBillingZip(e.target.value)}
-                      onBlur={() => markTouched("billingZip")}
-                      aria-invalid={errorFor("billingZip") ? true : undefined}
-                      aria-describedby={errorFor("billingZip") ? "billing-zip-help billing-zip-err" : "billing-zip-help"}
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="billing postal-code"
-                      maxLength={10}
-                      disabled={!quote?.orderable}
+                  {walletsOn ? (
+                    // SPRINT-19: with a wallet flagged on, the card fields and the ZIP move into
+                    // the Card tab. Wallet panels are mounted even while their tab is hidden, so
+                    // Collect.js can draw into them and report whether this device can pay.
+                    <PaymentMethodTabs
+                      methods={methods}
+                      active={activeMethod}
+                      onChange={(method) => {
+                        setSelectedMethod(method);
+                        setSubmitError(null);
+                      }}
+                      locked={walletInProgress || submitting}
+                      panels={[
+                        { method: "card", content: <>{cardFields}{billingZipField}</> },
+                        ...(wallets.applePay
+                          ? [
+                              {
+                                method: "apple_pay" as const,
+                                content: (
+                                  <WalletPanel
+                                    method="apple_pay"
+                                    mountId={WALLET_MOUNT_ID.apple_pay}
+                                    blockedMessage={walletBlockedMessage}
+                                    onBlockedPress={handleBlockedWalletPress}
+                                    onActivate={() => {
+                                      setSubmitError(null);
+                                      setWalletInProgress(true);
+                                    }}
+                                  />
+                                ),
+                              },
+                            ]
+                          : []),
+                        ...(wallets.googlePay
+                          ? [
+                              {
+                                method: "google_pay" as const,
+                                content: (
+                                  <WalletPanel
+                                    method="google_pay"
+                                    mountId={WALLET_MOUNT_ID.google_pay}
+                                    blockedMessage={walletBlockedMessage}
+                                    onBlockedPress={handleBlockedWalletPress}
+                                    onActivate={() => {
+                                      setSubmitError(null);
+                                      setWalletInProgress(true);
+                                    }}
+                                  />
+                                ),
+                              },
+                            ]
+                          : []),
+                      ]}
                     />
-                    <p className="help" id="billing-zip-help">
-                      The ZIP on your card&apos;s statement. Your bank uses it to confirm the card is yours.
-                    </p>
-                    {errorFor("billingZip") ? (
-                      <p className="field-err" id="billing-zip-err" role="alert">
-                        {errorFor("billingZip")}
-                      </p>
-                    ) : null}
-                  </div>
+                  ) : (
+                    <>
+                      {cardFields}
+                      {billingZipField}
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -668,11 +900,15 @@ export default function CheckoutPage() {
                   server.
                 </p>
 
-                {/* Card only. Collect.js supports wallets separately and this deployment has not
-                    set them up, and advertising a method the form does not offer is worse than
-                    not listing it. */}
+                {/* Only the methods this checkout offers on THIS device. Advertising a method the
+                    form does not offer is worse than not listing it. SPRINT-19: with no wallet on
+                    or available this is the single "Card" chip it always was. */}
                 <div className="paywith">
-                  <span className="paychip">Card</span>
+                  {methods.map((method) => (
+                    <span key={method} className="paychip">
+                      {PAYMENT_METHOD_LABEL[method]}
+                    </span>
+                  ))}
                 </div>
 
                 {/* The payment outcome announces through a polite live region. */}
@@ -692,20 +928,29 @@ export default function CheckoutPage() {
                   ) : null}
                 </div>
 
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ width: "100%", height: 52 }}
-                  disabled={payDisabled}
-                  aria-busy={submitting || undefined}
-                  onClick={handlePayClick}
-                >
-                  {submitting
-                    ? "Paying…"
-                    : quote
-                      ? `Pay ${formatCents(quote.totalCents)}`
-                      : "Pay"}
-                </button>
+                {isWalletTab ? (
+                  // SPRINT-19: a wallet is paid with its own button, in the Payment card.
+                  <p className="help" aria-busy={submitting || undefined}>
+                    {submitting
+                      ? "Paying…"
+                      : `Pay with the ${PAYMENT_METHOD_LABEL[activeMethod]} button in Payment.`}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ width: "100%", height: 52 }}
+                    disabled={payDisabled}
+                    aria-busy={submitting || undefined}
+                    onClick={handlePayClick}
+                  >
+                    {submitting
+                      ? "Paying…"
+                      : quote
+                        ? `Pay ${formatCents(quote.totalCents)}`
+                        : "Pay"}
+                  </button>
+                )}
               </div>
             </div>
           </div>

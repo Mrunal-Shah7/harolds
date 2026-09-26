@@ -1,7 +1,8 @@
-// SPRINT-3: POST /api/v1/quote — stateless cart pricing (no persistence, no side effects)
+// SPRINT-3 / SPRINT-19: POST /api/v1/quote — stateless cart pricing (no persistence, no side effects)
 import { fetchItemsForQuote, getStoreConfig, getStoreStatus } from "@harolds/db";
 import { parseCartRequest, quoteCart, toMenuCatalog } from "@harolds/pricing";
-import { ApiErrorCode } from "@harolds/types";
+import { toGatewayAmount } from "@harolds/payments";
+import { ApiErrorCode, type QuoteResult } from "@harolds/types";
 import { fail, handleRouteError, ok } from "@/lib/api";
 import { BODY_LIMITS, readBoundedJson } from "@/lib/read-json";
 import { enforceRateLimit } from "@/lib/enforce-rate-limit";
@@ -54,7 +55,15 @@ export async function POST(request: Request) {
       });
     }
 
-    return ok(quoted.result, {
+    // SPRINT-19: the total in the gateway's own amount format, made here by the formatter the sale
+    // uses. The wallet sheet displays this string untouched, so the storefront never does money
+    // arithmetic, and the server can compare what the sheet showed with what it charges byte for byte.
+    const result: QuoteResult = {
+      ...quoted.result,
+      totalGatewayAmount: quoted.result.totalCents > 0 ? toGatewayAmount(quoted.result.totalCents) : null,
+    };
+
+    return ok(result, {
       headers: {
         "Cache-Control": "no-store",
       },

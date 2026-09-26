@@ -325,6 +325,16 @@ Mobile: sticky bottom bar above the safe area, appearing only when non-empty. De
 ### Tip control (stated explicitly in 1.1)
 A pill group of the configured presets; presets and the default selection are business inputs and are never moved by design work. Pressed state fills `roast` with `ink-on-roast` in the light scheme, and `flame` with `ink` in the dark scheme.
 
+### Payment-method tabs (Sprint 19)
+<!-- SPRINT-19 -->
+Card | Apple Pay | Google Pay, inside the checkout **Payment** card, and only where there is a real choice. With no wallet switched on, or none available on this device, **no strip renders** and the Payment card is the card form it always was. A wallet the device cannot use is **hidden, not disabled**.
+
+The tabs are the menu tabs' pattern at checkout scale: three equal columns, `font-display` 700 at `body` (`body-sm` under 400px), active in `brand-text` over a 3px `brand` underline, inactive in `ink-muted`, ≥ 44px tall, and **never scrolling sideways** (verified at 360px). They are WAI-ARIA tabs: arrows move and select, Home and End jump, focus is the standard blue ring, and a change of method is announced politely. Card is always first and is the default.
+
+Pickup details stay **outside** the tabs. The billing ZIP lives **inside** the Card tab. Every panel stays mounted; an inactive one is hidden by `visibility` with zero height, **never `display: none`**, because the payment frames need a width to lay out at.
+
+The wallet buttons are **Apple's and Google's own**, exactly as Collect.js renders them. Nothing here restyles them: Apple Pay is `black` at 44px, and Google Pay uses Google's `default` colour. Until the order is payable, a transparent gate covers the wallet button. Pressing it shows the same field errors the Pay button does, and one `help` line under the button says why. When the wallet tab is selected, the order summary replaces the red Pay button with one `help` line that points at the wallet button. The "Pay with" chips list only the methods offered on this device.
+
 ### Kitchen order card
 `kds-card`, 1px `kds-line-strong`, no shadow. A **6px left age bar** encodes elapsed time since payment — `kds-open` under 5 minutes, `flame` from 5 to 12, `kds-danger` beyond — **with the elapsed minutes always printed beside it.**
 

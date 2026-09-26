@@ -1,4 +1,4 @@
-// SPRINT-4 / SPRINT-18.3: API error codes — stable machine-readable identifiers; part of the frozen contract.
+// SPRINT-4 / SPRINT-18.3 / SPRINT-19: API error codes — stable machine-readable identifiers; part of the frozen contract.
 export const ApiErrorCode = {
   NOT_FOUND: "NOT_FOUND",
   VALIDATION_ERROR: "VALIDATION_ERROR",
@@ -39,5 +39,9 @@ export const API_ERROR_STATUS: Record<ApiErrorCode, number> = {
   UNAUTHORIZED: 401,
 };
 
-/** Contract version — 1.3.0 adds images, announcements, closed reason (additive over 1.2.0). */
-export const API_CONTRACT_VERSION = "1.3.0" as const;
+/**
+ * Contract version — 1.3.0 added images, announcements, closed reason (additive over 1.2.0).
+ * SPRINT-19: 1.4.0 adds `paymentMethod`, `walletDisplayedAmount` and `cardBrand` to the checkout
+ * request and `totalGatewayAmount` to the quote (all additive over 1.3.0).
+ */
+export const API_CONTRACT_VERSION = "1.4.0" as const;

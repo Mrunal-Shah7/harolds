@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- SPRINT-19: checkout Payment card shows the payment-method tabs (wallets-on state); CSS mirrors globals.css. -->
 <html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
@@ -1739,6 +1740,94 @@ a.wordmark {
   font-size: var(--body-sm);
   color: var(--ink-muted);
   background: var(--surface);
+}
+
+/* SPRINT-19: payment-method tabs (Card | Apple Pay | Google Pay). The menu's tab pattern
+   (design.md "Category rail and sticky tabs") at checkout scale: active is brand-text over a 3px
+   brand underline, inactive is ink-muted. Three equal columns that never scroll sideways — at
+   360px the Payment card's content box is ~280px, and "Google Pay" at body size fits a third. */
+.pm-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.pm-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 4px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--body);
+  color: var(--ink-muted);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color var(--t-base) var(--ease);
+}
+.pm-tab[aria-selected="true"] {
+  color: var(--brand-text);
+  border-bottom-color: var(--brand);
+}
+.pm-tab[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+/* Panels stay mounted (Collect.js draws into them once). A hidden panel keeps its WIDTH so the
+   frames and Apple's button lay out at their real size, but takes no height, is invisible, and —
+   with the `inert` attribute — is out of the tab order and the accessibility tree. */
+.pm-panels {
+  position: relative;
+}
+.pm-panel-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+/* The wallet's own button (Apple's or Google's, as Collect.js renders it — never restyled) and,
+   while the order is not payable, a transparent gate over it that explains why. */
+.wallet-slot {
+  position: relative;
+  min-height: 48px;
+}
+.wallet-mount {
+  width: 100%;
+  min-height: 44px;
+}
+.wallet-mount iframe {
+  width: 100% !important;
+  border: 0;
+  display: block;
+}
+.wallet-mount[inert] {
+  opacity: 0.5;
+}
+.wallet-gate {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.wallet-panel .help {
+  margin-top: 8px;
+}
+@media (max-width: 400px) {
+  .pm-tab {
+    font-size: var(--body-sm);
+  }
 }
 
 /* confirmation */
@@ -4896,21 +4985,56 @@ select[multiple] {
 
                 <div class="co-card card">
                   <h3>Payment</h3>
-                  <!-- SPRINT-17: NMI Collect.js. The express-checkout row is GONE, not hidden:
-                       the wallet scaffolding was Square-specific and went with it. Collect.js
-                       mounts one iframe per field, so the card is three labelled containers
-                       rather than one combined row. Only the containers are styled; the field
-                       chrome inside each iframe is passed to Collect.js as customCss. -->
-                  <label style="display:block;font-size:var(--body-sm);margin:0 0 4px;color:var(--ink-muted)">Card number</label>
-                  <div style="min-height:46px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">1234 5678 9012 3456</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div>
-                      <label style="display:block;font-size:var(--body-sm);margin:12px 0 4px;color:var(--ink-muted)">Expiry</label>
-                      <div style="min-height:46px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">MM / YY</div>
+                  <!-- SPRINT-19: payment-method tabs, shown in the wallets-ON state with Card selected.
+                       With both wallet flags off, or no wallet available on the device, there is
+                       NO strip and the Payment card is exactly the card form (and ZIP) below. The
+                       wallet panels stay mounted; an inactive one is .pm-panel-hidden (visibility,
+                       zero height), never display:none. Buttons inside wallet panels are Apple's
+                       and Google's own, drawn by Collect.js. -->
+                  <div class="pm">
+                    <div class="pm-tabs" role="tablist" aria-label="Payment method">
+                      <button type="button" role="tab" class="pm-tab" aria-selected="true" tabindex="0">Card</button>
+                      <button type="button" role="tab" class="pm-tab" aria-selected="false" tabindex="-1">Apple Pay</button>
+                      <button type="button" role="tab" class="pm-tab" aria-selected="false" tabindex="-1">Google Pay</button>
                     </div>
-                    <div>
-                      <label style="display:block;font-size:var(--body-sm);margin:12px 0 4px;color:var(--ink-muted)">Security code</label>
-                      <div style="min-height:46px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">CVV</div>
+                    <div class="pm-panels">
+                      <div class="pm-panel" role="tabpanel">
+                      <!-- SPRINT-17: NMI Collect.js. The express-checkout row is GONE, not hidden:
+                           the wallet scaffolding was Square-specific and went with it. Collect.js
+                           mounts one iframe per field, so the card is three labelled containers
+                           rather than one combined row. Only the containers are styled; the field
+                           chrome inside each iframe is passed to Collect.js as customCss. -->
+                      <label style="display:block;font-size:var(--body-sm);margin:0 0 4px;color:var(--ink-muted)">Card number</label>
+                      <div style="min-height:46px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">1234 5678 9012 3456</div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div>
+                          <label style="display:block;font-size:var(--body-sm);margin:12px 0 4px;color:var(--ink-muted)">Expiry</label>
+                          <div style="min-height:46px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">MM / YY</div>
+                        </div>
+                        <div>
+                          <label style="display:block;font-size:var(--body-sm);margin:12px 0 4px;color:var(--ink-muted)">Security code</label>
+                          <div style="min-height:46px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:12px;display:flex;align-items:center;color:var(--ink-faint)">CVV</div>
+                        </div>
+                      </div>
+                        <!-- SPRINT-18.3 / SPRINT-19: the billing ZIP belongs to the card, so it lives in the Card tab. -->
+                        <div class="field" style="margin-top:12px">
+                          <label for="ds-billing-zip">Billing ZIP code</label>
+                          <input id="ds-billing-zip" type="text" inputmode="numeric" maxlength="10" value="60633">
+                          <p class="help">The ZIP on your card&apos;s statement. Your bank uses it to confirm the card is yours.</p>
+                        </div>
+                      </div>
+                      <div class="pm-panel pm-panel-hidden" role="tabpanel" inert>
+                        <div class="wallet-panel">
+                          <div class="wallet-slot"><div class="wallet-mount"></div><button type="button" class="wallet-gate" aria-label="Pay with Apple Pay"></button></div>
+                          <p class="help">Please complete your pickup details above first.</p>
+                        </div>
+                      </div>
+                      <div class="pm-panel pm-panel-hidden" role="tabpanel" inert>
+                        <div class="wallet-panel">
+                          <div class="wallet-slot"><div class="wallet-mount"></div></div>
+                          <p class="help">Google Pay uses the billing address saved in your wallet. We don&apos;t keep it.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4940,11 +5064,12 @@ select[multiple] {
 
                 <p class="quote-note">Quoted by the store just now &mdash; every figure above, tip included, comes from the server.</p>
 
-                <!-- Card only. Collect.js handles wallets through a separate setup this
-                     deployment has not done, and advertising a method the form does not offer
-                     is worse than not listing it. -->
+                <!-- Only the methods offered on THIS device (SPRINT-19). Wallets-on state shown;
+                     with no wallet on or available this is the single "Card" chip. -->
                 <div class="paywith">
                   <span class="paychip">Card</span>
+                  <span class="paychip">Apple Pay</span>
+                  <span class="paychip">Google Pay</span>
                 </div>
 
                 <button type="button" class="btn btn-primary" style="width:100%;height:52px">Pay $36.53</button>

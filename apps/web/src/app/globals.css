@@ -1,3 +1,4 @@
+/* SPRINT-19: adds the checkout payment-method tabs and wallet gate (.pm-*, .wallet-*). */
 /* =============================================================================
    Design v1.1 — the single token declaration for every surface.
    Ported from harolds-design-v1_1.html: the token block, the shared primitives,
@@ -1825,6 +1826,94 @@ a.wordmark {
   font-size: var(--body-sm);
   color: var(--ink-muted);
   background: var(--surface);
+}
+
+/* SPRINT-19: payment-method tabs (Card | Apple Pay | Google Pay). The menu's tab pattern
+   (design.md "Category rail and sticky tabs") at checkout scale: active is brand-text over a 3px
+   brand underline, inactive is ink-muted. Three equal columns that never scroll sideways — at
+   360px the Payment card's content box is ~280px, and "Google Pay" at body size fits a third. */
+.pm-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.pm-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 4px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--body);
+  color: var(--ink-muted);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color var(--t-base) var(--ease);
+}
+.pm-tab[aria-selected="true"] {
+  color: var(--brand-text);
+  border-bottom-color: var(--brand);
+}
+.pm-tab[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+/* Panels stay mounted (Collect.js draws into them once). A hidden panel keeps its WIDTH so the
+   frames and Apple's button lay out at their real size, but takes no height, is invisible, and —
+   with the `inert` attribute — is out of the tab order and the accessibility tree. */
+.pm-panels {
+  position: relative;
+}
+.pm-panel-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+/* The wallet's own button (Apple's or Google's, as Collect.js renders it — never restyled) and,
+   while the order is not payable, a transparent gate over it that explains why. */
+.wallet-slot {
+  position: relative;
+  min-height: 48px;
+}
+.wallet-mount {
+  width: 100%;
+  min-height: 44px;
+}
+.wallet-mount iframe {
+  width: 100% !important;
+  border: 0;
+  display: block;
+}
+.wallet-mount[inert] {
+  opacity: 0.5;
+}
+.wallet-gate {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.wallet-panel .help {
+  margin-top: 8px;
+}
+@media (max-width: 400px) {
+  .pm-tab {
+    font-size: var(--body-sm);
+  }
 }
 
 /* confirmation */

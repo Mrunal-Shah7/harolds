@@ -1,4 +1,4 @@
-// SPRINT-4 / SPRINT-17 / SPRINT-18.3: public API of @harolds/payments. This is the ONLY module in the
+// SPRINT-4 / SPRINT-17 / SPRINT-18.3 / SPRINT-19: public API of @harolds/payments. This is the ONLY module in the
 // repo permitted to talk to the payment gateway — everything callers need is re-exported
 // from here, in vocabulary that names no provider.
 export {
@@ -12,6 +12,9 @@ export {
   GATEWAY_REQUEST_TIMEOUT_MS,
 } from "./client";
 export { PaymentClientError } from "./errors";
+// SPRINT-19: the one cents → "x.xx" formatter. The quote uses it for the wallet sheet's amount and
+// the sale uses it for `amount`, so the two strings are comparable byte for byte.
+export { toGatewayAmount } from "./money";
 
 export type {
   PaymentOutcome,

@@ -1,4 +1,4 @@
-// SPRINT-4 / SPRINT-17 / SPRINT-18.2 / SPRINT-18.3: public result/error taxonomy for payment operations.
+// SPRINT-4 / SPRINT-17 / SPRINT-18.2 / SPRINT-18.3 / SPRINT-19: public result/error taxonomy for payment operations.
 // These types intentionally do not mirror the gateway's wire shapes field-for-field —
 // callers outside this package must never need to know NMI's vocabulary.
 
@@ -145,6 +145,12 @@ export type CreatePaymentInput = {
    * and never stored or logged — only whether one was provided is logged.
    */
   billingZip?: string | null;
+  /**
+   * SPRINT-19: how the token was produced, for the outcome log line ONLY. It is never sent to the
+   * gateway: a wallet token is an ordinary `payment_token`, and the sale request is identical for
+   * every method. Omitted means card.
+   */
+  paymentMethod?: "card" | "apple_pay" | "google_pay";
 };
 
 export type RefundPaymentInput = {

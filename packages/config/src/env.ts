@@ -1,4 +1,4 @@
-// SPRINT-1 / SPRINT-4 / SPRINT-5 / SPRINT-18.2: environment schema — validates required vars at module load and fails loudly
+// SPRINT-1 / SPRINT-4 / SPRINT-5 / SPRINT-18.2 / SPRINT-19: environment schema — validates required vars at module load and fails loudly
 import { z } from "zod";
 import { missingProductionVariables } from "./production-guards";
 
@@ -50,6 +50,22 @@ const envSchema = z.object({
   // SPRINT-18.2: there are no NEXT_PUBLIC_NMI_* variables. The checkout layout resolves the
   // Collect.js URL and the active tokenization key on the server, per request, from the two
   // values above — so the browser cannot disagree with the server about which gateway is live.
+
+  /**
+   * SPRINT-19: digital wallets. Server-side only (no NEXT_PUBLIC_), read per request by the
+   * checkout layout and the CSP, so a change needs a RESTART, not a rebuild. Off unless set to
+   * exactly "true". Turn one on only after Merchant Pay Connect confirms it for this MID.
+   */
+  PAYMENTS_APPLE_PAY_ENABLED: z
+    .enum(["true", "false"], {
+      errorMap: () => ({ message: 'PAYMENTS_APPLE_PAY_ENABLED must be "true" or "false"' }),
+    })
+    .default("false"),
+  PAYMENTS_GOOGLE_PAY_ENABLED: z
+    .enum(["true", "false"], {
+      errorMap: () => ({ message: 'PAYMENTS_GOOGLE_PAY_ENABLED must be "true" or "false"' }),
+    })
+    .default("false"),
 
   // Required — Sprint 5 (Epson Server Direct Print). Comma-separated serials supported.
   PRINTER_SERIAL_NUMBER: z

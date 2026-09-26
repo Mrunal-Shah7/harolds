@@ -1,6 +1,7 @@
-// SPRINT-4 / SPRINT-18.3: authoritative checkout — reprice, persist, charge, converge with webhooks.
+// SPRINT-4 / SPRINT-18.3 / SPRINT-19: authoritative checkout — reprice, persist, charge, converge with webhooks.
+// SPRINT-19: Apple Pay and Google Pay tokens arrive here and take EXACTLY the card path below.
 import { createHash } from "node:crypto";
-import { getOrderDuplicateGuardWindowMs, getPrinterConfig } from "@harolds/config";
+import { emitLog, getOrderDuplicateGuardWindowMs, getPrinterConfig, getWalletFlags } from "@harolds/config";
 import {
   claimOrderForCharge,
   createPendingOrderGuarded,
@@ -28,6 +29,7 @@ import {
   findPaymentByOrderId,
   isGatewayIncident,
   GATEWAY_REQUEST_TIMEOUT_MS,
+  toGatewayAmount,
 } from "@harolds/payments";
 import { BILLING_ZIP_MESSAGE, normalizeBillingZip } from "@/lib/billing-zip";
 import {
@@ -35,8 +37,10 @@ import {
   JobStatus,
   JobType,
   OrderStatus,
+  PAYMENT_METHODS,
   PaymentStatus,
   type CartRequest,
+  type PaymentMethod,
   type CheckoutOrderResponse,
   type CreateOrderRequest,
 } from "@harolds/types";
@@ -163,7 +167,8 @@ export function toCheckoutOrderResponse(order: OrderWithLines): CheckoutOrderRes
   };
 }
 
-function parseCreateOrderBody(body: unknown):
+/** Exported (SPRINT-19) so tests can follow a request from its body to the gateway. */
+export function parseCreateOrderBody(body: unknown):
   | { ok: true; request: CreateOrderRequest; fingerprint: string }
   | { ok: false; failure: CheckoutFailure } {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -300,10 +305,19 @@ function parseCreateOrderBody(body: unknown):
     };
   }
 
+  // SPRINT-19: how the token was produced. Omitted means card, so every existing client is a card
+  // client. A wallet whose flag is off is refused here, before anything is created or charged.
+  const wallet = parseWalletFields(raw);
+  if (!wallet.ok) return { ok: false, failure: wallet.failure };
+  const { paymentMethod, walletDisplayedAmount, cardBrand } = wallet;
+  const isWallet = paymentMethod !== "card";
+
   // SPRINT-18.3: optional in the contract, always sent by the storefront. Passed to the gateway
   // for AVS and never persisted — it goes into `request` and from there only to the sale.
+  // SPRINT-19: a card-only field. A wallet puts the billing postal code in its own token and the
+  // gateway uses that, so a ZIP sent alongside a wallet token is dropped unread, never sent.
   let billingZip: string | undefined;
-  if (raw.billingZip !== undefined && raw.billingZip !== null && raw.billingZip !== "") {
+  if (!isWallet && raw.billingZip !== undefined && raw.billingZip !== null && raw.billingZip !== "") {
     const normalized = typeof raw.billingZip === "string" ? normalizeBillingZip(raw.billingZip) : null;
     if (!normalized) {
       return {
@@ -346,9 +360,56 @@ function parseCreateOrderBody(body: unknown):
     // Free text that ends up on a thermal printer. `sanitizeKitchenNote` caps the length and
     // strips control bytes, which ESC/POS would otherwise read as printer commands.
     customerNote: sanitizeKitchenNote(raw.customerNote),
+    paymentMethod,
+    walletDisplayedAmount,
+    cardBrand,
   };
 
   return { ok: true, request, fingerprint: cartFingerprint(request.cart) };
+}
+
+/** SPRINT-19: the amount format the gateway and Collect.js share: whole dollars, two decimals. */
+const WALLET_AMOUNT_PATTERN = /^\d{1,7}\.\d{2}$/;
+
+/**
+ * SPRINT-19: `paymentMethod`, `walletDisplayedAmount` and `cardBrand`. Everything else a wallet
+ * callback carries (name, address, postal code, email, phone) is never sent by the storefront,
+ * and if a client sent it anyway it would be ignored: nothing here reads it.
+ */
+function parseWalletFields(raw: Record<string, unknown>):
+  | { ok: true; paymentMethod: PaymentMethod; walletDisplayedAmount: string | undefined; cardBrand: string | undefined }
+  | { ok: false; failure: CheckoutFailure } {
+  const invalid = (field: string, message: string): { ok: false; failure: CheckoutFailure } => ({
+    ok: false,
+    failure: { ok: false, code: ApiErrorCode.VALIDATION_ERROR, message, details: { field } },
+  });
+
+  const method = raw.paymentMethod ?? "card";
+  if (typeof method !== "string" || !(PAYMENT_METHODS as readonly string[]).includes(method)) {
+    return invalid("paymentMethod", "paymentMethod must be card, apple_pay or google_pay.");
+  }
+  const paymentMethod = method as PaymentMethod;
+
+  // The server-side flag is the kill switch. A page rendered before a restart that turned a wallet
+  // off can still post a wallet token; it is refused before an order exists.
+  const flags = getWalletFlags();
+  if ((paymentMethod === "apple_pay" && !flags.applePay) || (paymentMethod === "google_pay" && !flags.googlePay)) {
+    return invalid("paymentMethod", "That payment method isn't available right now. Please pay by card.");
+  }
+
+  let walletDisplayedAmount: string | undefined;
+  if (paymentMethod !== "card") {
+    if (typeof raw.walletDisplayedAmount !== "string" || !WALLET_AMOUNT_PATTERN.test(raw.walletDisplayedAmount)) {
+      return invalid("walletDisplayedAmount", "walletDisplayedAmount is required for a wallet payment.");
+    }
+    walletDisplayedAmount = raw.walletDisplayedAmount;
+  }
+
+  // Diagnostic only, and client-reported: kept when it looks like a brand name, dropped otherwise.
+  const brand = typeof raw.cardBrand === "string" ? raw.cardBrand.trim().toLowerCase() : "";
+  const cardBrand = /^[a-z][a-z ]{1,19}$/.test(brand) ? brand : undefined;
+
+  return { ok: true, paymentMethod, walletDisplayedAmount, cardBrand };
 }
 
 /**
@@ -564,11 +625,60 @@ const REAL_DEPS: ChargeDeps = {
 /**
  * SPRINT-18.3: what a sale needs from the request. The billing ZIP rides along to the gateway
  * and is never written anywhere — not the order, not the attempt record, not a log line.
+ *
+ * SPRINT-19: the wallet fields are optional, and absent means card. `walletDisplayedAmount` is
+ * compared, never charged; `paymentMethod` and `cardBrand` go to the attempt record and the log.
  */
-export type ChargePayment = { paymentToken: string; billingZip: string | null };
+export type ChargePayment = {
+  paymentToken: string;
+  billingZip: string | null;
+  paymentMethod?: PaymentMethod;
+  walletDisplayedAmount?: string | null;
+  cardBrand?: string | null;
+};
 
-function chargePaymentOf(request: CreateOrderRequest): ChargePayment {
-  return { paymentToken: request.paymentToken, billingZip: request.billingZip ?? null };
+export function chargePaymentOf(request: CreateOrderRequest): ChargePayment {
+  return {
+    paymentToken: request.paymentToken,
+    billingZip: request.billingZip ?? null,
+    paymentMethod: request.paymentMethod ?? "card",
+    walletDisplayedAmount: request.walletDisplayedAmount ?? null,
+    cardBrand: request.cardBrand ?? null,
+  };
+}
+
+/**
+ * SPRINT-19: the customer wording when a wallet sheet showed a different total from the one the
+ * server would charge. Nothing was charged and the card is fine, so it says so and asks for a
+ * retry against the refreshed total.
+ */
+export const WALLET_TOTAL_CHANGED_MESSAGE =
+  "Your order total changed before we could charge it, so nothing was charged. Please check the new total and pay again.";
+
+/**
+ * SPRINT-19: a wallet sheet displays an amount and the customer authorises THAT amount. Neither
+ * NMI's nor Merchant Pay Connect's documentation says the gateway holds a wallet sale to it
+ * (docs/SPRINT-19-NOTES.md §0.9), so the server does: the amount the sheet showed must equal,
+ * byte for byte, the amount this sale is about to send. Both strings come from the one formatter
+ * (`toGatewayAmount`) — the sheet's through the quote's `totalGatewayAmount`.
+ *
+ * Null means proceed: a card, or a wallet whose sheet showed exactly this total.
+ */
+export function walletAmountRefusal(orderTotalCents: number, payment: ChargePayment): CheckoutFailure | null {
+  if (!payment.paymentMethod || payment.paymentMethod === "card") return null;
+  let charging: string | null;
+  try {
+    charging = toGatewayAmount(orderTotalCents);
+  } catch {
+    charging = null;
+  }
+  if (charging !== null && payment.walletDisplayedAmount === charging) return null;
+  return {
+    ok: false,
+    code: ApiErrorCode.INTERNAL_ERROR,
+    message: WALLET_TOTAL_CHANGED_MESSAGE,
+    details: { reason: "WALLET_AMOUNT_MISMATCH", retryable: true },
+  };
 }
 
 /**
@@ -724,6 +834,28 @@ async function chargeClaimedOrder(
   payment: ChargePayment,
   deps: ChargeDeps,
 ): Promise<CheckoutSuccess | CheckoutFailure> {
+  // SPRINT-19: immediately before the one sale call, against the one amount it sends. Every route
+  // to the gateway — a new order, an idempotent replay, a duplicate-guard hit, a recovered claim —
+  // arrives here. A refusal releases THIS claim (as an incident does): nothing was sent, so the
+  // same checkout may retry once the storefront has re-quoted.
+  const refusal = walletAmountRefusal(order.totalCents, payment);
+  if (refusal) {
+    if (order.chargeClaimedAt) await releaseChargeClaim(order.id, order.chargeClaimedAt);
+    emitLog(
+      "warn",
+      "checkout.wallet_amount_mismatch",
+      {
+        orderId: order.id,
+        paymentMethod: payment.paymentMethod ?? "card",
+        orderTotalCents: order.totalCents,
+        walletDisplayedAmount: payment.walletDisplayedAmount ?? null,
+        requestId: getRequestId() ?? null,
+      },
+      { scope: "payments" },
+    );
+    return refusal;
+  }
+
   const outcome = await deps.createPayment({
     paymentToken: payment.paymentToken,
     billingZip: payment.billingZip,
@@ -731,11 +863,19 @@ async function chargeClaimedOrder(
     amountCents: order.totalCents,
     orderId: order.id,
     orderReference: order.id,
+    paymentMethod: payment.paymentMethod ?? "card",
   });
 
   // SPRINT-18.3: record what the gateway said BEFORE acting on it, for every outcome. Neither
   // call throws, so a failure to record can never change the customer's answer or the order.
-  await deps.recordPaymentAttempt({ orderId: order.id, amountCents: order.totalCents, ...outcome.attempt });
+  // SPRINT-19: plus how the token was produced. Nothing a wallet sheet collected is recorded.
+  await deps.recordPaymentAttempt({
+    orderId: order.id,
+    amountCents: order.totalCents,
+    ...outcome.attempt,
+    paymentMethod: payment.paymentMethod ?? "card",
+    cardBrand: payment.cardBrand ?? null,
+  });
   if (isGatewayIncident(outcome.attempt.classification)) {
     await deps.raisePaymentGatewayIncident({
       orderId: order.id,

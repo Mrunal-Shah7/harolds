@@ -1,4 +1,4 @@
-// SPRINT-4 / SPRINT-18.3: checkout / order request + public response contract (version 1.2.0).
+// SPRINT-4 / SPRINT-18.3 / SPRINT-19: checkout / order request + public response contract (version 1.4.0).
 import type { CartRequest, PricedLineSnapshot, TipApplied } from "./cart";
 import type { ApiErrorCode } from "./errors";
 
@@ -31,7 +31,26 @@ export type CreateOrderRequest = {
   billingZip?: string;
   idempotencyKey: string;
   customerNote?: string | null;
+  /**
+   * SPRINT-19 (additive): how the token was produced. Omitted means `card`, so existing clients
+   * keep working. It does not change the sale: every method's token goes through the same request.
+   */
+  paymentMethod?: PaymentMethod;
+  /**
+   * SPRINT-19 (additive): for a wallet, the amount the wallet sheet showed the customer and they
+   * authorised, exactly as it was handed to Collect.js ("12.34"). Required for a wallet, ignored
+   * for a card. It is NEVER a price: the server charges its own total and refuses the sale, before
+   * the gateway is called, when this differs from it. Named so it cannot be mistaken for, or pass
+   * as, the forbidden client money fields (`…Cents`, `…Price`, `amount`, `total`).
+   */
+  walletDisplayedAmount?: string;
+  /** SPRINT-19 (additive): card brand as Collect.js reported it ("visa"). Diagnostic only. */
+  cardBrand?: string;
 };
+
+/** SPRINT-19: the ways a customer can produce a payment token. */
+export const PAYMENT_METHODS = ["card", "apple_pay", "google_pay"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 /** Returned on successful create (and idempotent replay). Includes lookupToken once. */
 export type CheckoutOrderResponse = {

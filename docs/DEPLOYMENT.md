@@ -1,4 +1,4 @@
-<!-- SPRINT-10 / SPRINT-11: production deploy and rollback. Sprint 11 rehearsed the build, standalone start, migrate:deploy, and rollback copy locally. Ubuntu host still does not exist. -->
+<!-- SPRINT-10 / SPRINT-11 / SPRINT-19: production deploy and rollback. Sprint 11 rehearsed the build, standalone start, migrate:deploy, and rollback copy locally. Ubuntu host still does not exist. -->
 <!-- SPRINT-18.2: gateway glance check (Merchant Pay Connect host), no NEXT_PUBLIC_NMI_*, both key triples may coexist (matches .env.example). -->
 
 # Deployment and rollback — Harold's Chicken Oak Lawn
@@ -37,6 +37,16 @@ This is a pnpm monorepo. `outputFileTracingRoot` is the repo root, so standalone
 | Copy `apps/web/public` to | `apps/web/.next/standalone/apps/web/public` |
 | Run from | `apps/web/.next/standalone/apps/web` (`node server.js`) |
 
+**SPRINT-19: copy `public` with its dot-directories.** `public/.well-known/` holds the Apple Pay
+domain association file. A shell glob (`cp -r apps/web/public/* …`) silently skips it, and this was
+verified on the development machine. Use the trailing `/.` form, which copies everything,
+dot-directories included:
+
+```
+cp -a apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+cp -a apps/web/public/. apps/web/.next/standalone/apps/web/public/
+```
+
 Example unit:
 
 ```
@@ -73,6 +83,14 @@ Confirm on reboot: service comes up **after** Postgres; `GET /api/v1/health` bec
 - Body sizes: public JSON 32 KiB, admin 64 KiB, webhooks 1 MiB, print 256 KiB — do not set nginx `client_max_body_size` below 1m.
 - HTTP → HTTPS at nginx (Node also redirects when `TRUST_PROXY=1` and proto is http).
 - logrotate for nginx and the Node stdout file (14 days).
+- **SPRINT-19: `/.well-known/apple-developer-merchantid-domain-association`** must reach the app,
+  or be served from the same file, as **200 with the exact bytes**. No redirect, no auth, no
+  rewrite, no gzip-then-cache of a stale copy, and **no trailing slash**. The app serves it with
+  `Content-Type: application/octet-stream`. `www` → apex stays a redirect, and Apple Pay is
+  registered for the apex only. Verify through the proxy (Sprint 19 Phase 7):
+  `curl -sS -D - https://haroldsburnham.com/.well-known/apple-developer-merchantid-domain-association | tail -c 228 | sha256sum`
+  must print `6e6bea7f8889670155ec616394f08cff3c782e170f76db38c89ffdfe19107d51`, and a
+  `curl -I` must show `200` directly, not a `30x`.
 
 ---
 
@@ -142,6 +160,10 @@ Production `.env` must show:
 - `NODE_ENV=production`
 - `NMI_ENVIRONMENT="production"` (exact, lowercase) and the complete `NMI_*_KEY_LIVE` triple from the Merchant Pay Connect portal. Nothing about the gateway is inlined at build (Sprint 18.2): the checkout page resolves Collect.js from the server's `NMI_ENVIRONMENT` on every request, so a restart is enough to change it — no rebuild ordering to get wrong. Remove any leftover `NEXT_PUBLIC_NMI_*` lines; nothing reads them.
 - The sandbox triple **may** remain alongside the live one: only the triple matching `NMI_ENVIRONMENT` is read or validated (`packages/config/src/payments.ts`, `production-guards.ts`), matching `.env.example`. Leaving it blank is tidier and equally valid.
+- **SPRINT-19:** `PAYMENTS_APPLE_PAY_ENABLED` and `PAYMENTS_GOOGLE_PAY_ENABLED` are `"false"` (or unset)
+  until Merchant Pay Connect has confirmed the wallet in writing for this MID. Each is `"true"` or
+  `"false"` exactly, and anything else refuses to start. They are read at run time, so **changing
+  one needs a restart, not a rebuild**. Setting one back to `"false"` and restarting is the kill switch.
 - `NEXT_PUBLIC_APP_URL=https://<real-domain>`
 - `TRUST_PROXY=1`
 - `LOG_LEVEL=info`
@@ -149,4 +171,4 @@ Production `.env` must show:
 - Print secret ≥ 32 characters
 - No localhost URLs
 
-`GET /api/v1/health` is the glance check for the gateway. It must show `paymentEnvironment: production`, `paymentGatewayOrigin: https://mpc.transactiongateway.com`, and a `collectJsUrl` on that origin. If any says sandbox or a generic NMI host, stop. The gateway host is the reseller's, set once in `packages/config/src/nmi-gateway.ts` — never in `.env`. `app.startup_summary` is the glance check for email / alerting / error tracker / printer serial, and repeats `collectJsUrl`.
+`GET /api/v1/health` is the glance check for the gateway. It must show `paymentEnvironment: production`, `paymentGatewayOrigin: https://mpc.transactiongateway.com`, and a `collectJsUrl` on that origin. If any says sandbox or a generic NMI host, stop. The gateway host is the reseller's, set once in `packages/config/src/nmi-gateway.ts` — never in `.env`. `app.startup_summary` is the glance check for email / alerting / error tracker / printer serial, and repeats `collectJsUrl`. SPRINT-19: health also reports `wallets: { applePay, googlePay }` (the flags as this process read them), and `app.startup_summary` repeats them as `applePayEnabled` / `googlePayEnabled`.

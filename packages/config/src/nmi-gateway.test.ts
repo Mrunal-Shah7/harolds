@@ -1,4 +1,4 @@
-// SPRINT-18.2: pins the gateway URLs, in both branches, to the values Merchant Pay Connect
+// SPRINT-18.2 / SPRINT-19: pins the gateway URLs, in both branches, to the values Merchant Pay Connect
 // confirmed. This file is the one deliberate second statement of the host outside
 // nmi-gateway.ts: a test that derived its expectations from the module would prove nothing.
 import assert from "node:assert/strict";
@@ -50,19 +50,24 @@ describe("gateway URLs", () => {
     env.NMI_WEBHOOK_SIGNING_KEY_LIVE = "test-live-signing";
     assert.equal(activeNmiGateway().origin, "https://mpc.transactiongateway.com");
     assert.equal(getNmiConfig().gateway.transactUrl, "https://mpc.transactiongateway.com/api/transact.php");
-    assert.deepEqual(getNmiBrowserConfig(), {
+    assert.deepEqual(gatewayPart(getNmiBrowserConfig()), {
       collectJsUrl: "https://mpc.transactiongateway.com/token/Collect.js",
       tokenizationKey: "test-live-tokenization",
     });
 
     env.NMI_ENVIRONMENT = "sandbox";
     env.NMI_TOKENIZATION_KEY_SANDBOX = "  test-sandbox-tokenization \n";
-    assert.deepEqual(getNmiBrowserConfig(), {
+    assert.deepEqual(gatewayPart(getNmiBrowserConfig()), {
       collectJsUrl: "https://sandbox.nmi.com/token/Collect.js",
       tokenizationKey: "test-sandbox-tokenization",
     });
   });
 });
+
+/** SPRINT-19: the gateway half of the browser config; `wallets` is covered in wallets.test.ts. */
+function gatewayPart(c: ReturnType<typeof getNmiBrowserConfig>) {
+  return { collectJsUrl: c.collectJsUrl, tokenizationKey: c.tokenizationKey };
+}
 
 describe("generated CSP, per environment", () => {
   it("production allows Merchant Pay Connect and no generic NMI host", () => {

@@ -1,5 +1,6 @@
 // Checkout field validation.
 // SPRINT-18.3: adds the billing ZIP, which belongs to the payment card, not to the contact block.
+// SPRINT-19: the ZIP is required only when paying by card. A wallet supplies its own postal code.
 //
 // This is a COURTESY layer, not a security boundary: everything here is re-checked on the server
 // (phone by normalizePhoneToE164, email by validateEmail, tip bounds by parseCartRequest against
@@ -117,7 +118,9 @@ export function validateCheckout(input: {
   customTip: string;
   orderNote: string;
   billingZip: string;
-}): CheckoutFieldErrors {
+}, options: { requireBillingZip?: boolean } = {}): CheckoutFieldErrors {
+  // SPRINT-19: defaults to required, so every existing caller is the card checkout it always was.
+  const requireBillingZip = options.requireBillingZip ?? true;
   return {
     firstName: validateName(input.firstName, "First name"),
     lastName: validateName(input.lastName, "Last name"),
@@ -125,7 +128,7 @@ export function validateCheckout(input: {
     email: validateEmailField(input.email),
     customTip: validateCustomTip(input.customTip),
     orderNote: validateOrderNote(input.orderNote),
-    billingZip: validateBillingZip(input.billingZip),
+    billingZip: requireBillingZip ? validateBillingZip(input.billingZip) : null,
   };
 }
 

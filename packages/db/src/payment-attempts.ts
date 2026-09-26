@@ -1,8 +1,9 @@
-// SPRINT-18.3: the per-attempt gateway record, and the payment-gateway incident alert.
+// SPRINT-18.3 / SPRINT-19: the per-attempt gateway record, and the payment-gateway incident alert.
 //
 // No gateway import: the record arrives as plain data from the checkout, shaped by
 // @harolds/payments. NOTHING here may take a PAN, expiry, security code, payment token, or the
-// billing ZIP — the input type has no field that could carry one, on purpose.
+// billing ZIP — the input type has no field that could carry one, on purpose. SPRINT-19: nor any
+// wallet contact data (name, address, postal code, email, phone) — only the method and the brand.
 import { emitLog } from "@harolds/config";
 import { JobStatus, JobType } from "@harolds/types";
 import { prisma } from "./client";
@@ -29,6 +30,10 @@ export type PaymentAttemptInput = {
   authCode: string | null;
   gatewayTransactionId: string | null;
   httpStatus: number | null;
+  /** SPRINT-19: card | apple_pay | google_pay. Omitted means card. */
+  paymentMethod?: "card" | "apple_pay" | "google_pay";
+  /** SPRINT-19: brand as Collect.js reported it, already normalised. Never a card number. */
+  cardBrand?: string | null;
 };
 
 /**
@@ -54,6 +59,8 @@ export async function recordPaymentAttempt(input: PaymentAttemptInput): Promise<
         authCode: input.authCode,
         gatewayTransactionId: input.gatewayTransactionId,
         httpStatus: input.httpStatus,
+        paymentMethod: input.paymentMethod ?? "card",
+        cardBrand: input.cardBrand ?? null,
       },
       select: { id: true },
     });

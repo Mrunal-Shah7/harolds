@@ -1,4 +1,4 @@
-// SPRINT-3: cart request contract — identifiers and quantities only; never prices.
+// SPRINT-3 / SPRINT-19: cart request contract — identifiers and quantities only; never prices.
 import type { ApiErrorCode } from "./errors";
 
 /** Structural abuse-prevention limits (named in one place). */
@@ -125,6 +125,13 @@ export type QuoteResult = {
   taxAppliedPreDiscount: boolean;
   tip: TipApplied;
   totalCents: number;
+  /**
+   * SPRINT-19 (additive): `totalCents` in the gateway's amount format ("12.34"), made on the
+   * server by the same function that formats the sale. The storefront hands it to the wallet
+   * sheet untouched, so the browser does no money arithmetic at all. Null when the total is not
+   * chargeable (zero). Set by the /quote route; absent from the pure pricing result.
+   */
+  totalGatewayAmount?: string | null;
   orderable: boolean;
   blockingReasons: ApiErrorCode[];
   estimatedReadyAt: string;

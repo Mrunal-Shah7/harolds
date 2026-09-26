@@ -2,6 +2,7 @@
 // Later sprints add rows, not tables. All money is integer US cents (*Cents suffix). No soft deletes.
 // SPRINT-18.3: exception to "rows, not tables" — PaymentAttempt, because an order can see more
 // than one sale attempt and each one's gateway answer must survive the next.
+// SPRINT-19: PaymentAttempt gains paymentMethod (enum PaymentMethod) and cardBrand.
 
 generator client {
   provider = "prisma-client-js"
@@ -897,12 +898,23 @@ model PaymentAttempt {
   gatewayTransactionId String?
   /// HTTP status when the gateway answered with something other than 200.
   httpStatus           Int?
+  /// SPRINT-19: how the payment token was produced. Existing rows are cards.
+  paymentMethod        PaymentMethod                @default(card)
+  /// SPRINT-19: card brand as Collect.js reported it ("visa"). Diagnostic only; never the number.
+  cardBrand            String?
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([orderId, createdAt])
   @@index([classification, createdAt])
   @@index([gatewayTransactionId])
+}
+
+/// SPRINT-19: the ways a payment token can be produced. Every one goes through the same sale.
+enum PaymentMethod {
+  card
+  apple_pay
+  google_pay
 }
 
 /// SPRINT-18.3: a decline is a statement about the customer's card; every other non-approval is

@@ -1,4 +1,4 @@
-// SPRINT-9 / SPRINT-17 / SPRINT-18.2: exemptions and NMI Collect.js CSP sources.
+// SPRINT-9 / SPRINT-17 / SPRINT-18.2 / SPRINT-19: exemptions and NMI Collect.js CSP sources.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { env } from "./env";
@@ -41,7 +41,9 @@ describe("content security policy", () => {
   // literal values are pinned once, in nmi-gateway.test.ts.
   for (const environment of ["sandbox", "production"] as const) {
     it(`allows exactly the ${environment} gateway on every Collect.js directive`, () => {
-      const csp = contentSecurityPolicy(environment);
+      // SPRINT-19: wallets pinned OFF. This is the gateway-only policy; with Google Pay on,
+      // frame-src legitimately gains its hosts (wallets.test.ts), whatever the local .env says.
+      const csp = contentSecurityPolicy(environment, { applePay: false, googlePay: false });
       const active = nmiGatewayUrls(environment).origin;
       const other = nmiGatewayUrls(environment === "production" ? "sandbox" : "production").origin;
       for (const directive of COLLECT_JS_DIRECTIVES) {

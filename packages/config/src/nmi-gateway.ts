@@ -1,4 +1,5 @@
-// SPRINT-18.2: the payment gateway's address — the ONLY place in the repository that states it.
+// SPRINT-18.2 / SPRINT-19: the payment gateway's address — the ONLY place in the repository that states it.
+// SPRINT-19: and the digital wallets' external origins, for the same reason.
 //
 // Every consumer derives from here: the Payment API and Query API URLs (payments.ts → the
 // payments client), the Collect.js script URL (checkout layout → payment form), the CSP gateway
@@ -56,3 +57,25 @@ export function nmiGatewayUrls(environment: NmiEnvironment): NmiGatewayUrls {
 export function activeNmiGateway(): NmiGatewayUrls {
   return nmiGatewayUrls(env.NMI_ENVIRONMENT);
 }
+
+/**
+ * SPRINT-19: the external origins the digital wallets need. They live here, beside the gateway,
+ * for the same reason: one literal, derived everywhere else (CSP, checkout props). Sources are in
+ * docs/SPRINT-19-NOTES.md §0.9 and §3.
+ *
+ * - `applePaySdk`: Apple's Pay JS SDK. Collect.js injects it on EVERY checkout load, wallets or
+ *   not, so the CSP allows it unconditionally (security.ts). Apple Pay itself adds no other
+ *   origin: its button renders in the page and merchant validation goes through the gateway.
+ * - `collectWalletFrames`: Collect.js mounts the Google Pay button as an iframe from this host.
+ *   It is hard-coded in the Collect.js build (`googlePayIFrameRootUrl`), not in NMI's CSP list.
+ * - `googlePay`: Google's Pay API. Loaded by the checkout ONLY to ask `isReadyToPay`, because
+ *   Collect.js reports no Google Pay availability of its own.
+ */
+export const WALLET_ORIGINS = {
+  applePaySdk: "https://applepay.cdn-apple.com",
+  collectWalletFrames: "https://collectcheckout.com",
+  googlePay: "https://pay.google.com",
+} as const;
+
+/** Google's Pay API script, used for the availability check only. */
+export const GOOGLE_PAY_JS_URL = `${WALLET_ORIGINS.googlePay}/gp/p/js/pay.js`;

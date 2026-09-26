@@ -1,4 +1,4 @@
-// SPRINT-4 / SPRINT-17 / SPRINT-18.2 / SPRINT-18.3: NMI gateway client — the ONLY module in this repo that speaks to the
+// SPRINT-4 / SPRINT-17 / SPRINT-18.2 / SPRINT-18.3 / SPRINT-19: NMI gateway client — the ONLY module in this repo that speaks to the
 // payment gateway. All callers go through the functions exported here, and nothing about NMI's
 // wire format (form-encoded requests, XML query responses, numeric response codes) escapes it.
 import { env, getNmiConfig, nmiGatewayUrls } from "@harolds/config";
@@ -342,6 +342,7 @@ export async function createPayment(input: CreatePaymentInput): Promise<PaymentO
     avsResult: a.avsResponse,
     securityCodeResult: a.cvvResponse,
     httpStatus: a.httpStatus,
+    paymentMethod: input.paymentMethod ?? "card",
   });
   return outcome;
 }

@@ -1,8 +1,8 @@
-// SPRINT-9 / SPRINT-12: dependency-aware health — process alive is not enough; database and worker matter.
+// SPRINT-9 / SPRINT-12 / SPRINT-19: dependency-aware health — process alive is not enough; database and worker matter.
 // SPRINT-18.2: also reports the gateway this instance is addressed to and the Collect.js URL the
 // checkout page serves. Both come from the same per-request resolution the page uses, so there
 // is no separate bundle environment that could disagree — this is the cutover glance check.
-import { activeNmiGateway, env, getWorkerStaleMs } from "@harolds/config";
+import { activeNmiGateway, env, getWalletFlags, getWorkerStaleMs } from "@harolds/config";
 import { prisma } from "@harolds/db";
 import { getPaymentEnvironment } from "@harolds/payments";
 import { API_CONTRACT_VERSION } from "@harolds/types";
@@ -15,6 +15,8 @@ export type HealthSnapshot = {
   paymentGatewayOrigin: string;
   /** SPRINT-18.2 (additive): the Collect.js URL /checkout renders for this instance. */
   collectJsUrl: string;
+  /** SPRINT-19 (additive): which wallets checkout offers. Flags only — availability is per device. */
+  wallets: { applePay: boolean; googlePay: boolean };
   nodeEnv: string;
   contractVersion: typeof API_CONTRACT_VERSION;
   checks: {
@@ -61,6 +63,7 @@ export async function getHealthSnapshot(
     paymentEnvironment: getPaymentEnvironment(),
     paymentGatewayOrigin: gateway.origin,
     collectJsUrl: gateway.collectJsUrl,
+    wallets: getWalletFlags(),
     nodeEnv: env.NODE_ENV,
     contractVersion: API_CONTRACT_VERSION,
     checks: {

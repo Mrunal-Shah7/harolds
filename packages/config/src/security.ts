@@ -1,6 +1,7 @@
-// SPRINT-9 / SPRINT-17 / SPRINT-18.2: rate-limit knobs, body caps, trusted-proxy, and CSP for NMI Collect.js.
+// SPRINT-9 / SPRINT-17 / SPRINT-18.2 / SPRINT-19: rate-limit knobs, body caps, trusted-proxy, and CSP for NMI Collect.js and the wallets.
 import { env } from "./env";
-import { nmiGatewayUrls, type NmiEnvironment } from "./nmi-gateway";
+import { nmiGatewayUrls, WALLET_ORIGINS, type NmiEnvironment } from "./nmi-gateway";
+import { getWalletFlags, type WalletFlags } from "./payments";
 
 export type RateBucketName =
   | "quote"
@@ -84,27 +85,42 @@ export function getWorkerStaleMs(): number {
  * so the two cannot disagree, and a list of every gateway ever used is looser than it needs to
  * be and a place for a stale entry to hide.
  */
-export function contentSecurityPolicy(environment: NmiEnvironment = env.NMI_ENVIRONMENT): string {
+export function contentSecurityPolicy(
+  environment: NmiEnvironment = env.NMI_ENVIRONMENT,
+  wallets: WalletFlags = getWalletFlags(),
+): string {
   const gateway = nmiGatewayUrls(environment).origin;
   /**
    * Apple's Pay JS SDK, which Collect.js injects ITSELF.
    *
-   * Do not remove this on the reasoning that this checkout has no wallets — it does not, and
-   * this is still required. Collect.js appends the script tag in its own constructor, at load
-   * time, before `CollectJS.configure()` is ever called, with no flag to suppress it. Blocking
-   * it does not prevent any feature we use; it only produces an unfixable CSP violation on
-   * every single checkout page load, which is how a violation report stops being worth reading.
+   * Do not remove this on the reasoning that a wallet is switched off — it is still required.
+   * Collect.js appends the script tag in its own constructor, at load time, before
+   * `CollectJS.configure()` is ever called, with no flag to suppress it. Blocking it does not
+   * prevent any feature we use; it only produces an unfixable CSP violation on every single
+   * checkout page load, which is how a violation report stops being worth reading.
    * The host is `cdn-apple.com` (hyphen) — `cdn.apple.com` is a different name and will not match.
+   *
+   * SPRINT-19: it is also everything Apple Pay needs, so PAYMENTS_APPLE_PAY_ENABLED adds nothing
+   * here. Apple Pay's button renders in the page, and Collect.js validates the merchant session
+   * through the gateway, which is already allowed.
    */
-  const collectJsApplePay = "https://applepay.cdn-apple.com";
+  const collectJsApplePay = WALLET_ORIGINS.applePaySdk;
+  /**
+   * SPRINT-19: Google Pay, ONLY while PAYMENTS_GOOGLE_PAY_ENABLED is on, in exactly the directives
+   * it uses: Google's Pay API script and its calls and frames (NMI's Collect.js CSP list), and the
+   * host Collect.js mounts the Google Pay button iframe from. With the flag off every directive is
+   * byte-identical to the pre-wallet header (proven in security.test.ts).
+   */
+  const google = wallets.googlePay ? ` ${WALLET_ORIGINS.googlePay}` : "";
+  const googleFrames = wallets.googlePay ? ` ${WALLET_ORIGINS.collectWalletFrames} ${WALLET_ORIGINS.googlePay}` : "";
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${gateway} ${collectJsApplePay}`,
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${gateway} ${collectJsApplePay}${google}`,
     `style-src 'self' 'unsafe-inline' ${gateway}`,
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
-    `frame-src 'self' ${gateway}`,
-    `connect-src 'self' ${gateway}`,
+    `frame-src 'self' ${gateway}${googleFrames}`,
+    `connect-src 'self' ${gateway}${google}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

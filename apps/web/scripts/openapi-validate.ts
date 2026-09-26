@@ -1,8 +1,8 @@
-// SPRINT-2 / SPRINT-3 / SPRINT-4 / SPRINT-18.3: validate docs/openapi/v1.yaml against published surface
+// SPRINT-2 / SPRINT-3 / SPRINT-4 / SPRINT-18.3 / SPRINT-19: validate docs/openapi/v1.yaml against published surface
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import SwaggerParser from "@apidevtools/swagger-parser";
-import { API_CONTRACT_VERSION } from "@harolds/types";
+import { API_CONTRACT_VERSION, PAYMENT_METHODS } from "@harolds/types";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const specPath = path.join(rootDir, "docs/openapi/v1.yaml");
@@ -45,7 +45,14 @@ async function main(): Promise<void> {
   console.log(`Validating OpenAPI: ${path.relative(rootDir, specPath)}`);
   const api = (await SwaggerParser.validate(specPath)) as {
     paths?: Record<string, Record<string, unknown>>;
-    components?: { schemas?: { ApiErrorCode?: { enum?: string[] } } };
+    components?: {
+      schemas?: {
+        ApiErrorCode?: { enum?: string[] };
+        // SPRINT-19: the wallet contract fields checked below.
+        CreateOrderRequest?: { properties?: Record<string, { enum?: string[] } | undefined> };
+        QuoteResult?: { properties?: Record<string, unknown> };
+      };
+    };
     info?: { version?: string };
   };
 
@@ -89,6 +96,19 @@ async function main(): Promise<void> {
   // silently disabled the drift check that runs after it (since Sprint 17).
   if (api.info?.version !== API_CONTRACT_VERSION) {
     throw new Error(`Expected info.version "${API_CONTRACT_VERSION}", got ${String(api.info?.version)}`);
+  }
+
+  // SPRINT-19: the wallet contract, against the code's own constants rather than literals.
+  const createOrder = api.components?.schemas?.CreateOrderRequest?.properties ?? {};
+  const documentedMethods = createOrder.paymentMethod?.enum ?? [];
+  if (JSON.stringify(documentedMethods) !== JSON.stringify(PAYMENT_METHODS)) {
+    throw new Error(`OpenAPI drift: CreateOrderRequest.paymentMethod enum ${JSON.stringify(documentedMethods)} != ${JSON.stringify(PAYMENT_METHODS)}`);
+  }
+  for (const field of ["walletDisplayedAmount", "cardBrand", "billingZip"]) {
+    if (!createOrder[field]) throw new Error(`OpenAPI drift: CreateOrderRequest.${field} missing`);
+  }
+  if (!api.components?.schemas?.QuoteResult?.properties?.totalGatewayAmount) {
+    throw new Error("OpenAPI drift: QuoteResult.totalGatewayAmount missing");
   }
 
   console.log(`OK — ${documented.length} paths, ${codes.length} error codes, version ${api.info?.version}`);

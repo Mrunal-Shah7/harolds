@@ -1,4 +1,4 @@
-// SPRINT-11 / SPRINT-17: one structured startup line — what this instance can actually do.
+// SPRINT-11 / SPRINT-17 / SPRINT-19: one structured startup line — what this instance can actually do.
 // `smsConfigured` is gone: SMS was removed, so email is the only notification channel and
 // `emailConfigured` false now means customers get NO confirmation and alerts go nowhere.
 // SPRINT-12 / SPRINT-17 / SPRINT-18.2: include the Collect.js URL this instance will serve and
@@ -48,6 +48,9 @@ export async function runStartupChecks(): Promise<void> {
       paymentEnvironment: getPaymentEnvironment(),
       collectJsUrl: collectJs.collectJsUrl,
       collectJsKeyConfigured: collectJs.tokenizationKey.length > 0,
+      // SPRINT-19: which wallets checkout offers. A flag change takes effect on restart.
+      applePayEnabled: collectJs.wallets.applePay,
+      googlePayEnabled: collectJs.wallets.googlePay,
       emailConfigured: configured(env.EMAIL_API_KEY) && configured(env.EMAIL_FROM_ADDRESS),
       alertingConfigured,
       alertingDetail,

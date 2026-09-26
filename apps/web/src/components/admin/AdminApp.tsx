@@ -1,6 +1,6 @@
 "use client";
 
-// SPRINT-8 / SPRINT-18.3: admin application shell and screens — role nav, dense tables, confirmation.
+// SPRINT-8 / SPRINT-18.3 / SPRINT-19: admin application shell and screens — role nav, dense tables, confirmation.
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
@@ -19,6 +19,13 @@ import { formatStoreDateTime } from "@/lib/admin-format";
 import { SeoView } from "@/components/admin/SeoView";
 
 type Flash = { kind: "ok" | "err"; text: string } | null;
+
+/** SPRINT-19: a payment attempt's method as an operator reads it. Older rows are cards. */
+function paymentMethodLabel(value: unknown): string {
+  if (value === "apple_pay") return "Apple Pay";
+  if (value === "google_pay") return "Google Pay";
+  return "Card";
+}
 
 function money(cents: number): string {
   return formatCents(Math.max(0, cents));
@@ -1997,7 +2004,7 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
         <table className="adm-table">
           <thead>
             <tr>
-              <th>When</th><th>Result</th><th>Reason</th><th>Gateway code</th><th>Gateway text</th>
+              <th>When</th><th>Method</th><th>Result</th><th>Reason</th><th>Gateway code</th><th>Gateway text</th>
               <th>AVS</th><th>CVV</th><th>Auth</th><th>Transaction</th><th>Amount</th>
             </tr>
           </thead>
@@ -2005,6 +2012,11 @@ function OrderDetailView({ id, timezone }: { id: string; timezone: string }) {
             {((order.paymentAttempts as Array<Record<string, unknown>>) ?? []).map((a) => (
               <tr key={String(a.id)}>
                 <td>{String(a.createdAtLocal)}</td>
+                {/* SPRINT-19: payment method and card brand, beside the AVS and CVV codes. */}
+                <td>
+                  {paymentMethodLabel(a.paymentMethod)}
+                  {a.cardBrand ? ` · ${String(a.cardBrand)}` : ""}
+                </td>
                 <td>{String(a.classification)}</td>
                 <td>{String(a.internalReason)}</td>
                 <td>

@@ -1,4 +1,4 @@
-// SPRINT-1 / SPRINT-5 / SPRINT-18.2: config package public exports
+// SPRINT-1 / SPRINT-5 / SPRINT-18.2 / SPRINT-19: config package public exports
 export { env, parseEnv, type Env } from "./env";
 export { getPrinterConfig, isKnownPrinterSerial, type PrinterConfig } from "./printers";
 export {
@@ -54,13 +54,18 @@ export {
 export {
   getNmiConfig,
   getNmiBrowserConfig,
+  getWalletFlags,
   missingNmiCredentials,
   type NmiConfig,
   type NmiBrowserConfig,
+  type NmiBrowserWallets,
+  type WalletFlags,
 } from "./payments";
 export {
   activeNmiGateway,
   nmiGatewayUrls,
+  WALLET_ORIGINS,
+  GOOGLE_PAY_JS_URL,
   type NmiEnvironment,
   type NmiGatewayUrls,
 } from "./nmi-gateway";

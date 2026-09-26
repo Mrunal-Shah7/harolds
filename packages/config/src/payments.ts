@@ -1,10 +1,10 @@
-// SPRINT-17 / SPRINT-18.2: NMI gateway credentials and endpoint selection.
+// SPRINT-17 / SPRINT-18.2 / SPRINT-19: NMI gateway credentials, endpoint selection, and wallet flags.
 //
 // The sandbox and live key triples live side by side in .env so switching environments is one
 // variable, not a credential swap. Only the ACTIVE environment's keys are ever read or
 // validated — the inactive triple may legitimately be blank.
 import { env } from "./env";
-import { nmiGatewayUrls, type NmiGatewayUrls } from "./nmi-gateway";
+import { GOOGLE_PAY_JS_URL, nmiGatewayUrls, type NmiGatewayUrls } from "./nmi-gateway";
 
 /*
  * Where requests are addressed is NOT decided here. The gateway host comes from the reseller
@@ -86,10 +86,33 @@ export function getNmiConfig(): NmiConfig {
   };
 }
 
-/** The only NMI values the browser may see: where Collect.js loads from, and the public key. */
+/** SPRINT-19: which wallets this deployment offers. Both false unless explicitly enabled. */
+export type WalletFlags = { applePay: boolean; googlePay: boolean };
+
+/** SPRINT-19: the wallet flags, from `PAYMENTS_*_ENABLED`. Read per call, never at build. */
+export function getWalletFlags(source: { PAYMENTS_APPLE_PAY_ENABLED?: string; PAYMENTS_GOOGLE_PAY_ENABLED?: string } = env): WalletFlags {
+  return {
+    applePay: source.PAYMENTS_APPLE_PAY_ENABLED === "true",
+    googlePay: source.PAYMENTS_GOOGLE_PAY_ENABLED === "true",
+  };
+}
+
+/**
+ * SPRINT-19: what the browser needs to offer wallets. `googlePayJsUrl` is the availability
+ * check's script (Collect.js reports no Google Pay availability), `null` when Google Pay is off so
+ * nothing extra loads. `googlePayEnvironment` follows NMI_ENVIRONMENT: the sandbox gateway is a
+ * test account and must never ask Google for a production-ready answer.
+ */
+export type NmiBrowserWallets = WalletFlags & {
+  googlePayJsUrl: string | null;
+  googlePayEnvironment: "TEST" | "PRODUCTION";
+};
+
+/** The only NMI values the browser may see: where Collect.js loads from, the public key, and the wallets. */
 export type NmiBrowserConfig = {
   collectJsUrl: string;
   tokenizationKey: string;
+  wallets: NmiBrowserWallets;
 };
 
 /**
@@ -101,10 +124,16 @@ export type NmiBrowserConfig = {
  */
 export function getNmiBrowserConfig(): NmiBrowserConfig {
   const environment = env.NMI_ENVIRONMENT;
+  const flags = getWalletFlags();
   return {
     collectJsUrl: nmiGatewayUrls(environment).collectJsUrl,
     tokenizationKey: clean(
       environment === "production" ? env.NMI_TOKENIZATION_KEY_LIVE : env.NMI_TOKENIZATION_KEY_SANDBOX,
     ),
+    wallets: {
+      ...flags,
+      googlePayJsUrl: flags.googlePay ? GOOGLE_PAY_JS_URL : null,
+      googlePayEnvironment: environment === "production" ? "PRODUCTION" : "TEST",
+    },
   };
 }

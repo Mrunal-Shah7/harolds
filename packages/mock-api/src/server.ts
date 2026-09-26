@@ -1,4 +1,4 @@
-// SPRINT-2 / SPRINT-3 / SPRINT-11: Harold's mock API — fixture-backed /api/v1; checkout fields match the real contract.
+// SPRINT-2 / SPRINT-3 / SPRINT-11 / SPRINT-19: Harold's mock API — fixture-backed /api/v1; checkout fields match the real contract.
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -441,7 +441,7 @@ app.get("/api/v1/orders/status/:lookupToken", (c) => {
 });
 
 app.get("/api/v1/health", (c) => {
-  return c.json(okBody({ ok: true, paymentEnvironment: "mock", nodeEnv: "development", contractVersion: "1.3.0" }));
+  return c.json(okBody({ ok: true, paymentEnvironment: "mock", nodeEnv: "development", contractVersion: "1.4.0" }));
 });
 
 app.notFound((c) => {

@@ -1,4 +1,4 @@
-// SPRINT-4 / SPRINT-17 / SPRINT-18.2 / SPRINT-18.3: structured logging for payment operations — field-name redaction is applied centrally.
+// SPRINT-4 / SPRINT-17 / SPRINT-18.2 / SPRINT-18.3 / SPRINT-19: structured logging for payment operations — field-name redaction is applied centrally.
 import { emitLog } from "@harolds/config";
 
 type LogFields = Record<string, string | number | boolean | null | undefined>;
@@ -41,6 +41,8 @@ export function logPaymentOutcome(fields: {
   avsResult: string | null;
   securityCodeResult: string | null;
   httpStatus: number | null;
+  /** SPRINT-19: card | apple_pay | google_pay. The only field wallets add; no wallet contact data. */
+  paymentMethod: string;
 }): void {
   const level =
     fields.outcomeKind === "succeeded" ? "info" : fields.outcomeKind === "declined" ? "warn" : "error";
