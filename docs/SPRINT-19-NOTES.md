@@ -268,7 +268,7 @@ accessibility tree. This is safe whichever way the Apple button behaves.
     - an invalid field (the ZIP excepted);
     - an order that isn't orderable;
     - a quote that is loading, missing, or **not the price Collect.js holds**;
-    - a submission in progress, or a sheet already open;
+    - a submission in progress;
     - the 18.x retry lockout;
     - the decoy or the 3 s minimum-fill check.
 - **Accessibility:** `tablist`/`tab`/`tabpanel` roles; a roving tabindex; arrows (wrapping), Home and End; the global blue
@@ -391,15 +391,15 @@ health reports 1.4.0.
 ## 7. Suite, CSP proof and deltas (Phase 6)
 
 **Typecheck, lint, build and test were run twice. The summaries are identical:** every step exited 0, and the tests
-passed **650 / 650** both times.
+passed **651 / 651** both times. This is the run after the two §8 fixes; the run before them was 650 / 650, also twice.
 
 | Package | Before | After | Added |
 |---|---|---|---|
 | config | 40 | 65 | wallet flags, the CSP (literal pre-sprint fixtures), origin single-source scan, browser-config wallets |
 | payments | 81 | 81 | — (the log line change is covered by the web tests) |
 | db, pricing, print, email, notify | 256 | 256 | — |
-| web | 171 | 248 | `payment-methods.test.ts` (57), `wallet-checkout.test.ts` (16), `apple-domain-association.test.ts` (4) |
-| **Total** | **548** | **650** | |
+| web | 171 | 249 | `payment-methods.test.ts` (58), `wallet-checkout.test.ts` (16), `apple-domain-association.test.ts` (4) |
+| **Total** | **548** | **651** | |
 
 The existing card-checkout suite passes untouched: `checkout-validation`, `payment-classification`,
 `charge-recovery`, `duplicate-guard`, `order-key` and `payment-integrity`.
@@ -429,33 +429,50 @@ reported the flags each process was given.
 
 ## 8. Deviations
 
-1. **`mv` + `git add` instead of `git mv`** for the association file, which was untracked (§1).
-2. **The association file has no `SPRINT-19` header** because it is byte-sensitive. `design.md` carries its marker in
+0. **A card-path defect, found and fixed. It changes what the card checkout sends.**
+   - **The defect:** `handleTokenReady` was `useCallback(…, [firstName, lastName, phone, email])` and called
+     `submitOrder`. So it called the `submitOrder` of the render in which a contact field last changed, together with
+     **that render's cart, tip, order note and billing ZIP**.
+   - **The consequence:** anything entered after the email never reached `POST /orders`. A customer who typed the
+     email, then chose a tip, wrote a note, or typed the ZIP had those left out of the order. The ZIP sits below the
+     email, so on a normal top-to-bottom fill **the 18.3 AVS ZIP would usually not have been sent**, and the tip would
+     not have been charged.
+   - **The fix:** the handler is now stable (`[]`) and always calls the latest `submitOrder` through a ref. A
+     source-level test pins it and fails against the old page.
+   - **Why it matters for wallets:** a wallet order would otherwise be quoted for a different cart than its sheet
+     showed, and refused as `WALLET_AMOUNT_MISMATCH` on every retry.
+   - **Operator:** check recent live card orders: `PaymentAttempt.avsResponse` for a no-ZIP pattern, and whether the
+     order tips match what customers chose (OUTSTANDING §0).
+1. **The wallet sheet-open lock does not gate the wallet button.** An earlier draft counted "a sheet is open" as a gate
+   blocker. The press that opens the sheet set it, which made the button inert under the customer's finger before the
+   click Apple and Google need. The lock now freezes only the tip, the cart and the tabs.
+2. **`mv` + `git add` instead of `git mv`** for the association file, which was untracked (§1).
+3. **The association file has no `SPRINT-19` header** because it is byte-sensitive. `design.md` carries its marker in
    the new section rather than on line 1, because YAML frontmatter must come first.
-3. **The MPC portal was not read.** Rule 2 forbids contacting the MPC host. The local MPC Payment API export and NMI's
+4. **The MPC portal was not read.** Rule 2 forbids contacting the MPC host. The local MPC Payment API export and NMI's
    public docs were used, and **every Collect.js wallet fact rests on NMI alone** (§0).
-4. **Collect.js's source was read** (the sandbox `https://sandbox.nmi.com/token/Collect.js`, a generic NMI host). It
+5. **Collect.js's source was read** (the sandbox `https://sandbox.nmi.com/token/Collect.js`, a generic NMI host). It
    settled four things the docs leave open:
    - the wallet iframe host (`collectcheckout.com`);
    - that there is no Google Pay readiness signal;
    - that `updateAmount` is the surcharge input;
    - that `timeoutCallback` also fires for wallet-token failures.
-5. **A CSP origin that is not in NMI's list:** `https://collectcheckout.com` in `frame-src`, while Google Pay is on.
-6. **Google's pay.js is loaded when Google Pay is on**, only to ask `isReadyToPay`. Collect.js reports no Google Pay
+6. **A CSP origin that is not in NMI's list:** `https://collectcheckout.com` in `frame-src`, while Google Pay is on.
+7. **Google's pay.js is loaded when Google Pay is on**, only to ask `isReadyToPay`. Collect.js reports no Google Pay
    availability, and the brief requires one.
-7. **Two 18.2 config tests adjusted** (§2). No card-checkout test was edited.
-8. **Re-quoting on any cart change** also corrects the card path's stale *displayed* total after a quantity change.
+8. **Two 18.2 config tests adjusted** (§2). No card-checkout test was edited.
+9. **Re-quoting on any cart change** also corrects the card path's stale *displayed* total after a quantity change.
    Nothing the card path charges changes.
-9. **The amount refusal is a 500 `INTERNAL_ERROR`** with `details.reason: WALLET_AMOUNT_MISMATCH` and
+10. **The amount refusal is a 500 `INTERNAL_ERROR`** with `details.reason: WALLET_AMOUNT_MISMATCH` and
    `retryable: true`, per the brief ("an internal error that tells the customer to retry"). It is logged, not recorded
    as a `PaymentAttempt`, because no gateway attempt happened.
-10. **A ZIP sent with a wallet token is dropped, not refused.** Refusing it after the customer has approved the sheet
+11. **A ZIP sent with a wallet token is dropped, not refused.** Refusing it after the customer has approved the sheet
     would punish a client bug on the customer. It is never sent to the gateway.
-11. **A wallet whose flag is off is refused with 400** before any order exists: the kill switch covers a page rendered
+12. **A wallet whose flag is off is refused with 400** before any order exists: the kill switch covers a page rendered
     before the restart.
-12. **Card brand** is recorded for cards too, taken from the same callback field. **The masked number was not added**
+13. **Card brand** is recorded for cards too, taken from the same callback field. **The masked number was not added**
     (§5).
-13. **The ZIP stays typed across tab switches, but typed card digits do not survive a switch to a wallet tab.** The
+14. **The ZIP stays typed across tab switches, but typed card digits do not survive a switch to a wallet tab.** The
     switch re-draws Collect.js with the current price, which clears the card fields. This is recorded in
     OUTSTANDING.
 
@@ -487,10 +504,10 @@ reported the flags each process was given.
 | Headless Chrome runs (hidden containers ×7, tab width ×5, screenshots ×3) | Each exited on its own (`--dump-dom` / `--screenshot`, `timeout 40–60`) |
 | `kitchen-alerts.test.ts` ×5 | Background, exited 0 |
 | `prisma migrate diff`, `migrate deploy`, `generate` | Foreground, exited |
-| Targeted `tsx --test`, `tsc`, `eslint`, `openapi:validate`; one mutation run of `wallet-checkout.test.ts` (file restored) | Foreground, exited |
+| Targeted `tsx --test`, `tsc`, `eslint`, `openapi:validate`; mutation runs of `wallet-checkout.test.ts` (file restored) and of the wiring tests against the pre-fix page (`git stash` / `stash pop`) | Foreground, exited |
 | `pnpm build` (twice for the matrix; one failed on a script type error, which was fixed) | Background, exited |
 | Flag matrix: `server.js` ×4 on :3100, each followed by the e2e script | Each killed by PID inside the script before the next started. `netstat` afterwards: port 3100 free |
-| Final `typecheck` / `lint` / `build` / `test` ×2 | Background, exited 0 |
+| Final `typecheck` / `lint` / `build` / `test` ×2, then ×2 again after the two fixes in §8 (0, 1) | Background, exited 0 |
 
 No server, watcher or browser was left running. Scratch files are in the session scratchpad, outside the repository.
 Nothing contacted an MPC host. The only gateway-origin traffic was headless Chrome loading the **generic NMI sandbox**

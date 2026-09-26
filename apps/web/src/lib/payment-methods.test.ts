@@ -95,7 +95,6 @@ describe("the wallet sheet opens only for an order the server will accept", () =
     looksAutomated: false,
     quotePrice: "18.40",
     configuredPrice: "18.40",
-    walletInProgress: false,
   };
 
   it("opens when everything holds", () => {
@@ -122,7 +121,6 @@ describe("the wallet sheet opens only for an order the server will accept", () =
     ["Collect.js still holds the OLD total", { configuredPrice: "15.10" }, "price"],
     ["Collect.js not configured yet", { configuredPrice: null }, "price"],
     ["an order request in flight", { submitting: true }, "busy"],
-    ["a sheet already open", { walletInProgress: true }, "busy"],
     ["the retry lockout running", { lockoutSeconds: 9 }, "lockout"],
     ["the decoy or minimum-fill check tripped", { looksAutomated: true }, "automated"],
   ];
@@ -181,7 +179,6 @@ describe("the wallet price is the server's total, untouched", () => {
       looksAutomated: false,
       quotePrice: after,
       configuredPrice,
-      walletInProgress: false,
     });
     assert.deepEqual(walletSheetBlockers(gate(before)), ["price"]);
     assert.deepEqual(walletSheetBlockers(gate(after)), []);
@@ -211,5 +208,23 @@ describe("the Collect.js wallet configuration", () => {
     // Apple's style keys are the three Collect.js accepts, and the style one its guidelines allow.
     assert.deepEqual(Object.keys(apple.style as object).sort(), ["border-radius", "button-style", "height"]);
     assert.ok(["black", "white", "white-outline"].includes((apple.style as Record<string, string>)["button-style"]!));
+  });
+});
+
+describe("checkout page wiring (source-level: this repository has no DOM harness)", () => {
+  const page = readFileSync(path.join(here, "../app/(storefront)/checkout/page.tsx"), "utf8");
+
+  it("the token handler always submits the CURRENT page state, not a stale render's", () => {
+    // It was memoised on the four contact fields, so a tip, note, cart change or ZIP entered after
+    // the email never reached the order request.
+    assert.match(page, /const handleTokenReady = useCallback\(async \(token: string, meta: TokenMeta\) => \{[\s\S]*?await submitOrderRef\.current\(token, meta\);\s*\}, \[\]\);/);
+    assert.match(page, /\n {2}submitOrderRef\.current = submitOrder;\n/);
+    assert.doesNotMatch(page, /\[firstName, lastName, phone, email\]/);
+  });
+
+  it("opening a sheet never gates the wallet button it was opened from", () => {
+    const call = page.slice(page.indexOf("walletSheetBlockers({"), page.indexOf("});", page.indexOf("walletSheetBlockers({")));
+    assert.doesNotMatch(call, /walletInProgress/, "the sheet-open lock freezes tip, cart and tabs, not the mount");
+    assert.match(call, /submitting,/);
   });
 });

@@ -96,8 +96,6 @@ export type SheetGateInput = {
   /** The current quote's price, and the price Collect.js is configured with right now. */
   quotePrice: string | null;
   configuredPrice: string | null;
-  /** A wallet sheet is already open (or was just opened). */
-  walletInProgress: boolean;
 };
 
 /** Why a wallet sheet may not open. In priority order: the first is what the customer is told. */
@@ -117,7 +115,10 @@ export function walletSheetBlockers(input: SheetGateInput): SheetBlocker[] {
   if (input.quoteLoading || input.quotePrice === null || input.configuredPrice !== input.quotePrice) {
     blockers.push("price");
   }
-  if (input.submitting || input.walletInProgress) blockers.push("busy");
+  // NOT "a sheet is open": the press that opens a sheet sets that, and a gate that closed on it
+  // would make the wallet button inert under the customer's own finger, before the click that
+  // Apple and Google need lands. An open sheet freezes the tip, cart and tabs instead (checkout page).
+  if (input.submitting) blockers.push("busy");
   if (input.lockoutSeconds > 0) blockers.push("lockout");
   if (input.looksAutomated) blockers.push("automated");
   return blockers;

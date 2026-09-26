@@ -2,6 +2,23 @@
 
 # Sprint 19: outstanding
 
+## 0. Check live card orders now (independent of wallets)
+
+Sprint 19 found and fixed a checkout defect in the card path (notes §8.0). The page sent the cart, tip, order note
+and **billing ZIP as they were when the email was last typed**. Anything entered after the email was not sent. On a
+normal top-to-bottom fill, that means:
+
+- **the AVS ZIP was probably missing** from most live card sales since 18.3;
+- **a tip chosen after the email was not charged.**
+
+Please check:
+
+1. `PaymentAttempt.avsResponse` on recent live sales, for the pattern a missing ZIP produces.
+2. Whether order `tipCents` matches what customers say they chose.
+3. Whether any kitchen notes are missing.
+
+This deploys with the Sprint 19 code even while both wallet flags stay off.
+
 ## Before either flag goes on (operator, Phase 7)
 
 1. **Merchant Pay Connect must confirm in writing that each wallet is enabled for this MID.**

@@ -186,15 +186,20 @@ export default function CheckoutPage() {
 
   const tipPresets = status?.tipPresetsBps ?? [];
 
-  const handleTokenReady = useCallback(
-    async (token: string, meta: TokenMeta) => {
-      // SPRINT-19: a wallet sheet has closed with a token; the order request now owns the lock.
-      setWalletInProgress(false);
-      await submitOrder(token, meta);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [firstName, lastName, phone, email],
-  );
+  /**
+   * SPRINT-19: the token handler must submit what is on the page NOW. It used to be memoised on the
+   * four contact fields only, so it called the `submitOrder` of the render in which a contact field
+   * last changed — with that render's cart, tip, note and billing ZIP. A tip, note or ZIP entered
+   * after the email was therefore never sent (a card-path defect since the ZIP was added in 18.3),
+   * and a wallet's order would be quoted for a different cart than its sheet showed. The handler is
+   * now stable and always calls the latest `submitOrder` through this ref.
+   */
+  const submitOrderRef = useRef<(token: string, meta: TokenMeta) => Promise<void>>(async () => undefined);
+  const handleTokenReady = useCallback(async (token: string, meta: TokenMeta) => {
+    // SPRINT-19: a wallet sheet has closed with a token; the order request now owns the lock.
+    setWalletInProgress(false);
+    await submitOrderRef.current(token, meta);
+  }, []);
 
   const handleTokenError = useCallback((message: string) => {
     setWalletInProgress(false);
@@ -312,6 +317,7 @@ export default function CheckoutPage() {
       setSubmitting(false);
     }
   };
+  submitOrderRef.current = submitOrder;
 
   const handlePayClick = () => {
     // Attempting to pay marks every field touched, so an empty form explains itself rather than
@@ -355,7 +361,6 @@ export default function CheckoutPage() {
     looksAutomated: decoy.trim().length > 0 || !minFillElapsed,
     quotePrice: walletPrice,
     configuredPrice: walletState.configuredPrice,
-    walletInProgress,
   });
   const walletBlockedMessage = sheetBlockers.length > 0 ? sheetBlockerMessage(sheetBlockers[0]!) : null;
 
