@@ -1,6 +1,10 @@
 # SPRINT-1: normalize line endings so Windows and other checkouts avoid whole-file diffs
 * text=auto eol=lf
 
+# SPRINT-19: Apple Pay domain association. Apple verifies it byte-for-byte; no platform or git
+# setting may ever rewrite its line endings. `binary` = -text -diff. Must stay AFTER the rule above.
+apps/web/public/.well-known/apple-developer-merchantid-domain-association binary
+
 *.{cmd,bat} text eol=crlf
 *.png binary
 *.jpg binary
