@@ -1,5 +1,5 @@
-// SPRINT-19: wallet flags and the wallet CSP. Both flags off must be indistinguishable from the
-// card-only checkout, byte for byte; each flag adds its own origins and nothing else.
+// SPRINT-19: wallet flags and the wallet CSP. Both flags off must be the card-only checkout's
+// header plus only the Google Ads tag's sources; each flag adds its own origins and nothing else.
 import path from "node:path";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,7 @@ import { env, parseEnv } from "./env";
 import { GOOGLE_PAY_JS_URL, WALLET_ORIGINS } from "./nmi-gateway";
 import { getNmiBrowserConfig, getWalletFlags } from "./payments";
 import { contentSecurityPolicy } from "./security";
+import { GOOGLE_TAG_CSP } from "./google-tag";
 
 /**
  * The header as it was BEFORE Sprint 19, captured from `contentSecurityPolicy()` at commit
@@ -28,6 +29,18 @@ const PRE_SPRINT_19_CSP = {
 } as const;
 
 const OFF = { applePay: false, googlePay: false };
+
+/**
+ * The Google Ads tag's sources are on every policy, flags or not, appended after each directive's
+ * other sources. Folds them into a wallet's expected additions, in that order.
+ */
+function plusGoogleTag(added: Record<string, string[]>): Record<string, string[]> {
+  const out: Record<string, string[]> = { ...added };
+  for (const [directive, hosts] of Object.entries(GOOGLE_TAG_CSP)) {
+    out[directive] = [...(out[directive] ?? []), ...hosts];
+  }
+  return out;
+}
 
 function directives(csp: string): Map<string, string[]> {
   return new Map(
@@ -120,8 +133,10 @@ describe("wallet browser config (the 18.2 props path)", () => {
 
 describe("wallet CSP", () => {
   for (const environment of ["sandbox", "production"] as const) {
-    it(`is byte-identical to the pre-Sprint-19 header with both flags off (${environment})`, () => {
-      assert.equal(contentSecurityPolicy(environment, OFF), PRE_SPRINT_19_CSP[environment]);
+    it(`with both flags off differs from the pre-Sprint-19 header only by the Google Ads tag (${environment})`, () => {
+      const change = diff(PRE_SPRINT_19_CSP[environment], contentSecurityPolicy(environment, OFF));
+      assert.deepEqual(change.removed, {});
+      assert.deepEqual(change.added, plusGoogleTag({}));
     });
 
     it(`adds exactly Apple Pay's origins: its sheet's frame host and its merchant check (${environment})`, () => {
@@ -129,30 +144,30 @@ describe("wallet CSP", () => {
       // host after a registration check — both blocked left production Chrome with a blank sheet.
       const change = diff(PRE_SPRINT_19_CSP[environment], contentSecurityPolicy(environment, { applePay: true, googlePay: false }));
       assert.deepEqual(change.removed, {});
-      assert.deepEqual(change.added, {
+      assert.deepEqual(change.added, plusGoogleTag({
         "frame-src": [WALLET_ORIGINS.applePaySdk],
         "connect-src": [WALLET_ORIGINS.applePayMerchantCheck],
-      });
+      }));
     });
 
     it(`adds exactly Google Pay's origins, in exactly its directives (${environment})`, () => {
       const change = diff(PRE_SPRINT_19_CSP[environment], contentSecurityPolicy(environment, { applePay: false, googlePay: true }));
       assert.deepEqual(change.removed, {});
-      assert.deepEqual(change.added, {
+      assert.deepEqual(change.added, plusGoogleTag({
         "script-src": [WALLET_ORIGINS.googlePay],
         "frame-src": [WALLET_ORIGINS.collectWalletFrames, WALLET_ORIGINS.googlePay],
         "connect-src": [WALLET_ORIGINS.googlePay],
-      });
+      }));
     });
 
     it(`with both on adds exactly the union of the two (${environment})`, () => {
       const change = diff(PRE_SPRINT_19_CSP[environment], contentSecurityPolicy(environment, { applePay: true, googlePay: true }));
       assert.deepEqual(change.removed, {});
-      assert.deepEqual(change.added, {
+      assert.deepEqual(change.added, plusGoogleTag({
         "script-src": [WALLET_ORIGINS.googlePay],
         "frame-src": [WALLET_ORIGINS.applePaySdk, WALLET_ORIGINS.collectWalletFrames, WALLET_ORIGINS.googlePay],
         "connect-src": [WALLET_ORIGINS.applePayMerchantCheck, WALLET_ORIGINS.googlePay],
-      });
+      }));
     });
   }
 

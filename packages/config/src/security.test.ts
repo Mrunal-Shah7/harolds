@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { env } from "./env";
 import { nmiGatewayUrls } from "./nmi-gateway";
+import { GOOGLE_TAG_CSP } from "./google-tag";
 import {
   RATE_LIMITS,
   contentSecurityPolicy,
@@ -51,7 +52,9 @@ describe("content security policy", () => {
         assert.ok(!sources(csp, directive).includes(other), `${directive} must not allow ${other}`);
       }
       // Only one gateway origin in the whole policy: self, the Apple SDK host and the gateway.
-      const gatewayLike = sources(csp, "frame-src").filter((s) => s !== "'self'");
+      // The Google Ads tag's frame hosts are not gateways; wallets.test.ts pins them exactly.
+      const tagFrames: readonly string[] = GOOGLE_TAG_CSP["frame-src"];
+      const gatewayLike = sources(csp, "frame-src").filter((s) => s !== "'self'" && !tagFrames.includes(s));
       assert.deepEqual(gatewayLike, [active]);
     });
   }

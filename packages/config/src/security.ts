@@ -2,6 +2,7 @@
 import { env } from "./env";
 import { nmiGatewayUrls, WALLET_ORIGINS, type NmiEnvironment } from "./nmi-gateway";
 import { getWalletFlags, type WalletFlags } from "./payments";
+import { GOOGLE_TAG_CSP } from "./google-tag";
 
 export type RateBucketName =
   | "quote"
@@ -117,14 +118,16 @@ export function contentSecurityPolicy(
    */
   const google = wallets.googlePay ? ` ${WALLET_ORIGINS.googlePay}` : "";
   const googleFrames = wallets.googlePay ? ` ${WALLET_ORIGINS.collectWalletFrames} ${WALLET_ORIGINS.googlePay}` : "";
+  /** The Google Ads tag the storefront loads (google-tag.ts), appended last in each directive. */
+  const tag = (directive: keyof typeof GOOGLE_TAG_CSP) => ` ${GOOGLE_TAG_CSP[directive].join(" ")}`;
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${gateway} ${collectJsApplePay}${google}`,
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${gateway} ${collectJsApplePay}${google}${tag("script-src")}`,
     `style-src 'self' 'unsafe-inline' ${gateway}`,
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
-    `frame-src 'self' ${gateway}${appleFrames}${googleFrames}`,
-    `connect-src 'self' ${gateway}${appleConnect}${google}`,
+    `frame-src 'self' ${gateway}${appleFrames}${googleFrames}${tag("frame-src")}`,
+    `connect-src 'self' ${gateway}${appleConnect}${google}${tag("connect-src")}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
