@@ -31,7 +31,8 @@ packages/
   email/               Resend email (only file that imports the Resend SDK)
   notify/              Background job worker, templates, handlers
   mock-api/            Contract mock server
-docs/                  Sprint notes + harolds-menu-reconciliation.xlsx (menu seed source)
+docs/                  The cycle (see docs/README.md); docs/reference/ holds the sprint-era notes and runbooks;
+                       docs/harolds-menu-reconciliation.xlsx is the menu seed source
 ```
 
 ## Prerequisites
@@ -73,13 +74,13 @@ Open http://localhost:3000 (storefront placeholder), `/admin`, `/kitchen`.
 
 | Doc | Who |
 |---|---|
-| [`docs/LAUNCH-BLOCKERS.md`](docs/LAUNCH-BLOCKERS.md) | Owner — what must be true before go-live |
-| [`docs/OPERATOR-HANDBOOK.md`](docs/OPERATOR-HANDBOOK.md) | Managers — everyday ops index |
-| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Developer — deploy / rollback |
-| [`docs/CUTOVER-PLAN.md`](docs/CUTOVER-PLAN.md) | Developer + owner — go-live steps (unexecuted) |
-| [`docs/HANDOVER.md`](docs/HANDOVER.md) | Future developer — architecture and deferred work |
-| [`docs/SECURITY.md`](docs/SECURITY.md) | Incidents and credential rotation |
-| [`docs/API-CONTRACT-HANDOFF.md`](docs/API-CONTRACT-HANDOFF.md) | Storefront developer |
+| [`docs/reference/LAUNCH-BLOCKERS.md`](docs/reference/LAUNCH-BLOCKERS.md) | Owner — what must be true before go-live |
+| [`docs/reference/OPERATOR-HANDBOOK.md`](docs/reference/OPERATOR-HANDBOOK.md) | Managers — everyday ops index |
+| [`docs/reference/DEPLOYMENT.md`](docs/reference/DEPLOYMENT.md) | Developer — deploy / rollback |
+| [`docs/reference/CUTOVER-PLAN.md`](docs/reference/CUTOVER-PLAN.md) | Developer + owner — go-live steps (unexecuted) |
+| [`docs/reference/HANDOVER.md`](docs/reference/HANDOVER.md) | Future developer — architecture and deferred work |
+| [`docs/reference/SECURITY.md`](docs/reference/SECURITY.md) | Incidents and credential rotation |
+| [`docs/reference/API-CONTRACT-HANDOFF.md`](docs/reference/API-CONTRACT-HANDOFF.md) | Storefront developer |
 
 ## Scripts
 

@@ -53,7 +53,7 @@ Do **not** import `@harolds/db` or Prisma from the storefront.
 
 ## OpenAPI
 
-- Spec: [`docs/openapi/v1.yaml`](./openapi/v1.yaml)
+- Spec: [`docs/openapi/v1.yaml`](../openapi/v1.yaml)
 - Validate: `pnpm openapi:validate`
 
 ---
