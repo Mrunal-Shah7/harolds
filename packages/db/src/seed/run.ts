@@ -1,22 +1,54 @@
 // SPRINT-11: seed runners — menu and accounts are separate; production cannot restore test logins.
 import { prisma } from "../client";
 import { invalidateStoreConfigCache } from "../store-config";
-import { readWorkbook, slugify, defaultWorkbookPath } from "./workbook";
+import { rebrandUntouchedSeoDefaults } from "../seo";
+import { existsSync } from "node:fs";
+import { readWorkbook, slugify, workbookPathForBranch } from "./workbook";
 import { hashPin } from "../pin";
 import { hashPassword } from "../password";
 import { AdminRole } from "@harolds/types";
+import { adminAccountsPath, readAdminAccounts, seedAdminAccounts } from "./admin-accounts";
+import { branchConfigFor, DEFAULT_BRANCH_NAME, env, getBranchConfig } from "@harolds/config";
 
-/** Agreed store configuration values for Harold's Chicken Burnham. */
+/**
+ * The store facts that differ per location. Burnham's are the agreed values; any other branch
+ * starts from visible placeholders, so the storefront never shows another location's address or
+ * phone. The owner fills them in from the back office (Store page) before going live.
+ */
+const BRANCH_FACTS = {
+  Burnham: {
+    addressLine1: "4709 W 95th St",
+    city: "Burnham",
+    state: "IL",
+    postalCode: "60453-2515",
+    contactPhone: "TODO: CONFIRM PHONE",
+  },
+} as const;
+
+export const PLACEHOLDER_BRANCH_FACTS = {
+  addressLine1: "TODO: SET ADDRESS",
+  city: "TODO: SET CITY",
+  state: "IL",
+  postalCode: "00000",
+  contactPhone: "TODO: CONFIRM PHONE",
+} as const;
+
+const BRANCH = getBranchConfig();
+const FACTS =
+  BRANCH_FACTS[BRANCH.branchName as keyof typeof BRANCH_FACTS] ?? PLACEHOLDER_BRANCH_FACTS;
+
+/** Store configuration seeded for this deployment's branch (STORE_BRANCH_NAME). */
 export const STORE_SEED = {
   id: "default",
-  storeName: "Harold's Chicken Burnham",
-  addressLine1: "4709 W 95th St",
+  storeName: BRANCH.siteName,
+  addressLine1: FACTS.addressLine1 as string,
   addressLine2: null as string | null,
-  city: "Burnham",
-  state: "IL",
-  postalCode: "60453-2515",
-  contactPhone: "TODO: CONFIRM PHONE",
+  city: FACTS.city as string,
+  state: FACTS.state as string,
+  postalCode: FACTS.postalCode as string,
+  contactPhone: FACTS.contactPhone as string,
   timezone: "America/Chicago",
+  // Burnham's rate. CONFIRM for any other location: sales tax differs by municipality.
   taxRateBps: 1010,
   taxAppliedPreDiscount: true,
   orderNumberPrefix: "HC-",
@@ -81,18 +113,29 @@ const TEST_STAFF = [
   },
 ] as const;
 
-export type SeedTarget = "all" | "menu" | "accounts";
+/**
+ * - menu:          menu, store config, hours, SEO names (this branch's workbook)
+ * - accounts:      the REAL back-office accounts from seed-accounts.json (allowed in production)
+ * - test-accounts: the three fixed test logins (development only, never production)
+ * - all:           menu + accounts
+ */
+export type SeedTarget = "all" | "menu" | "accounts" | "test-accounts";
 
 export type SeedArgs = {
   target: SeedTarget;
   nodeEnv: string;
   allowExistingOrders: boolean;
   workbookPath?: string;
+  /** From --branch=<name>: the branch a per-branch script was written for. */
+  branch?: string;
+  /** The private accounts file (seed-accounts.json, or SEED_ACCOUNTS_PATH). */
+  accountsPath: string;
 };
 
 /**
  * Guard that must run before any write. Returns a refusal message or null to proceed.
- * Production never touches test accounts. A database with orders needs an explicit override.
+ * Production never gets the test logins. Catalogue and test-login seeds against a database with
+ * orders need an explicit override; adding real accounts does not touch orders, so it is exempt.
  */
 export function describeSeedRefusal(args: {
   target: SeedTarget;
@@ -100,15 +143,14 @@ export function describeSeedRefusal(args: {
   orderCount: number;
   allowExistingOrders: boolean;
 }): string | null {
-  const wantsAccounts = args.target === "all" || args.target === "accounts";
-  if (wantsAccounts && args.nodeEnv === "production") {
+  if (args.target === "test-accounts" && args.nodeEnv === "production") {
     return [
       "Refusing to create, update, or reactivate test accounts against a production database.",
       "Test logins (test-staff@localhost, test-manager@localhost, test-owner@localhost) must not exist in production.",
-      "To correct catalogue data, run the menu seed only: pnpm db:seed:menu",
+      "For the real back-office accounts run: pnpm db:seed:accounts. To correct catalogue data: pnpm db:seed:menu",
     ].join("\n");
   }
-  if (args.orderCount > 0 && !args.allowExistingOrders) {
+  if (args.target !== "accounts" && args.orderCount > 0 && !args.allowExistingOrders) {
     return [
       `Refusing to seed a database that already contains ${args.orderCount} order(s).`,
       "Pass --allow-existing-orders (or SEED_ALLOW_EXISTING_ORDERS=1) if you intend to run against this database.",
@@ -126,12 +168,32 @@ export function parseSeedArgs(argv: string[], env: NodeJS.ProcessEnv): SeedArgs 
   let target: SeedTarget = "all";
   if (argv.includes("--menu-only")) target = "menu";
   if (argv.includes("--accounts-only")) target = "accounts";
+  if (argv.includes("--test-accounts-only")) target = "test-accounts";
+  const branchArg = argv.find((a) => a.startsWith("--branch="));
   return {
     target,
     nodeEnv: env.NODE_ENV ?? "development",
     allowExistingOrders,
     workbookPath: env.WORKBOOK_PATH,
+    branch: branchArg ? branchArg.slice("--branch=".length) : undefined,
+    accountsPath: adminAccountsPath(env),
   };
+}
+
+/**
+ * The per-branch scripts (`pnpm db:seed:menu:burnham`, `pnpm db:seed:menu:zion`) pass
+ * --branch=<name>. Refuse when it disagrees with this deployment's STORE_BRANCH_NAME: the store
+ * name, SEO names and workbook all follow STORE_BRANCH_NAME, so running another branch's script
+ * against this database would mix two locations.
+ */
+export function describeBranchRefusal(requested: string | undefined, configured: string): string | null {
+  if (requested === undefined) return null;
+  if (slugify(requested) === slugify(configured)) return null;
+  return [
+    `Refusing to seed: this script is for branch "${requested}", but STORE_BRANCH_NAME is "${configured}".`,
+    `Check you are in the right folder and .env. If this database really is ${requested}, set`,
+    `STORE_BRANCH_NAME="${requested}" in .env first (unset means "${DEFAULT_BRANCH_NAME}").`,
+  ].join("\n");
 }
 
 export async function seedMenu(workbookPath: string): Promise<void> {
@@ -331,6 +393,38 @@ export async function seedStoreConfigIfAbsent(): Promise<void> {
   invalidateStoreConfigCache();
 }
 
+/**
+ * The SPRINT-18 migration seeds the SEO site defaults with Burnham's names and domain. On a new
+ * branch's database that row would name the wrong location, and canonicalHost cannot be changed
+ * from the back office. So for a branch other than Burnham, rewrite the row ONLY while it still
+ * holds exactly the migration's values (never an operator's edit), and bump the version as every
+ * SEO write must. The menu route's description is aligned under the same rule.
+ */
+export async function alignSeoDefaultsToBranch(): Promise<void> {
+  const migrated = branchConfigFor(DEFAULT_BRANCH_NAME).siteName;
+  if (BRANCH.siteName === migrated) {
+    console.log("seo_site_defaults: left as-is (Burnham branch)");
+    return;
+  }
+  const host = new URL(env.NEXT_PUBLIC_APP_URL).origin;
+  const changed = await rebrandUntouchedSeoDefaults({
+    fromSiteName: migrated,
+    fromHost: "https://haroldsburnham.com",
+    toSiteName: BRANCH.siteName,
+    toHost: host,
+  });
+  if (!changed) {
+    console.log("seo_site_defaults: left as-is (absent or already edited)");
+    return;
+  }
+  console.log(`seo_site_defaults: set to "${BRANCH.siteName}" on ${host}`);
+  if (host.includes("localhost")) {
+    console.warn(
+      "seo_site_defaults: canonicalHost is a localhost URL — set NEXT_PUBLIC_APP_URL to the live domain before seeding production.",
+    );
+  }
+}
+
 export async function seedTestStaff(): Promise<void> {
   for (const staff of TEST_STAFF) {
     const pinHash = await hashPin(staff.pin);
@@ -377,13 +471,38 @@ export async function runSeed(args: SeedArgs): Promise<{ ok: true } | { ok: fals
     return { ok: false, message: refusal };
   }
 
-  const workbookPath = args.workbookPath ?? defaultWorkbookPath();
-  if (args.target === "all" || args.target === "menu") {
+  const wantsMenu = args.target === "all" || args.target === "menu";
+  const wantsAccounts = args.target === "all" || args.target === "accounts";
+  const { accounts, problems } = wantsAccounts ? readAdminAccounts(args.accountsPath) : { accounts: [], problems: [] };
+  if (problems.length > 0) {
+    return { ok: false, message: ["Refusing to seed: the accounts file has problems.", ...problems].join("\n") };
+  }
+  const branchRefusal = wantsMenu ? describeBranchRefusal(args.branch, BRANCH.branchName) : null;
+  if (branchRefusal) {
+    return { ok: false, message: branchRefusal };
+  }
+  const workbookPath = args.workbookPath ?? workbookPathForBranch(BRANCH.branchName);
+  if (wantsMenu && !existsSync(workbookPath)) {
+    return {
+      ok: false,
+      message: [
+        `No menu workbook for branch "${BRANCH.branchName}": ${workbookPath} does not exist.`,
+        `Add one to docs/menus/ (copy an existing branch's file as the template), or point WORKBOOK_PATH at it.`,
+      ].join("\n"),
+    };
+  }
+  if (wantsMenu) {
+    console.log(`Branch: ${BRANCH.siteName} (STORE_BRANCH_NAME)`);
     console.log(`Seeding menu from ${workbookPath}`);
     await seedMenu(workbookPath);
     await seedStoreConfigIfAbsent();
+    await alignSeoDefaultsToBranch();
   }
   if (args.target === "all" || args.target === "accounts") {
+    console.log(`Seeding back-office accounts from ${args.accountsPath}`);
+    await seedAdminAccounts(accounts);
+  }
+  if (args.target === "test-accounts") {
     await seedTestStaff();
   }
   console.log("Seed complete.");

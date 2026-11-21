@@ -137,6 +137,19 @@ const envSchema = z.object({
 
   // SPRINT-17: TWILIO_* removed with the SMS subsystem. Email is the only notification channel.
 
+  /**
+   * Which Harold's location this deployment is, e.g. "Burnham". Every branded string on the
+   * storefront, back office, kitchen display and wallet sheet is built from it (branch.ts).
+   * Optional so the existing Burnham deployment keeps working with no .env change.
+   */
+  STORE_BRANCH_NAME: z
+    .string()
+    .trim()
+    .min(1, "STORE_BRANCH_NAME must not be empty when set")
+    .max(40, "STORE_BRANCH_NAME must be 40 characters or fewer")
+    .regex(/^[\p{L}\p{N} .'&-]+$/u, "STORE_BRANCH_NAME may contain letters, digits, spaces and . ' & - only")
+    .optional(),
+
   // Optional in development/test — required at production start (Sprint 11)
   EMAIL_API_KEY: z.string().optional(),
   EMAIL_FROM_ADDRESS: z.string().email().optional().or(z.literal("")),

@@ -4,15 +4,18 @@
 // contacted and the CSP is untouched.
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { getBranchConfig } from "@harolds/config";
 import "./admin.css";
 // The shell (session + sidebar) lives in the LAYOUT so a route change inside the group never
 // unmounts it. Only <main> swaps.
 import { AdminShell } from "@/components/admin/AdminShell";
 
-export const metadata: Metadata = {
-  title: "Back office — Harold's Chicken Burnham",
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Metadata {
+  return {
+    title: `Back office — ${getBranchConfig().siteName}`,
+    robots: { index: false, follow: false },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#f7f0e1",

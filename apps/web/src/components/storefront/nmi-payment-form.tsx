@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { useNmiCheckoutConfig } from "@/components/storefront/nmi-checkout-config";
+import { useBranch } from "@/components/branch-context";
 import {
   collectJsWalletOptions,
   GOOGLE_PAY_READY_REQUEST,
@@ -191,6 +192,7 @@ export function NmiPaymentForm({
   // different gateways. Both values come from the server for the active environment
   // (checkout/layout.tsx), so the script and the key always belong to the same gateway.
   const { collectJsUrl, tokenizationKey, wallets } = useNmiCheckoutConfig();
+  const { siteName } = useBranch();
   const hasConfig = collectJsUrl.length > 0 && tokenizationKey.length > 0;
   const walletsOn = wallets.applePay || wallets.googlePay;
 
@@ -294,7 +296,7 @@ export function NmiPaymentForm({
     const delay = configuredPrice.current === null ? 0 : 400;
     const timer = setTimeout(() => {
       if (!window.CollectJS) return;
-      const walletOptions = collectJsWalletOptions(wallets, walletPrice);
+      const walletOptions = collectJsWalletOptions(wallets, walletPrice, siteName);
       const options = baseOptions();
       try {
         setReady(false);
@@ -315,7 +317,7 @@ export function NmiPaymentForm({
       }
     }, delay);
     return () => clearTimeout(timer);
-  }, [walletsOn, hasConfig, sdkLoaded, walletPrice, activeMethod, wallets]);
+  }, [walletsOn, hasConfig, sdkLoaded, walletPrice, activeMethod, wallets, siteName]);
 
   // SPRINT-19: Apple Pay availability. Collect.js draws its <apple-pay-button> only when
   // ApplePaySession.canMakePayments() is true; both are checked, so neither alone can put an

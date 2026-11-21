@@ -31,7 +31,7 @@ packages/
   email/               Resend email (only file that imports the Resend SDK)
   notify/              Background job worker, templates, handlers
   mock-api/            Contract mock server
-docs/                  Sprint notes + harolds-menu-reconciliation.xlsx (menu seed source)
+docs/                  Sprint notes; docs/menus/harolds-<branch>-menu.xlsx (menu seed source, one per branch)
 ```
 
 ## Prerequisites
@@ -57,8 +57,9 @@ pnpm db:generate
 # 4. Apply migrations (development)
 pnpm db:migrate
 
-# 5. Seed menu + store config
-pnpm db:seed
+# 5. Seed this branch's menu + store config (STORE_BRANCH_NAME picks the workbook), then logins
+pnpm db:seed:menu
+pnpm db:seed:test-accounts   # development logins; real accounts: seed-accounts.json + pnpm db:seed:accounts
 
 # 6. Verify invariants
 pnpm db:verify
@@ -92,7 +93,10 @@ Open http://localhost:3000 (storefront placeholder), `/admin`, `/kitchen`.
 | `pnpm db:generate` | Generate Prisma client |
 | `pnpm db:migrate` | Development migrations (`prisma migrate dev`) — never on production |
 | `pnpm db:migrate:deploy` | Production migrations (`prisma migrate deploy`) |
-| `pnpm db:seed` | Idempotent menu + store-config seed |
+| `pnpm db:seed:menu` | Idempotent menu + store-config seed for this branch (`:burnham` / `:zion` variants refuse the wrong branch) |
+| `pnpm db:seed:accounts` | Real back-office accounts from the gitignored `seed-accounts.json`; insert-if-absent, production-safe |
+| `pnpm db:seed:test-accounts` | Three fixed test logins; development only |
+| `pnpm db:seed` | Menu + real accounts together |
 | `pnpm db:verify` | Print seed summary; exit non-zero on invariant violations |
 
 ## For the storefront developer

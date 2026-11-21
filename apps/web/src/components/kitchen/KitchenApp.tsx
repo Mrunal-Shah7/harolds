@@ -20,6 +20,7 @@ import {
 import { playNewTicketChime, playUnackedAlert, unlockKitchenAudio } from "@/lib/kitchen-audio";
 import { escalationLevel, formatElapsed, nextActionLabel, nextActionStatus } from "@/lib/kitchen-escalation";
 import { appearedOrderIds } from "@/lib/kitchen-queue-diff";
+import { useBranch } from "@/components/branch-context";
 import {
   clearSessionToken,
   readAudioUnlocked,
@@ -47,6 +48,7 @@ function printerHealthLine(queue: KitchenQueueResponse | null): { text: string; 
 }
 
 export function KitchenApp() {
+  const branch = useBranch();
   const [view, setView] = useState<View>("boot");
   const [token, setToken] = useState<string | null>(null);
   const [staffName, setStaffName] = useState("");
@@ -290,7 +292,7 @@ export function KitchenApp() {
     return (
       <div className="kds-signin">
         <div className="kds-signin-card">
-          <p className="kds-kicker">Harold&apos;s Burnham</p>
+          <p className="kds-kicker">{branch.shortName}</p>
           <h1 className="kds-title">Kitchen</h1>
         </div>
       </div>

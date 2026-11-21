@@ -26,7 +26,7 @@ Tick nothing you have not personally observed. The point of this document is to 
 
 | # | Check | Expected |
 |---|---|---|
-| B1.1 | `pnpm install && pnpm db:generate && pnpm db:migrate:deploy && pnpm db:seed && pnpm db:verify` from a clean clone of your new commit | Exits 0. 87 items, 8 unverified, 4 provisional. |
+| B1.1 | `pnpm install && pnpm db:generate && pnpm db:migrate:deploy && pnpm db:seed:menu:burnham && pnpm db:verify` from a clean clone of your new commit | Exits 0. 87 items, 8 unverified, 4 provisional. |
 | B1.2 | `pnpm test` | 287 pass. Run it twice; identical counts. |
 | B1.3 | `pnpm dev`, then browse `/api/v1/menu` | 17 categories, 87 items, envelope version 1.2.0. |
 | B1.4 | `POST /api/v1/quote` with a real item id | Priced result whose subtotal + tax + tip equals the total. |
@@ -36,7 +36,7 @@ Tick nothing you have not personally observed. The point of this document is to 
 
 | # | Check | Expected |
 |---|---|---|
-| B2.1 | `NODE_ENV=production pnpm db:seed` | Refuses. Names the test accounts. Exits non-zero. Writes nothing. |
+| B2.1 | `NODE_ENV=production pnpm db:seed:test-accounts` | Refuses. Names the test accounts. Exits non-zero. Writes nothing. |
 | B2.2 | Start with `NODE_ENV=production` and empty email vars | Refuses to start. Names every missing variable at once. |
 | B2.3 | Start with `NODE_ENV=production` and a short print secret | Refuses. Names the length requirement. |
 | B2.4 | Start with `NODE_ENV=production` and placeholder manager alert destinations | Refuses after the database connects. |

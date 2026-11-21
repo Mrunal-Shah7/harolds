@@ -1,5 +1,7 @@
 // Root application layout — shared HTML shell for all route-group surfaces.
 import type { Metadata } from "next";
+import { getBranchConfig } from "@harolds/config";
+import { BranchProvider } from "@/components/branch-context";
 import { ClientErrorReporter } from "@/components/ClientErrorReporter";
 import { rootMetadata } from "@/lib/seo/page";
 // Self-hosted poster/display/body/utility faces.
@@ -30,7 +32,7 @@ export default function RootLayout({
     <html lang="en" data-theme="light" className={fontVariables} suppressHydrationWarning>
       <body>
         <ClientErrorReporter />
-        {children}
+        <BranchProvider value={getBranchConfig()}>{children}</BranchProvider>
       </body>
     </html>
   );

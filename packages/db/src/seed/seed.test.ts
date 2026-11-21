@@ -9,13 +9,21 @@ loadDotenv({ path: path.join(rootDir, ".env") });
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { prisma } from "../client";
-import { describeSeedRefusal, parseSeedArgs, seedStoreConfigIfAbsent, STORE_SEED } from "./run";
+import {
+  describeBranchRefusal,
+  describeSeedRefusal,
+  parseSeedArgs,
+  seedStoreConfigIfAbsent,
+  STORE_SEED,
+} from "./run";
+import { readWorkbook, workbookPathForBranch } from "./workbook";
+import { parseAdminAccounts, readAdminAccounts } from "./admin-accounts";
 import { invalidateStoreConfigCache } from "../store-config";
 
 describe("seed guards", () => {
   it("refuses test accounts in production with a clear message", () => {
     const message = describeSeedRefusal({
-      target: "accounts",
+      target: "test-accounts",
       nodeEnv: "production",
       orderCount: 0,
       allowExistingOrders: false,
@@ -26,15 +34,23 @@ describe("seed guards", () => {
     assert.match(message, /db:seed:menu/);
   });
 
-  it("refuses the combined seed in production even on an empty database", () => {
+  it("allows the combined seed (menu + real accounts) in production on an empty database", () => {
     const message = describeSeedRefusal({
       target: "all",
       nodeEnv: "production",
       orderCount: 0,
-      allowExistingOrders: true,
+      allowExistingOrders: false,
     });
-    assert.ok(message);
-    assert.match(message, /test accounts/);
+    assert.equal(message, null);
+  });
+
+  it("allows the real accounts seed in production, even once orders exist", () => {
+    for (const orderCount of [0, 12]) {
+      assert.equal(
+        describeSeedRefusal({ target: "accounts", nodeEnv: "production", orderCount, allowExistingOrders: false }),
+        null,
+      );
+    }
   });
 
   it("allows the menu seed in production when the database has no orders", () => {
@@ -67,7 +83,7 @@ describe("seed guards", () => {
 
   it("the override flag still cannot create test accounts in production", () => {
     const message = describeSeedRefusal({
-      target: "accounts",
+      target: "test-accounts",
       nodeEnv: "production",
       orderCount: 12,
       allowExistingOrders: true,
@@ -91,6 +107,7 @@ describe("parseSeedArgs", () => {
   it("splits menu and accounts via flags", () => {
     assert.equal(parseSeedArgs(["--menu-only"], { NODE_ENV: "development" }).target, "menu");
     assert.equal(parseSeedArgs(["--accounts-only"], { NODE_ENV: "development" }).target, "accounts");
+    assert.equal(parseSeedArgs(["--test-accounts-only"], { NODE_ENV: "development" }).target, "test-accounts");
     assert.equal(parseSeedArgs([], { NODE_ENV: "development" }).target, "all");
   });
 
@@ -98,6 +115,64 @@ describe("parseSeedArgs", () => {
     assert.equal(parseSeedArgs(["--allow-existing-orders"], {}).allowExistingOrders, true);
     assert.equal(parseSeedArgs([], { SEED_ALLOW_EXISTING_ORDERS: "1" }).allowExistingOrders, true);
     assert.equal(parseSeedArgs([], {}).allowExistingOrders, false);
+  });
+
+  it("reads the branch a per-branch script was written for", () => {
+    assert.equal(parseSeedArgs(["--menu-only", "--branch=Zion"], {}).branch, "Zion");
+    assert.equal(parseSeedArgs(["--menu-only"], {}).branch, undefined);
+  });
+});
+
+describe("real back-office accounts file", () => {
+  const good = { email: " Owner@Example.com ", password: "Str0ng-enough", displayName: "Owner", role: "owner" };
+
+  it("accepts a valid file and normalises email and role", () => {
+    const { accounts, problems } = parseAdminAccounts({ accounts: [good] });
+    assert.deepEqual(problems, []);
+    assert.equal(accounts[0]?.email, "owner@example.com");
+    assert.equal(accounts[0]?.role, "OWNER");
+  });
+
+  it("rejects a password the back office would reject, naming the account but never the password", () => {
+    const { accounts, problems } = parseAdminAccounts({ accounts: [{ ...good, password: "Sh@61" }] });
+    assert.equal(accounts.length, 0, "nothing is seeded when any row is bad");
+    assert.equal(problems.length, 1);
+    assert.match(problems[0] ?? "", /owner@example\.com.*at least 8 characters/);
+    assert.doesNotMatch(problems[0] ?? "", /Sh@61/);
+  });
+
+  it("reports every problem at once: bad email, duplicate, missing name, unknown role", () => {
+    const { problems } = parseAdminAccounts({
+      accounts: [good, { ...good }, { ...good, email: "not-an-email" }, { ...good, email: "b@x.com", displayName: "", role: "BOSS" }],
+    });
+    assert.ok(problems.some((p) => /listed twice/.test(p)));
+    assert.ok(problems.some((p) => /not an email/.test(p)));
+    assert.ok(problems.some((p) => /displayName/.test(p)));
+    assert.ok(problems.some((p) => /role/.test(p)));
+  });
+
+  it("explains a missing file instead of seeding nothing silently", () => {
+    const { problems } = readAdminAccounts(path.join(path.dirname(fileURLToPath(import.meta.url)), "no-such-accounts.json"));
+    assert.match(problems.join(" "), /seed-accounts\.example\.json/);
+  });
+});
+
+describe("per-branch menu seeding", () => {
+  it("refuses another branch's script, and allows its own (case-insensitive) or none", () => {
+    assert.match(describeBranchRefusal("Zion", "Burnham") ?? "", /for branch "Zion", but STORE_BRANCH_NAME is "Burnham"/);
+    assert.match(describeBranchRefusal("Burnham", "Zion") ?? "", /Refusing to seed/);
+    assert.equal(describeBranchRefusal("zion", "Zion"), null);
+    assert.equal(describeBranchRefusal(undefined, "Zion"), null);
+  });
+
+  it("gives each branch its own workbook, and every committed one parses", () => {
+    for (const branch of ["Burnham", "Zion"]) {
+      const file = workbookPathForBranch(branch);
+      assert.ok(file.endsWith(path.join("docs", "menus", `harolds-${branch.toLowerCase()}-menu.xlsx`)));
+      const data = readWorkbook(file);
+      assert.ok(data.items.length > 0, `${branch} workbook has items`);
+    }
+    assert.notEqual(workbookPathForBranch("Burnham"), workbookPathForBranch("Zion"));
   });
 });
 

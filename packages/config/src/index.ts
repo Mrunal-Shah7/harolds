@@ -70,3 +70,9 @@ export {
   type NmiGatewayUrls,
 } from "./nmi-gateway";
 export { GOOGLE_TAG_ID, GOOGLE_TAG_JS_URL, GOOGLE_TAG_CSP } from "./google-tag";
+export {
+  getBranchConfig,
+  branchConfigFor,
+  DEFAULT_BRANCH_NAME,
+  type BranchConfig,
+} from "./branch";

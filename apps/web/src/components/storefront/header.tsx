@@ -14,6 +14,7 @@
 import Link from "next/link";
 import type { StoreStatus } from "@harolds/types";
 import { useCart } from "@/lib/cart-context";
+import { useBranch } from "@/components/branch-context";
 import { StoreStatusPill } from "@/components/storefront/store-status-pill";
 
 export function StorefrontHeader({
@@ -33,11 +34,12 @@ export function StorefrontHeader({
   showCart?: boolean;
 }) {
   const { totalItems } = useCart();
+  const { siteName } = useBranch();
 
   return (
     <header className="sf-header" role="banner">
       <div className="container">
-        <Link href="/" className="wordmark" aria-label="Harold's Chicken Burnham, home">
+        <Link href="/" className="wordmark" aria-label={`${siteName}, home`}>
           {/* Intrinsic size given so the row reserves its space before the image decodes. */}
           <img src="/logo.png" alt="Harold's Chicken" width={1314} height={580} />
         </Link>

@@ -267,3 +267,45 @@ export async function getMenuLastModified(): Promise<Date | null> {
   const dates = [items._max.updatedAt, categories._max.updatedAt].filter((d): d is Date => d instanceof Date);
   return dates.length > 0 ? new Date(Math.max(...dates.map((d) => d.getTime()))) : null;
 }
+
+/**
+ * Seed-time only (packages/db/src/seed/run.ts): point the SEO site defaults at a new branch's
+ * name and domain, but ONLY while they still hold exactly the migration's values — never over an
+ * operator's edit. Bumps the version like every SEO write. No audit row: there is no acting
+ * admin, and the row has never been edited by one. Returns whether anything was written.
+ */
+export async function rebrandUntouchedSeoDefaults(args: {
+  fromSiteName: string;
+  fromHost: string;
+  toSiteName: string;
+  toHost: string;
+}): Promise<boolean> {
+  const { fromSiteName: from, fromHost, toSiteName: to, toHost } = args;
+  return prisma.$transaction(async (tx) => {
+    const site = await tx.seoSiteDefaults.findUnique({ where: { id: "default" } });
+    const untouched =
+      site !== null &&
+      site.siteName === from &&
+      site.canonicalHost === fromHost &&
+      site.defaultTitle === from &&
+      site.titleTemplate === `{pageTitle} | ${from}` &&
+      site.defaultDescription === `Order pickup online from ${from}.`;
+    if (!untouched) return false;
+    await tx.seoSiteDefaults.update({
+      where: { id: "default" },
+      data: {
+        siteName: to,
+        canonicalHost: toHost,
+        defaultTitle: to,
+        titleTemplate: `{pageTitle} | ${to}`,
+        defaultDescription: `Order pickup online from ${to}.`,
+        version: { increment: 1 },
+      },
+    });
+    await tx.seoRouteOverride.updateMany({
+      where: { routeKey: "menu", description: `The full ${from} menu. Order online for pickup.` },
+      data: { description: `The full ${to} menu. Order online for pickup.` },
+    });
+    return true;
+  });
+}

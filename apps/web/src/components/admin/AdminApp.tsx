@@ -2317,7 +2317,8 @@ function StaffView() {
             <option>OWNER</option>
           </select>
         </label>
-        <label className="adm-field">Password<input name="password" type="password" required minLength={10} /></label>
+        {/* minLength mirrors PASSWORD_MIN_LENGTH in packages/db/src/password.ts */}
+        <label className="adm-field">Password<input name="password" type="password" required minLength={8} /></label>
         <label className="adm-field">PIN (optional)<input name="pin" pattern="[0-9]{4,8}" /></label>
       </AdminForm>
       <div className="adm-table-wrap">

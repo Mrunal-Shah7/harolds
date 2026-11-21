@@ -23,6 +23,9 @@ import { firstInvalidFieldId, hasAnyError, validateCheckout } from "./checkout-v
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+/** The Apple Pay merchant line; in the app it is useBranch().siteName. */
+const LABEL = "Harold's Chicken Test Branch";
+
 describe("tab visibility: flags × availability", () => {
   const flagCases = [
     { applePay: false, googlePay: false },
@@ -173,7 +176,7 @@ describe("the wallet price is the server's total, untouched", () => {
     const page = readFileSync(path.join(here, "../app/(storefront)/checkout/page.tsx"), "utf8");
     assert.match(page, /const walletPrice = walletPriceFromQuote\(quote\);/);
     const form = readFileSync(path.join(here, "../components/storefront/nmi-payment-form.tsx"), "utf8");
-    assert.match(form, /collectJsWalletOptions\(wallets, walletPrice\)/);
+    assert.match(form, /collectJsWalletOptions\(wallets, walletPrice, siteName\)/);
   });
 
   it("a TIP CHANGE changes the price Collect.js is configured with (quote → config)", () => {
@@ -181,8 +184,8 @@ describe("the wallet price is the server's total, untouched", () => {
     // Two server quotes for the same cart, before and after choosing a 20% tip.
     const before = walletPriceFromQuote({ totalGatewayAmount: "16.50" })!;
     const after = walletPriceFromQuote({ totalGatewayAmount: "19.80" })!;
-    assert.equal(collectJsWalletOptions(flags, before).price, "16.50");
-    assert.equal(collectJsWalletOptions(flags, after).price, "19.80");
+    assert.equal(collectJsWalletOptions(flags, before, LABEL).price, "16.50");
+    assert.equal(collectJsWalletOptions(flags, after, LABEL).price, "19.80");
     // And the sheet cannot open on the old one: Collect.js still holding 16.50 blocks it.
     const gate = (configuredPrice: string): SheetGateInput => ({
       fieldsValid: true,
@@ -201,16 +204,17 @@ describe("the wallet price is the server's total, untouched", () => {
 
 describe("the Collect.js wallet configuration", () => {
   it("configures only the flagged wallets", () => {
-    assert.deepEqual(Object.keys(collectJsWalletOptions({ applePay: false, googlePay: false }, "1.00").fields), []);
-    assert.deepEqual(Object.keys(collectJsWalletOptions({ applePay: true, googlePay: false }, "1.00").fields), ["applePay"]);
-    assert.deepEqual(Object.keys(collectJsWalletOptions({ applePay: false, googlePay: true }, "1.00").fields), ["googlePay"]);
+    assert.deepEqual(Object.keys(collectJsWalletOptions({ applePay: false, googlePay: false }, "1.00", LABEL).fields), []);
+    assert.deepEqual(Object.keys(collectJsWalletOptions({ applePay: true, googlePay: false }, "1.00", LABEL).fields), ["applePay"]);
+    assert.deepEqual(Object.keys(collectJsWalletOptions({ applePay: false, googlePay: true }, "1.00", LABEL).fields), ["googlePay"]);
   });
 
   it("asks each wallet for the MINIMUM that yields the billing postal code, and nothing else", () => {
-    const { fields } = collectJsWalletOptions({ applePay: true, googlePay: true }, "1.00");
+    const { fields } = collectJsWalletOptions({ applePay: true, googlePay: true }, "1.00", LABEL);
     const apple = fields.applePay as Record<string, unknown>;
     const google = fields.googlePay as Record<string, unknown>;
     assert.equal(apple.selector, `#${WALLET_MOUNT_ID.apple_pay}`);
+    assert.equal(apple.totalLabel, LABEL, "the sheet names this deployment's branch");
     assert.deepEqual(apple.requiredBillingContactFields, ["postalAddress"]);
     assert.equal(apple.contactFields, undefined, "no phone, no email");
     assert.equal(apple.requiredShippingContactFields, undefined, "no shipping");

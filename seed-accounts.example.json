@@ -1,0 +1,10 @@
+{
+  "accounts": [
+    {
+      "email": "owner@example.com",
+      "password": "8-or-more-chars-with-a-number-1",
+      "displayName": "Owner Name",
+      "role": "OWNER"
+    }
+  ]
+}

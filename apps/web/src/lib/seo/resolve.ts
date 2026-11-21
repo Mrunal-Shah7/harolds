@@ -15,8 +15,12 @@
 import type { SeoSnapshot } from "@harolds/types";
 import { DEFAULT_SHARE_IMAGE_PATH, seoRoute } from "./routes";
 
-/** Last-resort title when even the site name is empty. Matches the seeded site name. */
-export const SITE_NAME_FALLBACK = "Harold's Chicken Burnham";
+/**
+ * Last-resort title when even the site name is empty. The brand alone, with no location: this
+ * module also runs in the browser (admin preview), so it cannot read the branch config, and the
+ * brand is correct for every branch.
+ */
+export const SITE_NAME_FALLBACK = "Harold's Chicken";
 
 export type RouteTemplate = {
   title?: string | null;
@@ -46,7 +50,7 @@ function nonEmpty(v: string | null | undefined): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
-/** "https://haroldsburnham.com/" + path, with no query string and no trailing-slash ambiguity. */
+/** "https://<canonical host>/" + path, with no query string and no trailing-slash ambiguity. */
 export function canonicalUrl(canonicalHost: string, path: string): string {
   const origin = canonicalHost.replace(/\/+$/, "");
   const clean = (path.split(/[?#]/)[0] ?? "/").replace(/\/+$/, "");

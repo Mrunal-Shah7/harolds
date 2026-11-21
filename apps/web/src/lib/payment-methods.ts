@@ -161,8 +161,15 @@ export function sheetBlockerMessage(blocker: SheetBlocker): string {
  * Apple offers no ZIP-only field, so `postalAddress`; Google's `MIN` format is ZIP, country and
  * name. No phone, no email, no shipping — the order uses the pickup name and phone typed on the
  * page, and nothing the sheet returns is sent to our server.
+ *
+ * `totalLabel` is the merchant line on the Apple Pay sheet: the branch's site name
+ * (useBranch().siteName, from STORE_BRANCH_NAME).
  */
-export function collectJsWalletOptions(flags: WalletFlags, price: string): {
+export function collectJsWalletOptions(
+  flags: WalletFlags,
+  price: string,
+  totalLabel: string,
+): {
   price: string;
   fields: Record<string, Record<string, unknown>>;
 } {
@@ -171,7 +178,7 @@ export function collectJsWalletOptions(flags: WalletFlags, price: string): {
     fields.applePay = {
       selector: `#${WALLET_MOUNT_ID.apple_pay}`,
       requiredBillingContactFields: ["postalAddress"],
-      totalLabel: "Harold's Chicken Burnham",
+      totalLabel,
       type: "buy",
       // Apple's own button, in one of the three styles its guidelines allow.
       style: { "button-style": "black", height: "44px", "border-radius": "8px" },

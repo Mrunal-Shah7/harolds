@@ -19,7 +19,9 @@ describe("password hashing", () => {
   });
 
   it("rejects short, letter-only, and obvious passwords", () => {
-    assert.throws(() => assertPasswordPolicy("short1"), /at least 10/);
+    assert.throws(() => assertPasswordPolicy("short1"), /at least 8/);
+    assert.throws(() => assertPasswordPolicy("Short@1"), /at least 8/, "7 characters is one too few");
+    assertPasswordPolicy("Shrt@610"); // exactly 8: accepted
     assert.throws(() => assertPasswordPolicy("allletters"), /letter and one number/);
     assert.throws(() => assertPasswordPolicy("password123"), /stronger/);
     assert.throws(() => assertPasswordPolicy("test-owner12", "test-owner@localhost"), /email name/);

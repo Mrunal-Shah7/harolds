@@ -1,11 +1,6 @@
 // SPRINT-1 / SPRINT-11: idempotent seed CLI — menu and accounts are separately invocable.
-import path from "node:path";
-import { config as loadDotenv } from "dotenv";
-import { fileURLToPath } from "node:url";
-
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-loadDotenv({ path: path.join(rootDir, ".env") });
-
+// Must stay the first import: it fills process.env before ./run loads @harolds/config.
+import "./load-env";
 import { prisma } from "../client";
 import { parseSeedArgs, runSeed } from "./run";
 

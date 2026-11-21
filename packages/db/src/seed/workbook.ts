@@ -11,9 +11,17 @@ type WorkBook = import("xlsx").WorkBook;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Default workbook path: tracked copy under `docs/`. */
-export function defaultWorkbookPath(): string {
-  return path.resolve(__dirname, "../../../../docs/harolds-menu-reconciliation.xlsx");
+/** Every branch's menu workbook lives here, one file per branch. */
+export const MENUS_DIR = path.resolve(__dirname, "../../../../docs/menus");
+
+/**
+ * The menu workbook for a branch: docs/menus/harolds-<branch>-menu.xlsx, e.g. "Burnham" →
+ * harolds-burnham-menu.xlsx, "Zion" → harolds-zion-menu.xlsx. There is deliberately no shared
+ * default file, so one branch's menu can never be seeded into another branch's database by
+ * accident.
+ */
+export function workbookPathForBranch(branchName: string): string {
+  return path.join(MENUS_DIR, `harolds-${slugify(branchName)}-menu.xlsx`);
 }
 
 export type CategoryRow = {
@@ -167,7 +175,7 @@ function sheetRows(workbook: WorkBook, name: string): Record<string, unknown>[] 
   });
 }
 
-export function readWorkbook(filePath: string = defaultWorkbookPath()): WorkbookData {
+export function readWorkbook(filePath: string): WorkbookData {
   const workbook = XLSX.readFile(filePath);
 
   // --- categories ---

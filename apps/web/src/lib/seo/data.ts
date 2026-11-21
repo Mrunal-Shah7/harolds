@@ -19,7 +19,7 @@
 // worker that handled the save. See docs/SPRINT-18-NOTES.md §6.3 before changing `instances`.
 import { unstable_cache } from "next/cache";
 import type { SeoSnapshot } from "@harolds/types";
-import { emitLog } from "@harolds/config";
+import { emitLog, env, getBranchConfig } from "@harolds/config";
 import { loadSeoSnapshot } from "@harolds/db";
 
 export const SEO_CACHE_TAG = "seo";
@@ -33,9 +33,12 @@ const readSnapshot = unstable_cache(() => loadSeoSnapshot(), ["sprint18-seo-snap
 /**
  * Served only when the database cannot be read at all. It suppresses the Restaurant node
  * (isConfigured false) and keeps the pre-sprint title and description, so an outage degrades to
- * "no structured data" rather than to a 500 on every storefront page. The host is the
- * operator-confirmed canonical origin, the same value the migration seeds.
+ * "no structured data" rather than to a 500 on every storefront page. The names come from this
+ * deployment's branch (STORE_BRANCH_NAME) and the host from NEXT_PUBLIC_APP_URL, so a second
+ * location never falls back to another location's name or domain.
  */
+const FALLBACK_SITE_NAME = getBranchConfig().siteName;
+
 export const FALLBACK_SEO_SNAPSHOT: SeoSnapshot = {
   version: 0,
   business: {
@@ -61,11 +64,11 @@ export const FALLBACK_SEO_SNAPSHOT: SeoSnapshot = {
     updatedAt: new Date(0).toISOString(),
   },
   site: {
-    siteName: "Harold's Chicken Burnham",
-    canonicalHost: "https://haroldsburnham.com",
-    defaultTitle: "Harold's Chicken Burnham",
-    titleTemplate: "{pageTitle} | Harold's Chicken Burnham",
-    defaultDescription: "Order pickup online from Harold's Chicken Burnham.",
+    siteName: FALLBACK_SITE_NAME,
+    canonicalHost: new URL(env.NEXT_PUBLIC_APP_URL).origin,
+    defaultTitle: FALLBACK_SITE_NAME,
+    titleTemplate: `{pageTitle} | ${FALLBACK_SITE_NAME}`,
+    defaultDescription: `Order pickup online from ${FALLBACK_SITE_NAME}.`,
     defaultOgImageUrl: null,
     locale: "en_US",
     twitterHandle: null,

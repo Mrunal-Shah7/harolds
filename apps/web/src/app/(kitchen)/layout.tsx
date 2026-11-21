@@ -4,12 +4,15 @@
 // and the CSP is untouched.
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { getBranchConfig } from "@harolds/config";
 import "./kitchen.css";
 
-export const metadata: Metadata = {
-  title: "Kitchen — Harold's Chicken Burnham",
+export function generateMetadata(): Metadata {
+  const { siteName } = getBranchConfig();
+  return {
+  title: `Kitchen — ${siteName}`,
   applicationName: "Harold's Kitchen",
-  description: "Kitchen display for Harold's Chicken Burnham",
+  description: `Kitchen display for ${siteName}`,
   // SPRINT-18: the kitchen display was indexable until now. Never for a crawler.
   robots: { index: false, follow: false },
   manifest: "/kitchen/manifest.webmanifest",
@@ -22,7 +25,8 @@ export const metadata: Metadata = {
     icon: "/kitchen/icon-192.png",
     apple: "/kitchen/icon-192.png",
   },
-};
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#141110",

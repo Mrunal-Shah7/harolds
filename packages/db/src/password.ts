@@ -55,9 +55,16 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/**
+ * Minimum admin password length. 8 is the NIST SP 800-63B floor; lowered from 10 at the owner's
+ * request so existing passwords carry over. The admin staff form (AdminApp.tsx, minLength) must
+ * match this value.
+ */
+export const PASSWORD_MIN_LENGTH = 8;
+
 export function assertPasswordPolicy(password: string, email?: string): void {
-  if (password.length < 10) {
-    throw new PasswordTooWeakError("Password must be at least 10 characters.");
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    throw new PasswordTooWeakError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
   }
   if (password.length > 200) {
     throw new PasswordTooWeakError("Password is too long.");
